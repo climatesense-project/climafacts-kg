@@ -23,7 +23,8 @@ jobs:
             exit 1
           fi
           echo "Downloading 'climafacts_kg.ttl' asset from: $RELEASE_URL"
-          curl -L -o "$FILE_NAME" "$RELEASE_URL"          
+          curl -L -o "$FILE_NAME" "$RELEASE_URL"  
+          touch .nojekyll
           echo "::set-output name=downloaded_file::${FILE_NAME}"
 
       - name: Setup Pages
