@@ -1,0 +1,42 @@
+name: Deploy Released ClimaFactsKG TTL to GH-Pages
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Get latest release asset
+        id: get_asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FILE_NAME="climafacts_kg.ttl"
+          RELEASE_URL=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                        "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+                        jq -r '.assets[] | select(.name == "${FILE_NAME}") | .browser_download_url')
+          if [ -z "$RELEASE_URL" ]; then
+            echo "Error: File '${FILE_NAME}' not found in the latest release assets."
+            exit 1
+          fi
+          echo "Downloading 'climafacts_kg.ttl' asset from: $RELEASE_URL"
+          curl -L -o "$FILE_NAME" "$RELEASE_URL"          
+          echo "::set-output name=downloaded_file::${FILE_NAME}"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload TTL to GH-Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: . 
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
