@@ -47,14 +47,10 @@ jobs:
           done
       - if: steps.release-status.outputs.released == 'true'
         name: Convert TTL to RDF
-        run: >
+        run: |
           cd ${{github.workspace}}
-
           pip install rdflib
-
-          python -c "from rdflib import Graph; g = Graph();
-          g.parse('data/climafacts_kg.ttl', format='turtle');
-          g.serialize(destination='data/climafacts_kg.rdf', format='xml')"
+          python -c "from rdflib import Graph; g = Graph(); g.parse('data/climafacts_kg.ttl', format='turtle'); g.serialize(destination='data/climafacts_kg.rdf' format='xml')"
         shell: bash
       - if: steps.release-status.outputs.released == 'true'
         name: Add TTL and RDF to Release
