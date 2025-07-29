@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.4 (2025-07-29)
+
+### Bug Fixes
+
+- Workflows formatting
+  ([`d437208`](https://github.com/climatesense-project/climafacts-kg/commit/d4372089d7370be3811a5e7e5a1f67bafda786fb))
+
+
 ## v1.0.3 (2025-07-29)
 
 
