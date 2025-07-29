@@ -1,6 +1,5 @@
 # CHANGELOG
 
-<!-- version list -->
 
 ## v1.0.9 (2025-07-29)
 
@@ -57,6 +56,9 @@
 
 ### Bug Fixes
 
+- Missing comma in semantic-release.yml
+  ([`6be5143`](https://github.com/climatesense-project/climafacts-kg/commit/6be514396ba4bbef3441eb61d0bf46907debec35))
+
 - Update TTL conversion in semantic-release.yml
   ([`2f30a7a`](https://github.com/climatesense-project/climafacts-kg/commit/2f30a7a54e41bf9d9432d8c45a152eddb81e0d94))
 
@@ -83,6 +85,11 @@
 - Update gh-pages-publish.yml token
   ([`eb64ec6`](https://github.com/climatesense-project/climafacts-kg/commit/eb64ec618a528b37f27c9852ae040ec0e99b4844))
 
+Update token access in gh-pages-publish.yml
+
+- Update semantic-release.yml workflow for not publishing on PyPi
+  ([`d68b3d6`](https://github.com/climatesense-project/climafacts-kg/commit/d68b3d6e2e7ab33bdf0e600d4f66cb558908ae83))
+
 - Use RDF instead of TTL in gh-pages-publish.yml
   ([`aa2de5e`](https://github.com/climatesense-project/climafacts-kg/commit/aa2de5e4e08a8724c33e9b911162ffd0b3937767))
 
@@ -102,10 +109,10 @@
 - Add TTL publish action
   ([`28cc8aa`](https://github.com/climatesense-project/climafacts-kg/commit/28cc8aabe9ce6576712c7f8dcbd0ff5e86f046a4))
 
+Create gh-pages-publish.yml GitHub action for uploading the TTL ClimaFactsKG to GH-Pages.
+
 - First version of the ClimaFactsKG source code
   ([`c5ff907`](https://github.com/climatesense-project/climafacts-kg/commit/c5ff90798e7d5f84f48fe56cdd99280972ef4529))
 
 
 ## v0.1.0 (2025-07-26)
-
-- Initial Release

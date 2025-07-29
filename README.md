@@ -2,6 +2,7 @@
 
 ![Source code icense](https://img.shields.io/badge/Source_code_license-MIT-blue.svg?style=flat)
 ![ClimaFactsKG license](https://img.shields.io/badge/ClimaFactsKG_license-CC%20BY%204.0-success.svg?style=flat)
+[![Create Release](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml)
 [![Publish ClimaFactsKG RDF](https://github.com/climatesense-project/climafacts-kg/actions/workflows/gh-pages-publish.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/gh-pages-publish.yml)
 
 > [ClimaFactsKG](https://purl.net/climafactskg/ns) is a knowledge graph designed to combat pervasive climate misinformation by linking 252 common climate myths with scientific corrections.
