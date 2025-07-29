@@ -13,23 +13,54 @@ jobs:
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
-      - name: Create Semantic Release
-        uses: matteo4diani/poetry-semantic-release@v0
-        id: create-release
+      - name: Configure Python Environment (v3.13)
+        uses: actions/setup-python@v5.6.0
         with:
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
           python-version: 3.13
-      - name: Convert TTL to RDF
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Check Release Status
+        id: release-status
+        shell: bash
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          pip install python-semantic-release
+          if semantic-release --noop --strict version
+          then
+          echo "Releasing new version."
+          else
+          echo "Skipping release steps."
+          fi
+      - if: steps.release-status.outputs.released == 'true'
+        name: Release to GitHub
+        id: github-release
+        shell: bash
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          semantic-release version
+          git fetch --tags
+          for file in ./dist/**
+          do gh release upload "${{ steps.release-status.outputs.tag }}" $file
+          done
+      - if: steps.release-status.outputs.released == 'true'
+        name: Convert TTL to RDF
         run: >
           cd ${{github.workspace}}
-          pip install rdflib
-          python -c "from rdflib import Graph; g = Graph(); g.parse('data/climafacts_kg.ttl', format='turtle'); g.serialize(destination='data/climafacts_kg.rdf', format='xml')"
 
+          pip install rdflib
+
+          python -c "from rdflib import Graph; g = Graph();
+          g.parse('data/climafacts_kg.ttl', format='turtle');
+          g.serialize(destination='data/climafacts_kg.rdf', format='xml')"
         shell: bash
-      - name: Add TTL and RDF to Release
+      - if: steps.release-status.outputs.released == 'true'
+        name: Add TTL and RDF to Release
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: >
+        run: |
           cd ${{github.workspace}}
           gh release upload "${{steps.create-release.outputs.tag}}"
           data/climafacts_kg.rdf#climafacts_kg.ttl
