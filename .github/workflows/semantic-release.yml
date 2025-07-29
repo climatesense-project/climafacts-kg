@@ -58,7 +58,7 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           cd ${{github.workspace}}
-          gh release upload "${{steps.release-status.outputs.tag}}" data/climafacts_kg.rdf#climafacts_kg.ttl
+          gh release upload "${{steps.release-status.outputs.tag}}" data/climafacts_kg.ttl#climafacts_kg.ttl
           gh release upload "${{steps.release-status.outputs.tag}}" data/climafacts_kg.rdf#climafacts_kg.rdf
         shell: bash
     outputs:
