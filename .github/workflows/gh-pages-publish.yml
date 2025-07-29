@@ -16,22 +16,14 @@ jobs:
         id: get_asset
         run: >
           FILE_NAME="climafacts_kg.rdf"
-
-          RELEASE_URL=$(curl -s "https://api.github.com/repos/${{
-          github.repository }}/releases/latest" | jq -r ".assets[] |
-          select(.name == \"${FILE_NAME}\") | .browser_download_url")
-
+          RELEASE_URL=$(curl -s "https://api.github.com/repos/${{github.repository }}/releases/latest" | jq -r ".assets[] | select(.name == \"${FILE_NAME}\") | .browser_download_url")
           if [ -z "$RELEASE_URL" ]; then
             echo "Error: File '${FILE_NAME}' not found in the latest release assets: '${RELEASE_URL}'"
             exit 1
           fi
-
           echo "Downloading 'climafacts_kg.rdf' asset from: $RELEASE_URL"
-
           curl -L -o "$FILE_NAME" "$RELEASE_URL"
-
           touch .nojekyll
-
           echo "::set-output name=downloaded_file::${FILE_NAME}"
       - name: Setup Pages
         uses: actions/configure-pages@v5
