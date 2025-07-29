@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.5 (2025-07-29)
+
+### Bug Fixes
+
+- Vars in semantic-release.yml
+  ([`852466c`](https://github.com/climatesense-project/climafacts-kg/commit/852466cc55c58088518958560ff1ec992f9b411a))
+
+
 ## v1.0.4 (2025-07-29)
 
 ### Bug Fixes
