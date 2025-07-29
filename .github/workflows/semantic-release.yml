@@ -1,0 +1,42 @@
+name: Create Release
+'on':
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Create Semantic Release
+        uses: matteo4diani/poetry-semantic-release@v0
+        id: create-release
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          python-version: 3.13
+      - name: Convert TTL to RDF
+        run: >
+          cd ${{github.workspace}}
+          pip install rdflib
+          python -c "from rdflib import Graph; g = Graph(); g.parse('data/climafacts_kg.ttl', format='turtle'); g.serialize(destination='data/climafacts_kg.rdf', format='xml')"
+
+        shell: bash
+      - name: Add TTL and RDF to Release
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: >
+          cd ${{github.workspace}}
+          gh release upload "${{steps.create-release.outputs.tag}}"
+          data/climafacts_kg.rdf#climafacts_kg.ttl
+          gh release upload "${{steps.create-release.outputs.tag}}"
+          data/climafacts_kg.rdf#climafacts_kg.rdf
+        shell: bash
+    outputs:
+      released: '${{ steps.create-release.outputs.released }}'
+      tag: '${{ steps.create-release.outputs.tag }}'
+      version: '${{ steps.create-release.outputs.version }}'

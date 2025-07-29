@@ -1,0 +1,113 @@
+[tool.poetry]
+name = "climafactskg"
+version = "0.1.0"
+description = "ClimaFactsKG is a knowledge graph designed to combat pervasive climate misinformation by linking common climate myths with scientific corrections. ClimaFactsKG is integrated with CimpleKG."
+authors = ["Grégoire Burel <423662+evhart@users.noreply.github.com>"]
+readme = "README.md"
+include = [
+    { path = "README.md", format = "sdist" },
+    { path = "pyproject.toml", format = "sdist" },
+    { path = "LICENSE", format = "sdist" },
+]
+homepage = "https://github.com/climatesense-project/climafacts-kg"
+repository = "https://github.com/climatesense-project/climafacts-kg"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Operating System :: OS Independent",
+]
+keywords = ["nlp", "misinformation", "knowledge graph", "climate change"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+usingversion = "^0.1.2"
+pandas = "^2.2.3"
+beautifulsoup4 = "^4.13.4"
+langcodes = "^3.5.0"
+python-dotenv = "^1.1.0"
+tinydb = "^4.8.2"
+tinydb-serialization = "^2.2.0"
+rdflib = "^7.1.4"
+rdflib-endpoint = "^0.5.3"
+uvicorn = "^0.34.2"
+sparqlwrapper = "^2.0.0"
+sentence-transformers = "^5.0.0"
+langdetect = "^1.0.9"
+iso639 = "^0.1.4"
+typer = "^0.16.0"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.11.2"
+pre-commit = "^4.2.0"
+python-semantic-release = "^9.12.0"
+
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:tool.poetry.version"]
+branch = "main"
+upload_to_PyPI = false
+upload_to_release = true
+build_command = "pip install poetry && poetry build"
+commit_author = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = [
+    "build",
+    "chore",
+    "ci",
+    "docs",
+    "feat",
+    "fix",
+    "perf",
+    "style",
+    "refactor",
+    "test",
+]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+
+[tool.poetry.scripts]
+climafactskg = "climafactskg.cli:app"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff]
+line-length = 120
+extend-include = ["*.ipynb"]
+src = []
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "N",  # PEP8 naming convetions
+    "D",  # pydocstyle
+]
+ignore = [
+    "C901", # too complex
+    "W191", # indentation contains tabs
+    "D401", # imperative mood
+    "D107", # TODO remove docstring warning.
+    "D104", # TODO remove docstring warning.
+    "D103", # TODO remove docstring warning.
+    "D102", # TODO remove docstring warning.
+    "D101", # TODO remove docstring warning.
+    "D100", # TODO remove docstring warning.
+    "D105", # TODO remove docstring warning.
+    "W291",
+]
+exclude = ["data/raw/*", "LICENSE", "README.md"]

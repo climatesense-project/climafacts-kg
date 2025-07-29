@@ -1,0 +1,531 @@
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix : <https://purl.net/climafactskg/ns#> .
+
+:CARDS rdf:type skos:ConceptScheme ;
+    skos:prefLabel "CARDS"@en ;
+    skos:definition "Computer Assisted Recognition of Denial and Skepticism texonomy for categorising misinformation about climate change."@en ;
+    skos:hasTopConcept :0 ;
+    skos:hasTopConcept :1 ;
+    skos:hasTopConcept :2 ;
+    skos:hasTopConcept :3 ;
+    skos:hasTopConcept :4 ;
+    skos:hasTopConcept :5 .
+
+:0 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:topConceptOf :CARDS ;
+    #skos:narrower :0_0 ;
+    skos:prefLabel "Not climate misinformation or related to the climate."@en .
+
+# :0_0 rdf:type skos:Concept ;
+#     skos:inScheme :CARDS ;
+#     #skos:prefLabel "Not climate misinformation or related to the climate"@en ;
+#     #skos:broader :0 ;
+#     skos:exactMatch :0 .
+
+:1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:topConceptOf :CARDS ;
+    skos:prefLabel "Global warming is not happening"@en ;
+    skos:narrower :1_1 ;
+    skos:narrower :1_2 ;
+    skos:narrower :1_3 ;
+    skos:narrower :1_4 ;
+    skos:narrower :1_5 ;
+    skos:narrower :1_6 ;
+    skos:narrower :1_7 ;
+    skos:narrower :1_8 .
+
+
+:2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:topConceptOf :CARDS ;
+    skos:prefLabel "Human GHGs are not causing global warming"@en ;
+    skos:narrower :2_1 ;
+    skos:narrower :2_2 ;
+    skos:narrower :2_3 ;
+    skos:narrower :2_4 ;
+    skos:narrower :2_5 .
+
+
+:3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:topConceptOf :CARDS ;
+    skos:prefLabel "Climate impacts are not bad"@en ;
+    skos:narrower :3_1 ;
+    skos:narrower :3_2 ;
+    skos:narrower :3_3 ;
+    skos:narrower :3_4 ;
+    skos:narrower :3_5 ;
+    skos:narrower :3_6 .
+
+:4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:topConceptOf :CARDS ;
+    skos:prefLabel "Climate solutions won't work"@en ;
+    skos:narrower :4_1 ;
+    skos:narrower :4_2 ;
+    skos:narrower :4_3 ;
+    skos:narrower :4_4 ;
+    skos:narrower :4_5 .
+
+:5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:topConceptOf :CARDS ;
+    skos:prefLabel "Climate movement/science is unreliable"@en ;
+    skos:narrower :5_1 ;
+    skos:narrower :5_2 ;
+    skos:narrower :5_3 .
+
+# ------------ Sub-concepts for 1 ------------
+:1_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Ice isn't melting"@en ;
+    skos:broader :1 ;
+    skos:narrower :1_1_1 ;
+    skos:narrower :1_1_2 ;
+    skos:narrower :1_1_3 ;
+    skos:narrower :1_1_4 .
+
+:1_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Heading into ice age"@en ;
+    skos:broader :1 .
+
+:1_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Weather is cold"@en ;
+    skos:broader :1 .
+
+:1_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Hiatus in warming"@en ;
+    skos:broader :1 .
+
+:1_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Oceans are cooling"@en ;
+    skos:broader :1 .
+
+:1_6 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "See level rise is exagerated"@en ;
+    skos:broader :1 .
+
+:1_7 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Extremes aren't increasing"@en ;
+    skos:broader :1 .
+
+:1_8 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Changed the name"@en ;
+    skos:broader :1 .
+
+# ------------ Sub-concepts for 2 ------------
+:2_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "It's natural cycles"@en ;
+    skos:broader :2 ;
+    skos:narrower :2_1_1 ;
+    skos:narrower :2_1_2 ;
+    skos:narrower :2_1_3 ;
+    skos:narrower :2_1_4 ;
+    skos:narrower :2_1_5 .
+
+:2_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Non-GHG forcings"@en ;
+    skos:broader :2 .
+
+:2_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "No evidence for GHE"@en ;
+    skos:broader :2 ;
+    skos:narrower :2_3_1 ;
+    skos:narrower :2_3_2 ;
+    skos:narrower :2_3_3 ;
+    skos:narrower :2_3_4 ;
+    skos:narrower :2_3_5 ;
+    skos:narrower :2_3_6 .
+
+:2_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "CO2 not rising"@en ;
+    skos:broader :2 .
+
+:2_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Emissions not raising CO2 levels"@en ;
+    skos:broader :2 .
+
+# ------------ Sub-concepts for 3 ------------
+:3_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Sensitivity is low"@en ;
+    skos:broader :3 .
+
+:3_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "No species impact"@en ;
+    skos:broader :3 ;
+    skos:narrower :3_2_1 ;
+    skos:narrower :3_2_2 ;
+    skos:narrower :3_2_3 .
+
+:3_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Not a pollutant"@en ;
+    skos:broader :3 ;
+    skos:narrower :3_3_1 .
+
+:3_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Only a few degrees"@en ;
+    skos:broader :3 .
+
+:3_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "No link to conflict"@en ;
+    skos:broader :3 .
+
+:3_6 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "No health impacts"@en ;
+    skos:broader :3 .
+
+# ------------ Sub-concepts for 4 ------------
+:4_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policies are harmful"@en ;
+    skos:broader :4 ;
+    skos:narrower :4_1_1 ;
+    skos:narrower :4_1_2 ;
+    skos:narrower :4_1_3 ;
+    skos:narrower :4_1_4 ;
+    skos:narrower :4_1_5 .
+
+:4_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policies are ineffective"@en ;
+    skos:broader :4 ;
+    skos:narrower :4_2_1 ;
+    skos:narrower :4_2_2 ;
+    skos:narrower :4_2_3 ;
+    skos:narrower :4_2_4 ;
+    skos:narrower :4_2_5 ;
+    skos:narrower :4_2_6 ;
+    skos:narrower :4_2_7 .
+
+:4_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Too hard"@en ;
+    skos:broader :4 ;
+    skos:narrower :4_3_1 ;
+    skos:narrower :4_3_2 .
+
+:4_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Clean energy won't work"@en ;
+    skos:broader :4 ;
+    skos:narrower :4_4_1 ;
+    skos:narrower :4_4_2 .
+
+:4_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "We need energy"@en ;
+    skos:broader :4 ;
+    skos:narrower :4_5_1 ;
+    skos:narrower :4_5_2 ;
+    skos:narrower :4_5_3 .
+
+# ------------ Sub-concepts for 5 ------------
+:5_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Science is unreliable"@en ;
+    skos:broader :5 ;
+    skos:narrower :5_1_1 ;
+    skos:narrower :5_1_2 ;
+    skos:narrower :5_1_3 ;
+    skos:narrower :5_1_4 .
+
+:5_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Movement is unreliable"@en ;
+    skos:broader :5 ;
+    skos:narrower :5_2_1 ;
+    skos:narrower :5_2_2 ;
+    skos:narrower :5_2_3 ;
+    skos:narrower :5_2_4 ;
+    skos:narrower :5_2_5 .
+
+:5_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Climate is conspiracy"@en ;
+    skos:broader :5 ;
+    skos:narrower :5_3_1 ;
+    skos:narrower :5_3_2 .
+
+
+# ------------ Sub-concepts for 1.1 ------------
+:1_1_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Antartica isn't melting"@en ;
+    skos:broader :1_1 .
+
+:1_1_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Greenland isn't melting"@en ;
+    skos:broader :1_1 .
+
+:1_1_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Artic isn't melting"@en ;
+    skos:broader :1_1 .
+
+:1_1_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Glaciers aren't vanishing"@en ;
+    skos:broader :1_1 .
+
+# ------------ Sub-concepts for 2.1 ------------
+:2_1_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "It's the sun"@en ;
+    skos:broader :2_1 .
+
+:2_1_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "It's geological"@en ;
+    skos:broader :2_1 .
+
+:2_1_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "It's the ocean"@en ;
+    skos:broader :2_1 .
+
+:2_1_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Past climate change"@en ;
+    skos:broader :2_1 .
+
+:2_1_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Tiny CO2 emissions"@en ;
+    skos:broader :2_1 .
+
+# ------------ Sub-concepts for 2.3 ------------
+:2_3_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "CO2 is trace gas"@en ;
+    skos:broader :2_3 .
+
+:2_3_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "GHE is saturated"@en ;
+    skos:broader :2_3 .
+
+:2_3_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "CO2 lags climate"@en ;
+    skos:broader :2_3 .
+
+:2_3_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Water vapor"@en ;
+    skos:broader :2_3 .
+
+:2_3_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Tropospheric hot spot"@en ;
+    skos:broader :2_3 .
+
+:2_3_6 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "CO2 high in past"@en ;
+    skos:broader :2_3 .
+
+# ------------ Sub-concepts for 3.2 ------------
+:3_2_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Species can adapt"@en ;
+    skos:broader :3_2 .
+
+:3_2_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Polar bears ok"@en ;
+    skos:broader :3_2 .
+
+:3_2_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Oceans are ok"@en ;
+    skos:broader :3_2 .
+
+
+# ------------ Sub-concepts for 3.3 ------------
+:3_3_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "CO2 is plant food"@en ;
+    skos:broader :3_3 .
+
+
+# ------------ Sub-concepts for 4.1 ------------
+:4_1_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policy increases costs"@en ;
+    skos:broader :4_1 .
+
+:4_1_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policy weakens security"@en ;
+    skos:broader :4_1 .
+
+:4_1_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policy harms environment"@en ;
+    skos:broader :4_1 .
+
+:4_1_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Rich future generations"@en ;
+    skos:broader :4_1 .
+
+:4_1_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Limits freedom"@en ;
+    skos:broader :4_1 .
+
+
+# ------------ Sub-concepts for 4.2 ------------
+:4_2_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Green jobs don't work"@en ;
+    skos:broader :4_2 .
+
+:4_2_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Markets more efficient"@en ;
+    skos:broader :4_2 .
+
+:4_2_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policy impact is negligible"@en ;
+    skos:broader :4_2 .
+
+:4_2_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "One country is negligible"@en ;
+    skos:broader :4_2 .
+
+:4_2_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Better to adapt"@en ;
+    skos:broader :4_2 .
+
+:4_2_6 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "China's emissions"@en ;
+    skos:broader :4_2 .
+
+:4_2_7 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Techno fix"@en ;
+    skos:broader :4_2 .
+
+# ------------ Sub-concepts for 4.3 ------------
+:4_3_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policy too difficult"@en ;
+    skos:broader :4_3 .
+
+:4_3_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Low public support"@en ;
+    skos:broader :4_3 .
+
+# ------------ Sub-concepts for 4.4 ------------
+:4_4_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Clean energy unreliable"@en ;
+    skos:broader :4_4 .
+
+:4_4_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "CCS is unproven"@en ;
+    skos:broader :4_4 .
+
+# ------------ Sub-concepts for 4.5 ------------
+:4_5_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "FF is plentiful"@en ;
+    skos:broader :4_5 .
+
+:4_5_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "FF are cheap"@en ;
+    skos:broader :4_5 .
+
+:4_5_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Nuclear is good"@en ;
+    skos:broader :4_5 .
+
+# ------------ Sub-concepts for 5.1 ------------
+:5_1_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "No consensus"@en ;
+    skos:broader :5_1 .
+
+:5_1_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Proxies are unreliable"@en ;
+    skos:broader :5_1 .
+
+:5_1_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Temp is unreliable"@en ;
+    skos:broader :5_1 .
+
+:5_1_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Models are unreliable"@en ;
+    skos:broader :5_1 .
+
+# ------------ Sub-concepts for 5.2 ------------
+:5_2_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Climate is religion"@en ;
+    skos:broader :5_2 .
+
+:5_2_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Media is alarmist"@en ;
+    skos:broader :5_2 .
+
+:5_2_3 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Politicians are biased"@en ;
+    skos:broader :5_2 .
+
+:5_2_4 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Environmentalists are alarmist"@en ;
+    skos:broader :5_2 .
+
+:5_2_5 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Scientist are biased"@en ;
+    skos:broader :5_2 .
+
+# ------------ Sub-concepts for 5.3 ------------
+:5_3_1 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Policy is conspiracy"@en ;
+    skos:broader :5_3 .
+
+:5_3_2 rdf:type skos:Concept ;
+    skos:inScheme :CARDS ;
+    skos:prefLabel "Science is conspiracy"@en ;
+    skos:broader :5_3 .

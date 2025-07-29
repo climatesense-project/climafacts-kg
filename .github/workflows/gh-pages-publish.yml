@@ -1,8 +1,9 @@
 name: Deploy Released ClimaFactsKG RDF to GH-Pages
-on:
+'on':
   release:
-    types: [published]
-  workflow_dispatch:
+    types:
+      - published
+  workflow_dispatch: null
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -11,29 +12,33 @@ jobs:
       pages: write
       id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
       - name: Get latest release asset
         id: get_asset
-        run: |
+        run: >
           FILE_NAME="climafacts_kg.rdf"
-          RELEASE_URL=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r ".assets[] | select(.name == \"${FILE_NAME}\") | .browser_download_url")
+
+          RELEASE_URL=$(curl -s "https://api.github.com/repos/${{
+          github.repository }}/releases/latest" | jq -r ".assets[] |
+          select(.name == \"${FILE_NAME}\") | .browser_download_url")
+
           if [ -z "$RELEASE_URL" ]; then
             echo "Error: File '${FILE_NAME}' not found in the latest release assets: '${RELEASE_URL}'"
             exit 1
           fi
-          echo "Downloading 'climafacts_kg.rdf' asset from: $RELEASE_URL"
-          curl -L -o "$FILE_NAME" "$RELEASE_URL"  
-          touch .nojekyll
-          echo "::set-output name=downloaded_file::${FILE_NAME}"
 
+          echo "Downloading 'climafacts_kg.rdf' asset from: $RELEASE_URL"
+
+          curl -L -o "$FILE_NAME" "$RELEASE_URL"
+
+          touch .nojekyll
+
+          echo "::set-output name=downloaded_file::${FILE_NAME}"
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
       - name: Upload TTL to GH-Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: . 
+          path: .
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
