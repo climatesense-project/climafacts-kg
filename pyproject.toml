@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "climafactskg"
-version = "0.1.0"
+version = "1.0.0"
 description = "ClimaFactsKG is a knowledge graph designed to combat pervasive climate misinformation by linking common climate myths with scientific corrections. ClimaFactsKG is integrated with CimpleKG."
 authors = ["Grégoire Burel <423662+evhart@users.noreply.github.com>"]
 readme = "README.md"
