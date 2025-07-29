@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.8 (2025-07-29)
+
+### Bug Fixes
+
+- Workflow trigger
+  ([`ffe0129`](https://github.com/climatesense-project/climafacts-kg/commit/ffe0129147a0e3c784faba377773653c824db089))
+
+
 ## v1.0.7 (2025-07-29)
 
 ### Bug Fixes
