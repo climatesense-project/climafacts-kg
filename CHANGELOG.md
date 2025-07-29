@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.2 (2025-07-29)
+
+### Bug Fixes
+
+- Update TTL conversion in semantic-release.yml
+  ([`2f30a7a`](https://github.com/climatesense-project/climafacts-kg/commit/2f30a7a54e41bf9d9432d8c45a152eddb81e0d94))
+
+
 ## v1.0.1 (2025-07-29)
 
 
