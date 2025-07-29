@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.6 (2025-07-29)
+
+### Bug Fixes
+
+- File extension in semantic-release.yml
+  ([`034992c`](https://github.com/climatesense-project/climafacts-kg/commit/034992c8896ca9a95365ef25ff5ae4e48e8651d5))
+
+
 ## v1.0.5 (2025-07-29)
 
 ### Bug Fixes
