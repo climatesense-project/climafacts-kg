@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.9 (2025-07-29)
+
+### Bug Fixes
+
+- Add env token to workflow
+  ([`74ddcff`](https://github.com/climatesense-project/climafacts-kg/commit/74ddcffd2734e1be7fa3179968ae2fe17f7330aa))
+
+
 ## v1.0.8 (2025-07-29)
 
 ### Bug Fixes
