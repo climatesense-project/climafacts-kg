@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.7 (2025-07-29)
+
+### Bug Fixes
+
+- Use trigger event for publishing graph
+  ([`3cc88ef`](https://github.com/climatesense-project/climafacts-kg/commit/3cc88effc9d23a7660b34b66befc800f89bd4bbe))
+
+
 ## v1.0.6 (2025-07-29)
 
 ### Bug Fixes
