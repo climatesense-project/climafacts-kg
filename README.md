@@ -48,10 +48,29 @@ The main mappings used to represent the Skeptical Science data in ClimaFactsKG a
 | *Related Argument*             | →     | `seeAlso`                                                | <https://skepticalscience.com/global-cooling-january-2007-to-january-2008.htm>                                       |
 | *source: (...)*                | →     | `sc:citation`                                            | <https://wattsupwiththat.wordpress.com/2008/02/19/january-2008-4-sources-say-globally-cooler-in-the-past-12-months/> |
 
-## 🚧 ClimaFactsKG Source Code
-The source code of ClimaFactsKG is currently undergoing some updates and will be published soon here.
+## 🖥️ ClimaFactsKG Source Code
+The data and source code releases can be found on the [releases page](https://github.com/climatesense-project/climafacts-kg/releases).
 
-The data releases can be found on the [releases page](https://github.com/climatesense-project/climafacts-kg/releases).
+### ⌨️ Command Line Interface (CLI)
+ClimaFactsKG has a simple CLI interface that be accessed using the `climafactskg` command. The command line interface can be used for serving ClimaFactsKG (after [downloading](https://purl.archive.org/climafactskg/ns) or generating the RDF file).
+
+```
+ Usage: python -m climafactskg.cli [OPTIONS] COMMAND [ARGS]...
+
+ 🌍 ClimaFactsKG - An Interlinked Knowledge Graph of Scientific Evidence to Fight Climate Misinformation
+
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --version  -v        Show the installed climafactskg version.                                            │
+│ --help               Show this message and exit.                                                         │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────────────────────────────────╮
+│ collect    Collect data for the ClimaFactsKG knowledge graph.                                            │
+│ process    Process collected data and store it in the knowledge graph.                                   │
+│ build      Build the ClimaFactsKG knowledge graph.                                                       │
+│ classify   Classify text using CARDS.                                                                    │
+│ serve      Create a SPARQL endpoint for serving a knowledge graph.                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
 
 ## ©️ Licenses
 ClimaFactsKG source code is released under the [MIT license](https://opensource.org/license/mit), whereas the knowledge graph is released under the [Creative Commons Attribution 4.0 International (CC-BY 4.0) license](https://creativecommons.org/licenses/by/4.0/).
