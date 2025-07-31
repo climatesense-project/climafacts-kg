@@ -25,6 +25,7 @@ WHERE {
     ?cl schema:text ?text .
 }
 ORDER BY DESC(?date_published)
+LIMIT 100
 """
 
 
@@ -40,30 +41,31 @@ def fetch_claims() -> pd.DataFrame:
     return results
 
 
-def process_claims(
-    db: TinyDB,
-    claims_df: pd.DataFrame,
-    filter_lang: str = "en",
-) -> None:
+def process_claims(db: TinyDB, claims_df: pd.DataFrame) -> None:
     for _, row in track(claims_df.iterrows(), total=claims_df.shape[0], description="Processing claims"):
         text = row.get("text")
 
         # Check if URL not already in database
         if not db.contains(where("url") == row.get("rev")):
+            print(f"Processing claim with URL: {row.get('rev')}")
             if isinstance(text, str) and text.strip():
+                lang = None
                 try:
-                    if not filter_lang or detect(text) == filter_lang:
-                        mapping = {
-                            "url": row.get("rev"),
-                            "date_published": row.get("date_published"),
-                            "claim": text,
-                        }
-                        db.insert(mapping)
+                    lang = detect(text)
                 except Exception as e:
                     logger.warning(f"Language detection failed for text: {text[:30]}... Error: {e}")
+                mapping = {
+                    "url": row.get("rev"),
+                    "date_published": row.get("date_published"),
+                    "claim": text,
+                    "lang": lang,
+                }
+                db.insert(mapping)
+        else:
+            logger.info(f"Skipping already processed claim with URL: {row.get('rev')}")
 
 
-def classify_claims(db: TinyDB) -> None:
+def classify_claims(db: TinyDB, filter_lang: str = "en") -> None:
     """Classifies claims in the TinyDB database using the CARDSClassifier.
 
     This function iterates over all claims in the provided TinyDB instance.
@@ -72,25 +74,34 @@ def classify_claims(db: TinyDB) -> None:
 
     Args:
         db (TinyDB): The TinyDB database instance containing claims to classify.
+        filter_lang (str): Language code to filter claims for classification (default is "en").
 
     Returns:
         None
     """
     classifier = CARDSClassifier()
 
-    for claim in track(db.all(), description="Classifying claims"):
+    if filter_lang:
+        sel = db.search(where("lang") == filter_lang)
+        logger.info(f"Classifying {len(sel)} claims in language '{filter_lang}'")
+    else:
+        logger.info("Classifying all claims in the database")
+        sel = db.all()
+
+    for claim in track(sel, description="Classifying claims"):
         if "cards_category" not in claim and "claim" in claim:
             text = claim["claim"]
             prediction = classifier.classify(text)
             db.update({"cards_category": prediction}, doc_ids=[claim.doc_id])
 
 
-def process_all(db: TinyDB, claims_df: pd.DataFrame) -> None:
+def process_all(db: TinyDB, claims_df: pd.DataFrame, filter_lang: str = "en") -> None:
     """Fetches claims from CimpleKG, processes them, and stores them in the TinyDB database.
 
     Args:
         db (TinyDB): The TinyDB database instance where claims will be stored.
         claims_df (pd.DataFrame): DataFrame containing claims to be processed.
+        filter_lang (str): Language code to filter claims for classification (default is "en").
 
     Returns:
         None
@@ -98,7 +109,7 @@ def process_all(db: TinyDB, claims_df: pd.DataFrame) -> None:
     logger.info("Processing claims...")
     process_claims(db, claims_df)
     logger.info("Classifying claims...")
-    classify_claims(db)
+    classify_claims(db, filter_lang=filter_lang)
 
 
 if __name__ == "__main__":

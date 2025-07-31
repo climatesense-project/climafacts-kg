@@ -375,3 +375,17 @@ def parse_translated_article(url: str, html: Optional[str] = None, language_code
             article["main_url"] = lang["url"]
 
     return article
+
+
+if __name__ == "__main__":
+    # Example usage:
+    from climafactskg.classifiers.cards import CARDSMatcher
+    from climafactskg.utils import print_dict_tree
+
+    taxonomy = parse_taxonomy()
+    print_dict_tree(taxonomy, main_key="url", list_key="subcategories")
+
+    cm = CARDSMatcher()
+    print(cm.clean("This is some testing text with some 'climate' myths."))
+
+    print(cm.classify("Mikes Nature trick hide the decline"))

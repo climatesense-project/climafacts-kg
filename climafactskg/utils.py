@@ -4,7 +4,7 @@ import os
 import re
 import tempfile
 from datetime import datetime, timedelta
-from typing import Dict
+from typing import Dict, Optional
 from urllib.parse import urljoin
 
 import bs4
@@ -154,3 +154,45 @@ def hash_string(s: str) -> str:
         str: The hexadecimal representation of the MD5 hash of the input string.
     """
     return hashlib.md5(s.encode("utf-8")).hexdigest()
+
+
+def print_dict_tree(
+    data: list[Dict],
+    main_key: str = "title",
+    list_key: str = "sublist",
+    indent: int = 0,
+    _counter: Optional[list] = None,
+) -> None:
+    """Recursively prints a list of dictionaries as a tree structure and prints the total number of items at the end.
+
+    Each dictionary should contain a 'title' key and optionally a 'subcategories' key
+    which is a list of dictionaries in the same format.
+
+    Args:
+        data (list[Dict]): The list of dictionaries to print.
+        main_key (str, optional): The key to use for the main label in each dictionary. Defaults to "title".
+        list_key (str, optional): The key to use for subcategories in each dictionary. Defaults to "sublist".
+        indent (int, optional): The current indentation level. Defaults to 0.
+    """
+    if _counter is None:
+        _counter = [0]
+        root_call = True
+    else:
+        root_call = False
+
+    for item in data:
+        title = item.get(main_key, "")
+        print("│  " * indent + f"├─ {title}")
+        _counter[0] += 1
+        subcategories = item.get(list_key, [])
+        if isinstance(subcategories, list) and subcategories:
+            print_dict_tree(
+                subcategories,
+                main_key=main_key,
+                list_key=list_key,
+                indent=indent + 1,
+                _counter=_counter,
+            )
+
+    if root_call:
+        print(f"\nTotal items: {_counter[0]}")

@@ -23,7 +23,7 @@ classifiers = [
 keywords = ["nlp", "misinformation", "knowledge graph", "climate change"]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.14"
 usingversion = "^0.1.2"
 pandas = "^2.2.3"
 beautifulsoup4 = "^4.13.4"
@@ -39,6 +39,8 @@ sentence-transformers = "^5.0.0"
 langdetect = "^1.0.9"
 iso639 = "^0.1.4"
 typer = "^0.16.0"
+spacy = "^3.8.7"
+en-core-web-sm = {url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.2"

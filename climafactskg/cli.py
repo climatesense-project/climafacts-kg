@@ -92,10 +92,10 @@ def build(
     cards_ttl: str = typer.Option("data/cards.ttl", help="Path to the CARDS TTL file."),
     cimplekg_db: str = typer.Option("data/cimplekg_mappings_db.json", help="Path to the CimpleKG claims database."),
     output: str = typer.Option(
-        "data/climafacts_kg.rdf",
+        "data/climafacts_kg.ttl",
         help="Path to the output file for the ClimaFactsKG knowledge graph.",
     ),
-    output_format: str = typer.Option("xml", help="Format of the output file."),
+    output_format: str = typer.Option("ttl", help="Format of the output file."),
 ):
     """Build the ClimaFactsKG knowledge graph."""
     from climafactskg.builders.climafactskg import build_climafactskg
