@@ -4,6 +4,8 @@ import typer
 from dotenv import load_dotenv
 from typing_extensions import Annotated
 
+from climafactskg.collectors.skepticalscience import fetch_misinformers_urls
+
 load_dotenv()
 app = typer.Typer(add_completion=False)
 
@@ -44,39 +46,43 @@ def collect():
     fetch_arguments_urls(
         ignore_urls=["https://skepticalscience.com/wigley-santer-2012-attribution.html"],
     )
+    fetch_misinformers_urls()
     fetch_claims()
 
 
 @app.command()
 def process(
     climafactskg_db: str = typer.Option(
-        "data/skepticalscience_arguments_db.json",
+        "data/skepticalscience_arguments_db.db",
         help="Path to the SkepticalScience arguments database.",
     ),
-    cimplekg_db: str = typer.Option("data/cimplekg_mappings_db.json", help="Path to the CimpleKG claims database."),
+    misinformers_db: str = typer.Option(
+        "data/skepticalscience_misinformers.db",
+        help="Path to the SkepticalScience misinformers database.",
+    ),
+    cimplekg_db: str = typer.Option("data/cimplekg_mappings_db.db", help="Path to the CimpleKG claims database."),
 ):
     """Process collected data and store it in the knowledge graph."""
-    from tinydb import JSONStorage, TinyDB
-    from tinydb_serialization import SerializationMiddleware
-    from tinydb_serialization.serializers import DateTimeSerializer
+    import preserve
 
     import climafactskg.collectors.cimplekg as cimplekg_collectors
     import climafactskg.collectors.skepticalscience as skepticalscience_collectors
 
     load_dotenv()
-    serialization = SerializationMiddleware(JSONStorage)
-    serialization.register_serializer(DateTimeSerializer(), "TinyDate")
 
     ignore_urls = ["https://skepticalscience.com/wigley-santer-2012-attribution.html"]
 
-    with TinyDB(cimplekg_db, storage=serialization) as db:
-        db.default_table_name = "mappings"
+    with preserve.open(format="sqlite", filename=cimplekg_db) as db:
         cimplekg_collectors.process_all(db, cimplekg_collectors.fetch_claims())
 
-    with TinyDB(climafactskg_db, storage=serialization) as db:
-        db.default_table_name = "arguments"
+    with preserve.open(format="sqlite", filename=misinformers_db) as db:
+        skepticalscience_collectors.process_misinformers_urls(
+            db,
+            skepticalscience_collectors.fetch_misinformers_urls(ignore_urls=ignore_urls),
+        )
 
-        skepticalscience_collectors.process_urls(
+    with preserve.open(format="sqlite", filename=climafactskg_db) as db:
+        skepticalscience_collectors.process_all(
             db=db,
             urls=skepticalscience_collectors.fetch_arguments_urls(ignore_urls=ignore_urls),
             ignore_urls=ignore_urls,
@@ -86,11 +92,11 @@ def process(
 @app.command()
 def build(
     climafactskg_db: str = typer.Option(
-        "data/skepticalscience_arguments_db.json",
+        "data/skepticalscience_arguments_db.db",
         help="Path to the SkepticalScience arguments database.",
     ),
     cards_ttl: str = typer.Option("data/cards.ttl", help="Path to the CARDS TTL file."),
-    cimplekg_db: str = typer.Option("data/cimplekg_mappings_db.json", help="Path to the CimpleKG claims database."),
+    cimplekg_db: str = typer.Option("data/cimplekg_mappings_db.db", help="Path to the CimpleKG claims database."),
     output: str = typer.Option(
         "data/climafacts_kg.ttl",
         help="Path to the output file for the ClimaFactsKG knowledge graph.",
@@ -137,6 +143,27 @@ def serve(
 
     app = climafactskg_to_sparql_endpoint(rdf, format=rdf_format)
     serve_endpoint(app, host=host, port=port)
+
+
+# create a command that export the db file to json
+@app.command()
+def export(
+    db: str = typer.Option(
+        "data/skepticalscience_arguments_db.db",
+        help="Path to the SkepticalScience arguments database.",
+    ),
+    output: str = typer.Option(
+        "data/skepticalscience_arguments_db.json",
+        help="Path to the output JSON file.",
+    ),
+):
+    """Export a Preserve database to a JSON file."""
+    import preserve
+
+    from climafactskg.utils import preserve_to_json
+
+    with preserve.open(format="sqlite", filename=db) as db_conn:
+        preserve_to_json(db_conn, output)
 
 
 if __name__ == "__main__":

@@ -377,6 +377,111 @@ def parse_translated_article(url: str, html: Optional[str] = None, language_code
     return article
 
 
+def parse_misinformer_article(url: str, html: Optional[str] = None) -> dict:
+    """Parses a Skeptical Science 'misinformer' article and extracts the author name and quotes.
+
+    Args:
+        url (str): The URL of the article to parse.
+        html (Optional[str], optional): The HTML content of the article.
+            If not provided, it will be fetched from the URL.
+
+    Returns:
+        dict: A dictionary containing:
+            - 'url' (str): The URL of the article.
+            - 'author_name' (Optional[str]): The name of the author or source.
+            - 'quotes' (List[dict]): A list of dictionaries, each containing:
+                - 'quote' (Optional[str]): The extracted quote text.
+                - 'date' (Optional[datetime]): The date associated with the quote.
+                - 'url' (Optional[str]): The URL of the quote source.
+                - 'argument_url' (Optional[str]): The URL to the related argument on Skeptical Science.
+    """
+    author_name = None
+    quotes = []
+
+    if html is None:
+        # If no HTML is provided, fetch it from the URL:
+        html = fetch_url_content(url)
+
+    # Parse the HTML content using BeautifulSoup:
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Check article type:
+    if "Climate Misinformation by Source" in soup.text:
+        # Source article:
+        h1_elem = soup.select_one("#centerColumn > h1")
+        if h1_elem and h1_elem.text:
+            author_name = h1_elem.text.split(":")[-1].strip()
+
+        for i, j in zip(
+            soup.select("#centerColumn > table > tr .footnote > td:nth-child(1)"),
+            soup.select("#centerColumn > table > tr .footnote > td:nth-child(2) > a"),
+        ):
+            argument_url = None
+            quote = None
+            quote_date = None
+            quote_url = None
+
+            a_tag = i.select_one("a")
+            if a_tag is not None and a_tag.has_attr("href"):
+                quote_url = str(a_tag["href"]).strip()
+
+            result = re.search(r"^\"((.|\s|\r)+)\"(\d.+)\(Source\)$", i.text)
+            if result:
+                quote = result.group(1).strip()
+                quote_date = datetime.strptime(result.group(3).strip(), "%d %B %Y")
+
+            argument_url = urljoin("https://skepticalscience.com/", str(j["href"]).strip())
+
+            quotes.append(
+                {
+                    "quote": quote,
+                    "quote_date": quote_date,
+                    "quote_url": quote_url,
+                    "argument_url": argument_url,
+                }
+            )
+    else:
+        # Politician article
+        h1_elem = soup.select_one("#centerColumn > h1")
+        if h1_elem and h1_elem.text:
+            author_name = h1_elem.text.strip()
+
+        for i, j in zip(
+            soup.select("#centerColumn > table > tr.footnote > td:nth-child(1)"),
+            soup.select("#centerColumn > table > tr > td:nth-child(2) > a"),
+        ):
+            argument_url = None
+            quote = None
+            quote_date = None
+            quote_url = None
+
+            a_tag = i.select_one("a")
+            if a_tag is not None and a_tag.has_attr("href"):
+                quote_url = str(a_tag["href"]).strip()
+
+            result = re.search(r"^\"((.|\s|\r)+)\"(\d.+)\(Source\)$", i.text)
+            if result:
+                quote = result.group(1).strip()
+                quote_date = datetime.strptime(result.group(3).strip(), "%d %B %Y")
+
+            argument_url = urljoin("https://skepticalscience.com/", str(j["href"]).strip())
+
+            quotes.append(
+                {
+                    "quote": quote,
+                    "quote_date": quote_date,
+                    "quote_url": quote_url,
+                    "argument_url": argument_url,
+                }
+            )
+
+    return {
+        "url": url,
+        "author_name": author_name,
+        "quotes": quotes,
+    }
+
+
 if __name__ == "__main__":
     # Example usage:
     from climafactskg.classifiers.cards import CARDSMatcher

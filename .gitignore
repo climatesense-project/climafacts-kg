@@ -187,7 +187,11 @@ pyrightconfig.json
 # End of https://www.toptal.com/developers/gitignore/api/jupyternotebooks,python
 .env
 .cache/
+notebooks/*.json
 notebooks/
 
 data/*.json
+data/*.db
 data/climafacts_kg.rdf
+data/cimplekg/
+.vscode/settings.json

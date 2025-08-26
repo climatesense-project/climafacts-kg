@@ -2,12 +2,10 @@ import logging
 from typing import Optional
 
 import iso639
+import preserve
 from dotenv import load_dotenv
 from rdflib import OWL, RDF, RDFS, SDO, BNode, Graph, Literal, Namespace
 from rdflib.namespace import NamespaceManager
-from tinydb import JSONStorage, TinyDB
-from tinydb_serialization import SerializationMiddleware
-from tinydb_serialization.serializers import DateTimeSerializer
 
 from climafactskg.builders.cimplekg import generate_cimplekg_mappings
 from climafactskg.utils import hash_string
@@ -15,32 +13,32 @@ from climafactskg.utils import hash_string
 logging.basicConfig(level=logging.INFO)
 
 
-def generate_climafactskg_base(db: TinyDB, ignore_urls: Optional[list] = None) -> Graph:
-    """Generates a knowledge graph (KG) in RDF format from the articles stored in a TinyDB database.
+def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[list] = None) -> Graph:
+    """Generates the base knowledge graph for ClimafactsKG from a database of articles.
+
+    This function iterates over articles in the provided database connector, extracting relevant metadata
+    and content to construct RDF triples according to the Schema.org vocabulary. The resulting graph
+    represents claim reviews, claims, authors, publishers, ratings, and other related entities.
 
     Args:
-        db (TinyDB): The TinyDB database instance containing the articles and their metadata.
-        ignore_urls (list, optional): A list of URLs to ignore while generating the KG. Defaults to None.
+        db (preserve.Connector): A database connector yielding article records as dictionaries.
+        ignore_urls (Optional[list], optional): A list of URLs to skip during graph generation. Defaults to None.
 
     Returns:
-        Graph: An RDFLib Graph object representing the generated knowledge graph.
+        Graph: An RDFLib Graph object containing the generated knowledge graph.
 
-    Workflow:
-        1. Iterates over all articles in the database.
-        2. For each article:
-            - Adds RDF triples for metadata such as URL, language, author, publisher, license, and content.
-            - Handles nested data like related arguments, languages, and claims.
-        3. Logs progress and any issues encountered during the process.
-
-    Notes:
-        - The function assumes the existence of helper functions like `hash_string`.
-        - The generated graph uses the Schema.org (SDO) vocabulary and custom namespaces.
+    The function performs the following steps for each article:
+        - Skips articles whose URLs are in the ignore list.
+        - Processes only the first level for English articles.
+        - Adds claim review information, including ratings, explanations, and review body.
+        - Adds metadata such as author, publisher, license, description, keywords, abstract, and categories.
+        - Links related arguments and main URLs.
+        - Creates language entities for each supported language.
+        - Adds the reviewed claim and its source citation if available.
+        - Logs progress and errors during processing.
 
     Raises:
-        Any exceptions raised during RDF triple creation or database access will propagate to the caller.
-
-    Returns:
-        Graph: The generated RDF graph.
+        Exception: Logs any exceptions encountered during article processing.
     """
     logging.info("Starting knowledge graph generation.")
     ns = Namespace("https://purl.net/climafactskg/ns#")
@@ -50,7 +48,7 @@ def generate_climafactskg_base(db: TinyDB, ignore_urls: Optional[list] = None) -
     g.namespace_manager.bind("", ns)
 
     # Iterate over all the articles in the database and create RDF triples:
-    for arg in db.all():
+    for _, arg in db:
         url = arg["url"]
         lang = arg["lang"]
         language = iso639.to_name(lang)
@@ -256,9 +254,9 @@ def generate_climafactskg_base(db: TinyDB, ignore_urls: Optional[list] = None) -
 
 
 def build_climafactskg(
-    climafactskg_db: str = "data/skepticalscience_arguments_db.json",
+    climafactskg_db: str = "data/skepticalscience_arguments_db.db",
     cards_ttl: str = "data/cards.ttl",
-    cimplekg_db: str = "data/cimplekg_claims_db.json",
+    cimplekg_db: str = "data/cimplekg_claims_db.db",
     ignore_urls: Optional[list] = None,
 ) -> Graph:
     """Builds the ClimaFacts Knowledge Graph by integrating data from multiple sources.
@@ -278,8 +276,6 @@ def build_climafactskg(
         Graph: An RDFLib Graph object containing the integrated knowledge graph.
     """
     load_dotenv()
-    serialization = SerializationMiddleware(JSONStorage)
-    serialization.register_serializer(DateTimeSerializer(), "TinyDate")
 
     logging.info("Starting ClimaFactsKG build process.")
 
@@ -289,8 +285,7 @@ def build_climafactskg(
         ignore_urls = ["https://skepticalscience.com/wigley-santer-2012-attribution.html"]
 
     logging.info(f"Loading ClimaFactsKG DB from: {climafactskg_db}")
-    with TinyDB(climafactskg_db, storage=serialization) as db:
-        db.default_table_name = "arguments"
+    with preserve.open(format="sqlite", filename=climafactskg_db) as db:
         g = generate_climafactskg_base(
             db,
             ignore_urls=ignore_urls,
@@ -302,8 +297,7 @@ def build_climafactskg(
 
     logging.info(f"Loading CimpleKG DB from: {cimplekg_db}")
     # add existing CimpleKG to g:
-    with TinyDB(cimplekg_db, storage=serialization) as db:
-        db.default_table_name = "mappings"
+    with preserve.open(format="sqlite", filename=cimplekg_db) as db:
         cimplekg_g = generate_cimplekg_mappings(db)
         g += cimplekg_g
 

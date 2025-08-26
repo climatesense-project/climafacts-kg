@@ -1,25 +1,17 @@
 from collections import Counter
 
-from tinydb import JSONStorage, TinyDB
-from tinydb_serialization import SerializationMiddleware
-from tinydb_serialization.serializers import DateTimeSerializer
+import preserve
 
 
 def count_unique_values(
-    json_db="data/skepticalscience_arguments_db.json",
+    sks_db="data/skepticalscience_arguments_db.db",
     key="main_url",
-    table_name="arguments",
 ):
-    serialization = SerializationMiddleware(JSONStorage)
-    serialization.register_serializer(DateTimeSerializer(), "TinyDate")
-
-    with TinyDB(json_db, storage=serialization) as db:
-        db.default_table_name = table_name
-
-        values = [item.get(key) for item in db.all() if key in item]
+    with preserve.open(format="sqlite", filename=sks_db) as db:
+        values = [db[k].get(key) for k in db if key in db[k]]
         unique_values = Counter(values)
 
-        print(f"Unique values for '{key}' in table '{table_name}': {len(unique_values)}")
+        print(f"Unique values for '{key}': {len(unique_values)}")
 
     return unique_values
 
@@ -28,16 +20,27 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
 
     load_dotenv()
-    json_db = "data/skepticalscience_arguments_db.json"
+    db = "data/skepticalscience_arguments_db.db"
 
     print("---------- ClimaFactsKG ----------")
-    count_unique_values(json_db, key="lang", table_name="arguments")
-    count_unique_values(json_db, key="main_url", table_name="arguments")
-    print(count_unique_values(json_db, key="cards_category", table_name="arguments"))
+    count_unique_values(db, key="lang")
+    count_unique_values(db, key="main_url")
+    print(count_unique_values(db, key="cards_category"))
 
     print("---------- CimpleKG ----------")
-    json_db = "data/cimplekg_claims_db.json"
-    cnt = count_unique_values(json_db, key="cards_category", table_name="mappings")
+    query = """PREFIX da: <https://www.wowman.org/index.php?id=1&type=get#>
+    PREFIX sd: <http://www.w3.org/ns/sparql-service-description#>
+    PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+    PREFIX sdo: <https://schema.org/>
+    PREFIX cf: <https://purl.net/climafactskg/ns#>
+
+    SELECT (COUNT(DISTINCT ?c) as ?count) WHERE {
+        ?c ?d ?e .
+        FILTER (STRSTARTS(str(?c), str('http://data.cimple.eu/')) ) .
+    }"""
+
+    db = "data/cimplekg_mappings_db.db"
+    cnt = count_unique_values(db, key="cards_category")
 
     # Count the total number of claims except 0_0:
     print(cnt)

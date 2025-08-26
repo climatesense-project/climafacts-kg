@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 
 import bs4
 import pandas as pd
+import preserve
 import requests
 from SPARQLWrapper import JSON, SPARQLWrapper
 
@@ -131,8 +132,11 @@ def fetch_url_content(
                 return cached_data["content"]
 
     # Fetch the content from the URL
-    response = requests.get(url)
-    if response.status_code != 200:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"  # noqa: E501
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200 and "not found" in response.text.strip().lower():
         raise ValueError(f"Failed to fetch URL content for '{url}'. Status code: {response.status_code}")
 
     content = response.text
@@ -196,3 +200,66 @@ def print_dict_tree(
 
     if root_call:
         print(f"\nTotal items: {_counter[0]}")
+
+
+def deserialize_datetime(obj):
+    """Converts an ISO formatted datetime string to a `datetime.datetime` object.
+
+    If the input `obj` is a string representing a datetime in ISO format,
+    returns the corresponding `datetime.datetime` object. If the conversion
+    fails or `obj` is not a string, returns `obj` unchanged.
+
+    Args:
+        obj (Any): The object to deserialize, typically a string or datetime.
+
+    Returns:
+        Any: A `datetime.datetime` object if deserialization is successful,
+                otherwise the original `obj`.
+    """
+    if isinstance(obj, str):
+        try:
+            return datetime.fromisoformat(obj)
+        except ValueError:
+            pass
+    return obj
+
+
+def serialize_datetime(obj):
+    """Serializes a datetime.datetime object to an ISO 8601 formatted string.
+
+    Args:
+        obj: The object to serialize.
+
+    Returns:
+        str: The ISO 8601 formatted string representation of the datetime object.
+
+    Raises:
+        TypeError: If the provided object is not a datetime.datetime instance.
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError("Type not serializable")
+
+
+def preserve_to_json(db: preserve.Connector, filename: str) -> None:
+    """Serializes dictionary entries from a preserve.Connector database to a JSON file.
+
+    Iterates over the database, selects entries that are dictionaries, and writes them to the specified
+    JSON file with UTF-8 encoding. Datetime objects within the dictionaries are serialized using the
+    `serialize_datetime` function.
+
+    Args:
+        db (preserve.Connector): The database connector to iterate over.
+        filename (str): The path to the output JSON file.
+
+    Returns:
+        None
+    """
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(
+            obj=[i for _, i in db],
+            fp=f,
+            default=serialize_datetime,
+            ensure_ascii=False,
+            indent=4,
+        )

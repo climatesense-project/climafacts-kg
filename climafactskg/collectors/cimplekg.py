@@ -1,9 +1,9 @@
 import logging
 
 import pandas as pd
+import preserve
 from langdetect import detect
 from rich.progress import track
-from tinydb import TinyDB, where
 
 from climafactskg.classifiers.cards import CARDSClassifier
 from climafactskg.utils import query_sparqlendpoint
@@ -25,7 +25,6 @@ WHERE {
     ?cl schema:text ?text .
 }
 ORDER BY DESC(?date_published)
-LIMIT 100
 """
 
 
@@ -41,12 +40,12 @@ def fetch_claims() -> pd.DataFrame:
     return results
 
 
-def process_claims(db: TinyDB, claims_df: pd.DataFrame) -> None:
+def process_claims(db: preserve.Connector, claims_df: pd.DataFrame) -> None:
     for _, row in track(claims_df.iterrows(), total=claims_df.shape[0], description="Processing claims"):
         text = row.get("text")
 
         # Check if URL not already in database
-        if not db.contains(where("url") == row.get("rev")):
+        if row.get("rev") not in db:
             print(f"Processing claim with URL: {row.get('rev')}")
             if isinstance(text, str) and text.strip():
                 lang = None
@@ -60,51 +59,54 @@ def process_claims(db: TinyDB, claims_df: pd.DataFrame) -> None:
                     "claim": text,
                     "lang": lang,
                 }
-                db.insert(mapping)
+                db[mapping["url"]] = mapping
         else:
             logger.info(f"Skipping already processed claim with URL: {row.get('rev')}")
 
 
-def classify_claims(db: TinyDB, filter_lang: str = "en") -> None:
-    """Classifies claims in the TinyDB database using the CARDSClassifier.
+def classify_claims(db: preserve.Connector, filter_lang: str = "en") -> None:
+    """Classifies claims in the provided database using the CARDSClassifier.
 
-    This function iterates over all claims in the provided TinyDB instance.
-    - If a claim does not have a "cards_category", it uses the CARDSClassifier to predict a category
-        for the "claim" text and updates the claim with this prediction.
+    Iterates through claims in the database, optionally filtering by language.
+    For each claim that does not already have a 'cards_category' and contains a 'claim' text,
+    the function classifies the claim and updates the database entry with the resulting category.
 
     Args:
-        db (TinyDB): The TinyDB database instance containing claims to classify.
-        filter_lang (str): Language code to filter claims for classification (default is "en").
+        db (preserve.Connector): The database connector to access and update claims.
+        filter_lang (str, optional): The language code to filter claims. Only claims matching this
+            language will be classified. Defaults to "en".
 
     Returns:
         None
     """
     classifier = CARDSClassifier()
-
-    if filter_lang:
-        sel = db.search(where("lang") == filter_lang)
-        logger.info(f"Classifying {len(sel)} claims in language '{filter_lang}'")
-    else:
-        logger.info("Classifying all claims in the database")
-        sel = db.all()
-
-    for claim in track(sel, description="Classifying claims"):
-        if "cards_category" not in claim and "claim" in claim:
-            text = claim["claim"]
-            prediction = classifier.classify(text)
-            db.update({"cards_category": prediction}, doc_ids=[claim.doc_id])
+    for url, claim in track(db, description="Classifying claims"):
+        if filter_lang and "lang" in claim and claim.get("lang") != filter_lang:
+            logger.info(f"Skipping claim with URL {claim.get('url')} due to language mismatch: {claim.get('lang')}")
+        else:
+            if "cards_category" not in claim and "claim" in claim:
+                text = claim["claim"]
+                claim["cards_category"] = classifier.classify(text)
+                db[url] = claim
 
 
-def process_all(db: TinyDB, claims_df: pd.DataFrame, filter_lang: str = "en") -> None:
-    """Fetches claims from CimpleKG, processes them, and stores them in the TinyDB database.
+def process_all(db: preserve.Connector, claims_df: pd.DataFrame, filter_lang: str = "en") -> None:
+    """Process all claims data through the complete pipeline.
+
+    This function orchestrates the full claims processing workflow by first
+    processing the raw claims data and then classifying the processed claims.
 
     Args:
-        db (TinyDB): The TinyDB database instance where claims will be stored.
-        claims_df (pd.DataFrame): DataFrame containing claims to be processed.
-        filter_lang (str): Language code to filter claims for classification (default is "en").
+        db (preserve.Connector): Database connector instance for data operations.
+        claims_df (pd.DataFrame): DataFrame containing the raw claims data to be processed.
+        filter_lang (str, optional): Language filter for claim classification. Defaults to "en".
 
     Returns:
-        None
+        None: This function performs operations in-place and does not return any value.
+
+    Note:
+        The function logs progress messages at info level for both processing and
+        classification stages.
     """
     logger.info("Processing claims...")
     process_claims(db, claims_df)
@@ -113,15 +115,10 @@ def process_all(db: TinyDB, claims_df: pd.DataFrame, filter_lang: str = "en") ->
 
 
 if __name__ == "__main__":
+    import preserve
     from dotenv import load_dotenv
-    from tinydb import JSONStorage
-    from tinydb_serialization import SerializationMiddleware
-    from tinydb_serialization.serializers import DateTimeSerializer
 
     load_dotenv()
-    serialization = SerializationMiddleware(JSONStorage)
-    serialization.register_serializer(DateTimeSerializer(), "TinyDate")
 
-    with TinyDB("data/cimplekg_claims_db.json", storage=serialization) as db:
-        db.default_table_name = "mappings"
+    with preserve.open(format="sqlite", filename="data/cimplekg_claims_db.db") as db:
         process_all(db, fetch_claims())

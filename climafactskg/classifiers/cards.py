@@ -673,37 +673,3 @@ def cards_classification(text: str) -> str:
     """Legacy function for single-use classification."""
     classifier = CARDSClassifier()
     return classifier.classify(text)
-
-
-if __name__ == "__main__":
-    from dotenv import load_dotenv
-    from rich.progress import track
-    from tinydb import JSONStorage, TinyDB
-    from tinydb_serialization import SerializationMiddleware
-    from tinydb_serialization.serializers import DateTimeSerializer
-
-    load_dotenv()
-    serialization = SerializationMiddleware(JSONStorage)
-    serialization.register_serializer(DateTimeSerializer(), "TinyDate")
-
-    with TinyDB("data/skepticalscience_arguments_db.json", storage=serialization) as db:
-        db.default_table_name = "arguments"
-        classifier = CARDSClassifier()
-
-        for argument in track(db.all(), description="Classifying arguments..."):
-            if "cards_category" in argument and argument["lang"] != "en":
-                db.update({"cards_category": None}, doc_ids=[argument.doc_id])
-            elif (
-                "cards_category" not in argument
-                and argument["climate_myth"] != None  # noqa: E711
-                and argument["lang"] == "en"
-            ):
-                text = argument["climate_myth"]
-
-                # print(argument.doc_id, text)
-                prediction = classifier.classify(text)
-                db.update({"cards_category": prediction}, doc_ids=[argument.doc_id])
-                # print(
-                #     f"Updated classification for argument {argument.doc_id}: {prediction}"
-                # )
-        print("All arguments classified.")

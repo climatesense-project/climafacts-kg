@@ -29,8 +29,6 @@ pandas = "^2.2.3"
 beautifulsoup4 = "^4.13.4"
 langcodes = "^3.5.0"
 python-dotenv = "^1.1.0"
-tinydb = "^4.8.2"
-tinydb-serialization = "^2.2.0"
 rdflib = "^7.1.4"
 rdflib-endpoint = "^0.5.3"
 uvicorn = "^0.34.2"
@@ -40,12 +38,14 @@ langdetect = "^1.0.9"
 iso639 = "^0.1.4"
 typer = "^0.16.0"
 spacy = "^3.8.7"
-en-core-web-sm = {url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"}
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+preserve = "^1.2.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.2"
 pre-commit = "^4.2.0"
 python-semantic-release = "^9.12.0"
+jupyter = "^1.1.1"
 
 
 [tool.semantic_release]

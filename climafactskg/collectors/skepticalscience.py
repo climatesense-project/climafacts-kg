@@ -2,18 +2,90 @@ import logging
 from typing import Optional
 from urllib.parse import urljoin
 
+import preserve
 from bs4 import BeautifulSoup
 from rich.progress import track
-from tinydb import Query, TinyDB
 
 from climafactskg.classifiers.cards import CARDSClassifier
 from climafactskg.parsers.skepticalscience import (
     parse_main_article,
+    parse_misinformer_article,
     parse_translated_article,
 )
 from climafactskg.utils import fetch_url_content
 
 logging.basicConfig(level=logging.INFO)
+
+
+def fetch_misinformers_urls(ignore_urls: Optional[list] = None) -> list:
+    """Fetches and returns a sorted list of URLs for misinformers from Skeptical Science.
+
+    This function scrapes two specific pages on Skeptical Science:
+    1. The main misinformers list.
+    2. The politicians' quotes list.
+
+    It collects all unique URLs found in the relevant sections of both pages.
+    Optionally, URLs provided in `ignore_urls` will be excluded from the results.
+
+    Args:
+        ignore_urls (Optional[list]): A list of URLs to exclude from the results.
+
+    Returns:
+        list: A sorted list of unique misinformer URLs.
+    """
+    misinformers_urls = set()
+
+    # 1) Extract from the main list:
+    url = "https://skepticalscience.com/misinformers.php"
+    content = fetch_url_content(url)
+    soup = BeautifulSoup(content, "html.parser")
+    misinformers_urls.update([urljoin(url, str(a["href"])) for a in soup.select("#centerColumn > ul > li > a")])
+
+    # 2) Extract from the politicians list:
+    url = "https://skepticalscience.com/skepticquotes.php"
+    content = fetch_url_content(url)
+    soup = BeautifulSoup(content, "html.parser")
+    misinformers_urls.update([urljoin(url, str(a["href"])) for a in soup.select("#centerColumn > div > a")])
+
+    # Remove ignored URLs if provided:
+    if ignore_urls:
+        misinformers_urls = [url for url in misinformers_urls if url not in ignore_urls]
+
+    # Sort the URLs:
+    logging.info(f"Found {len(misinformers_urls)} misinformer URLs.")
+    return sorted(misinformers_urls)
+
+
+def process_misinformers_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[list] = None) -> None:
+    """Processes a list of misinformer URLs.
+
+    Args:
+        db (preserve.Connector): The database connector used to store parsed articles.
+        urls (list[str]): List of URLs to process.
+        ignore_urls (Optional[list], optional): List of URLs to ignore during processing. Defaults to None.
+
+    Returns:
+        None
+    """
+    if ignore_urls is None:
+        ignore_urls = []
+
+    urls = [url for url in urls if url not in ignore_urls]
+
+    logging.info(f"Processing {len(urls)} URLs.")
+
+    for i, main_url in enumerate(urls, start=1):
+        logging.info(f"Processing URL {i}/{len(urls)}: {main_url}")
+
+        if main_url in db:
+            logging.info(f"Skipping already processed URL: {main_url}")
+        else:
+            content = fetch_url_content(main_url)
+            article = parse_misinformer_article(main_url, content)
+
+            # Store the article in the db
+            db[main_url] = article
+            logging.info(f"Stored article for URL: {main_url}")
 
 
 def fetch_arguments_urls(ignore_urls: Optional[list] = None) -> list:
@@ -69,25 +141,29 @@ def fetch_arguments_urls(ignore_urls: Optional[list] = None) -> list:
     return arguments_urls
 
 
-def process_urls(db: TinyDB, urls: list[str], ignore_urls: Optional[list] = None) -> None:
-    """Processes a list of URLs by parsing articles, and storing the results in a TinyDB database.
-    Also processes nested article levels and translated language versions if available.
+def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[list] = None) -> None:
+    """Process a list of URLs by fetching, parsing, and storing articles along with their levels and translations.
 
-        db (TinyDB): The TinyDB database instance where articles and related data will be stored.
-        urls (list[str]): List of URLs to process.
-        ignore_urls (Optional[list], optional): List of URLs to ignore during processing. Defaults to None.
+    This function processes each URL by:
+    1. Fetching and parsing the main article content
+    2. Processing any article levels (different versions/depths of the same content)
+    3. Processing any language translations of the article
+    4. Storing all processed content in the provided database connector
 
-        1. Filters out URLs present in `ignore_urls`.
-            - Fetches the content.
-            - Processes and stores articles for each nested level URL, if present.
-            - Processes and stores articles for each translated language version, if present.
+    Args:
+        db (preserve.Connector): Database connector for storing processed articles
+        urls (list[str]): List of URLs to process
+        ignore_urls (Optional[list], optional): List of URLs to skip during processing.
+            Defaults to None (empty list).
 
-        - Assumes the existence of helper functions: `fetch_url_content`, `parse_main_article`,
-            and `parse_translated_article`.
-        - Uses TinyDB's `upsert` to update or insert articles based on their URL.
+    Returns:
+        None
 
-        Any exceptions raised by helper functions or database operations will propagate to the caller.
-    """  # noqa: D205
+    Note:
+        - URLs already present in the database with a 'lang' field are skipped
+        - For each main URL, the function also processes associated level URLs and translation URLs
+        - Progress is logged throughout the processing with detailed status information
+    """
     if ignore_urls is None:
         ignore_urls = []
 
@@ -97,92 +173,107 @@ def process_urls(db: TinyDB, urls: list[str], ignore_urls: Optional[list] = None
 
     for i, main_url in enumerate(urls, start=1):
         logging.info(f"Processing URL {i}/{len(urls)}: {main_url}")
-        content = fetch_url_content(main_url)
 
-        article = parse_main_article(main_url, content)
+        if main_url in db and "lang" in db[main_url]:
+            logging.info(f"Skipping already processed URL: {main_url}")
+        else:
+            content = fetch_url_content(main_url)
+            article = parse_main_article(main_url, content)
 
-        # Store the article in TinyDB
-        db.upsert(article, Query().url == main_url)
-        logging.info(f"Stored article for URL: {main_url}")
+            # Store the article in the db
+            db[main_url] = article
+            logging.info(f"Stored article for URL: {main_url}")
 
-        # Process the article levels:
-        logging.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
-        if "levels" in article:
-            for level in article["levels"]:
-                logging.info(f"Processing level: {level['level']}")
+            # Process the article levels:
+            logging.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
+            if "levels" in article:
+                for level in article["levels"]:
+                    logging.info(f"Processing level: {level['level']}")
 
-                for level_url in level["urls"]:
-                    logging.info(f"Processing level URL: {level_url}")
-                    # Parse the main article for each level URL
-                    level_article = parse_main_article(level_url)
+                    for level_url in level["urls"]:
+                        logging.info(f"Processing level URL: {level_url}")
+                        # Parse the main article for each level URL
+                        level_article = parse_main_article(level_url)
 
-                    # Store the article in TinyDB
-                    db.upsert(level_article, Query().url == level_url)
-                    logging.info(f"Stored level article for URL: {level_url}")
+                        # Store the article in the db
+                        db[level_url] = level_article
+                        logging.info(f"Stored level article for URL: {level_url}")
 
-                logging.info(f"Finished level: {level['level']}")
+                    logging.info(f"Finished level: {level['level']}")
 
-        if "languages" in article:
-            for lang in article["languages"]:
-                logging.info(f"Processing language : {lang['lang']}")
+            if "languages" in article:
+                for lang in article["languages"]:
+                    logging.info(f"Processing language : {lang['lang']}")
 
-                logging.info(f"Processing language URL: {lang['url']}")
-                lang_article = parse_translated_article(lang["url"], language_code=lang["code"])
+                    logging.info(f"Processing language URL: {lang['url']}")
+                    lang_article = parse_translated_article(lang["url"], language_code=lang["code"])
 
-                # Store the  article in TinyDB
-                db.upsert(lang_article, Query().url == lang["url"])
-                logging.info(f"Stored translated article for language URL: {lang['url']}")
+                    # Store the  article in the db
+                    db[lang["url"]] = lang_article
+                    logging.info(f"Stored translated article for language URL: {lang['url']}")
 
-                logging.info(f"Finished language: {lang['lang']}")
+                    logging.info(f"Finished language: {lang['lang']}")
 
         logging.info(f"Finished processing URL {i}/{len(urls)}: {main_url}")
 
 
-def classify_urls(db: TinyDB) -> None:
-    """Classifies arguments in the TinyDB database using the CARDSClassifier.
+def classify_urls(db: preserve.Connector) -> None:
+    """Classify URLs in the database using the CARDS classifier.
 
-    This function iterates over all arguments in the provided TinyDB instance.
-    - If an argument has a "cards_category" and its language is not English ("en"),
-        the "cards_category" is reset to None.
-    - If an argument does not have a "cards_category", has a non-None "climate_myth", and its language is English,
-        the function uses the CARDSClassifier to predict a category for the "climate_myth" text and updates the argument
-        with this prediction.
+    This function processes arguments stored in the database, applying classification
+    to English-language climate myths while managing existing classifications for
+    non-English content.
 
     Args:
-        db (TinyDB): The TinyDB database instance containing arguments to classify.
+        db (preserve.Connector): Database connector containing URL-indexed arguments
+                                with fields like 'cards_category', 'lang', and 'climate_myth'
 
     Returns:
         None
+
+    Behavior:
+        - For non-English arguments with existing classifications: removes the classification
+        - For English arguments without classification but with climate_myth content:
+          applies CARDS classification to the climate_myth text
+        - Updates the database with modified argument data
+        - Logs completion message when all arguments are processed
+
+    Note:
+        Uses CARDSClassifier for text classification and track() for progress monitoring.
     """
     classifier = CARDSClassifier()
 
-    for argument in track(db.all(), description="Classifying arguments..."):
+    for url, argument in track(db, description="Classifying arguments..."):
         if "cards_category" in argument and argument["lang"] != "en":
-            db.update({"cards_category": None}, doc_ids=[argument.doc_id])
+            argument["cards_category"] = None
+            db[url] = argument
         elif "cards_category" not in argument and argument["climate_myth"] is not None and argument["lang"] == "en":
             text = argument["climate_myth"]
-            prediction = classifier.classify(text)
-            db.update({"cards_category": prediction}, doc_ids=[argument.doc_id])
+            argument["cards_category"] = classifier.classify(text)
+            db[url] = argument
     logging.info("All arguments classified.")
 
 
 def process_all(
-    db: TinyDB,
+    db: preserve.Connector,
     urls: Optional[list[str]] = None,
     ignore_urls: Optional[list] = None,
 ) -> None:
-    """Fetches, processes, and classifies arguments from Skeptical Science.
+    """Process all URLs for skeptical science data collection and classification.
 
-    This function fetches argument URLs, processes them to extract articles and their levels,
-    and classifies the articles using the CARDSClassifier. It stores all results in the provided TinyDB instance.
+    This function orchestrates the complete processing pipeline by first processing
+    the provided URLs (or an empty list if none provided) and then classifying
+    all URLs in the database.
 
     Args:
-        db (TinyDB): The TinyDB database instance where articles and classifications will be stored.
-        urls (list[str]): List of URLs to process and classify.
-        ignore_urls (Optional[list], optional): List of URLs to ignore during processing. Defaults to None.
+        db (preserve.Connector): Database connector instance for data operations.
+        urls (Optional[list[str]], optional): List of URLs to process. If None,
+            defaults to an empty list. Defaults to None.
+        ignore_urls (Optional[list], optional): List of URLs to ignore during
+            processing. Defaults to None.
 
     Returns:
-        None
+        None: This function performs operations but does not return a value.
     """
     if urls is None:
         urls = []
