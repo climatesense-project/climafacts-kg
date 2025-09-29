@@ -21,7 +21,7 @@ def generate_cimplekg_mappings(db: preserve.Connector) -> Graph:
         Graph: An RDFLib Graph containing the generated CimpleKG mappings.
     """
     logging.info("Starting CimpleKG mapping generation.")
-    ns = Namespace("https://purl.net/climafactskg/ns#")
+    ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
 
     g = Graph()
     g.namespace_manager = NamespaceManager(Graph())

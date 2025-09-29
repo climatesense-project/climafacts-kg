@@ -1,0 +1,35 @@
+{
+    "@context": "https://w3id.org/codemeta/3.0",
+    "type": "SoftwareSourceCode",
+    "author": [
+        {
+            "id": "https://orcid.org/0000-0003-0029-5219",
+            "type": "Person",
+            "affiliation": {
+                "type": "Organization",
+                "name": "The Open University"
+            },
+            "email": "gregoire.burel@open.ac.uk",
+            "familyName": "Burel",
+            "givenName": "Gregoire"
+        },
+        {
+            "type": "Role",
+            "schema:author": "https://orcid.org/0000-0003-0029-5219"
+        }
+    ],
+    "codeRepository": "https://github.com/climatesense-project/climafacts-kg",
+    "dateCreated": "2025-07-26",
+    "datePublished": "2025-07-26",
+    "description": "ClimaFactsKG is a knowledge graph designed to combat pervasive climate misinformation by linking 252 common climate myths with scientific corrections. ClimaFactsKG is integrated with CimpleKG.",
+    "keywords": [
+        "Climate Misinformation",
+        "Knowledge Graph",
+        "Linked Data",
+        "Scientific Fact-Checking"
+    ],
+    "license": "https://spdx.org/licenses/MIT",
+    "name": "ClimaFactsKG - An Interlinked Knowledge Graph of Scientific Evidence to Fight Climate Misinformation",
+    "programmingLanguage": "Python 3",
+    "issueTracker": "https://github.com/climatesense-project/climafacts-kg/issues"
+}

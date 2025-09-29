@@ -1,0 +1,55 @@
+cff-version: 1.2.0
+title: ClimaFactsKG
+message: >-
+  An Interlinked Knowledge Graph of Scientific Evidence to
+  Fight Climate Misinformation
+type: dataset
+authors:
+  - given-names: Grégoire
+    family-names: Burel
+    email: gregoire.burel@open.ac.uk
+    affiliation: The Open University
+    orcid: 'https://orcid.org/0000-0003-0029-5219'
+  - given-names: Harith
+    family-names: Alani
+    email: harith.alani@open.ac.uk
+    affiliation: The Open University
+    orcid: 'https://orcid.org/0000-0003-2784-349X'
+identifiers:
+  - type: url
+    value: 'https://purl.org/climatesense/climafacts-kg'
+    description: Code repository
+  - type: url
+    value: 'https://purl.org/climatesense/climafacts-kg/ns'
+    description: Resource namespace
+repository-code: 'https://github.com/climatesense-project/climafacts-kg'
+repository-artifact: 'https://github.com/climatesense-project/climafacts-kg'
+abstract: >-
+  Despite the overwhelming scientific evidence supporting
+  the impact of humans on the environment, climate
+  misinformation remains pervasive. This persistent spread
+  of falsehoods is often achieved through the
+  misrepresentation of scientific evidence and the promotion
+  of pseudoscientific narratives that hinder effective
+  climate action. To combat this issue, we introduce
+  ClimaFactsKG, a knowledge graph that links common climate
+  change denial narratives with scientific corrections.
+  ClimaFactsKG currently consists of 252 common climate
+  myths and the corresponding scientific counter-arguments.
+  A key feature of ClimaFactsKG is its strategic integration
+  with CimpleKG, one of the largest existing misinformation
+  knowledge graphs. This connection allows the interlinking
+  of scientific corrections and climate claims found in
+  CimpleKG and significantly enhances the utility of
+  ClimaFactsKG. By providing a structured and interlinked
+  repository of climate change myths and their scientific
+  rebuttals, ClimaFactsKG offers a valuable resource for
+  researchers studying climate misinformation, fact-checkers
+  seeking reliable counter-evidence, and educators aiming to
+  improve climate literacy.
+keywords:
+  - Climate Misinformation
+  - Knowledge Graph
+  - Linked Data
+  - Scientific Fact-Checking
+license: CC-BY-4.0

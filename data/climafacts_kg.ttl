@@ -1,4 +1,4 @@
-@prefix : <https://purl.net/climafactskg/ns#> .
+@prefix : <https://purl.net/climatesense/climafactskg/ns#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix schema: <https://schema.org/> .
@@ -35805,6 +35805,10 @@ Allora qual’è il punto attuale della situazione? Il documento  "Executive Su
 
 <http://data.cimple.eu/claim-review/54ff4acf368bacc6e996313293a2f681976125dfa67746b7b9c300e2> schema:about :5_1 .
 
+<http://data.cimple.eu/claim-review/55191dabf866d00d4abdc4e9bbb4fa289fef8858f365fdf6458fddd3> schema:about :5_1 .
+
+<http://data.cimple.eu/claim-review/5536c2372e89e551dd1f3098d0a0dd5d0ba9935fe2d63e5881b7b525> schema:about :5_1 .
+
 <http://data.cimple.eu/claim-review/553f49b226ccfdaccd98bfc4bf5689f6bd1288e6bd8653033c67eb62> schema:about :5_1 .
 
 <http://data.cimple.eu/claim-review/561815d0936bd454ca0179e4adf978c1a6d18046581061c12ab3a746> schema:about :5_2 .
@@ -36044,6 +36048,8 @@ Allora qual’è il punto attuale della situazione? Il documento  "Executive Su
 <http://data.cimple.eu/claim-review/861bbed0d6c9890b56ae8d769dbb44e6c589bf17019db6502ef41ac5> schema:about :5_1 .
 
 <http://data.cimple.eu/claim-review/86605c076156cceef74bd4b9983b808f29b18ad02993b3573812682c> schema:about :5_2 .
+
+<http://data.cimple.eu/claim-review/86b1e2a2b222f70d3fd966d87449a19f9eeb6e802a7e5c93a00ab256> schema:about :5_2 .
 
 <http://data.cimple.eu/claim-review/86badab5d7fbde5d995c8905224a40749d366fde42374e4858c6b1e2> schema:about :5_2 .
 
@@ -36335,6 +36341,8 @@ Allora qual’è il punto attuale della situazione? Il documento  "Executive Su
 
 <http://data.cimple.eu/claim-review/c102f3c85921ce124d812e88a9f39062707bcf7214caa822c64a1986> schema:about :5_1 .
 
+<http://data.cimple.eu/claim-review/c144d3c7056e2379e77c823274d14f1fb0c3b44b3025c863b3385000> schema:about :5_1 .
+
 <http://data.cimple.eu/claim-review/c147bc83b63d4c6bdd7e22aa3ff9fc798fb8ee00de7eb858c61eafba> schema:about :5_1 .
 
 <http://data.cimple.eu/claim-review/c1541e5f16c4f94f832117d0cf7bf1538dfd99cace36d79a4a65bfc1> schema:about :5_2 .
@@ -36370,6 +36378,8 @@ Allora qual’è il punto attuale della situazione? Il documento  "Executive Su
 <http://data.cimple.eu/claim-review/c5a14f875b608909b7e9a0a721181e8e1bada8d12073654e0093559c> schema:about :5_1 .
 
 <http://data.cimple.eu/claim-review/c6000fd8760d92364095bc0cc345dca4587fc1a36055fed4e4b7803c> schema:about :5_2 .
+
+<http://data.cimple.eu/claim-review/c625594e84b4fe7b96c497fc43a682982d10eaa6a0bc3bc26cb33292> schema:about :5_2 .
 
 <http://data.cimple.eu/claim-review/c63f344f95c8a061806d1a8ee360b4fa31c0e2a0e172afc0d9539e28> schema:about :5_2 .
 
@@ -60196,6 +60206,8 @@ In conclusion, the recent, post 1975 steep rise in global temperatures are not r
         <http://data.cimple.eu/claim-review/537238483cac67ca33990357b456ca0ee78dcd6d4f2ec435b25c4f8a>,
         <http://data.cimple.eu/claim-review/54d1829c009825856bd2e984ead4095a9b3259e4fbe3d09fcd013f52>,
         <http://data.cimple.eu/claim-review/54ff4acf368bacc6e996313293a2f681976125dfa67746b7b9c300e2>,
+        <http://data.cimple.eu/claim-review/55191dabf866d00d4abdc4e9bbb4fa289fef8858f365fdf6458fddd3>,
+        <http://data.cimple.eu/claim-review/5536c2372e89e551dd1f3098d0a0dd5d0ba9935fe2d63e5881b7b525>,
         <http://data.cimple.eu/claim-review/553f49b226ccfdaccd98bfc4bf5689f6bd1288e6bd8653033c67eb62>,
         <http://data.cimple.eu/claim-review/56e1719c8b1b3c45094c8715e5b7bbd0aedbcf9cabe594aa3ddabf4e>,
         <http://data.cimple.eu/claim-review/58b88d6f4f2981d2c6a7cdd8254262612e99de84889756dedd905dea>,
@@ -60262,6 +60274,7 @@ In conclusion, the recent, post 1975 steep rise in global temperatures are not r
         <http://data.cimple.eu/claim-review/be32a6ccdd89adcae480bf93434f82d95a77d053b69ee64df7cf4203>,
         <http://data.cimple.eu/claim-review/be4ff87f6eb6e540d168a7f1b38ab950ae383c8af6d97ce09f574436>,
         <http://data.cimple.eu/claim-review/c102f3c85921ce124d812e88a9f39062707bcf7214caa822c64a1986>,
+        <http://data.cimple.eu/claim-review/c144d3c7056e2379e77c823274d14f1fb0c3b44b3025c863b3385000>,
         <http://data.cimple.eu/claim-review/c147bc83b63d4c6bdd7e22aa3ff9fc798fb8ee00de7eb858c61eafba>,
         <http://data.cimple.eu/claim-review/c1dad99fe116e72dbfc47a823cfc411d3edbb5a168a920523df713cb>,
         <http://data.cimple.eu/claim-review/c3698da1020ea7470e0d2c8fdbcad3a047aabf72ad82bbc0bf9a44e5>,
@@ -60582,6 +60595,7 @@ In conclusion, the recent, post 1975 steep rise in global temperatures are not r
         <http://data.cimple.eu/claim-review/8524b5b2d032fece58dc3a587848c3055df97e11f677be874f3b42bd>,
         <http://data.cimple.eu/claim-review/85b5f71b744f1858b89a46e3fc60a1c0951a4a03816d6818b013a645>,
         <http://data.cimple.eu/claim-review/86605c076156cceef74bd4b9983b808f29b18ad02993b3573812682c>,
+        <http://data.cimple.eu/claim-review/86b1e2a2b222f70d3fd966d87449a19f9eeb6e802a7e5c93a00ab256>,
         <http://data.cimple.eu/claim-review/86badab5d7fbde5d995c8905224a40749d366fde42374e4858c6b1e2>,
         <http://data.cimple.eu/claim-review/879044ce94dca93768523617efc02635f40bbcb9cfb54fad0c921a08>,
         <http://data.cimple.eu/claim-review/87c4c815db0d794314c242d46088216d1a51f31d8445d0776e3ae4fc>,
@@ -60694,6 +60708,7 @@ In conclusion, the recent, post 1975 steep rise in global temperatures are not r
         <http://data.cimple.eu/claim-review/c586b8de20aa95e2f7403c3ac354b073d74b87115f847e33d566fd0f>,
         <http://data.cimple.eu/claim-review/c58a09fa9cf62d3bf8d8a4bf664229a0bdec3d89142a1b0d5523b1d3>,
         <http://data.cimple.eu/claim-review/c6000fd8760d92364095bc0cc345dca4587fc1a36055fed4e4b7803c>,
+        <http://data.cimple.eu/claim-review/c625594e84b4fe7b96c497fc43a682982d10eaa6a0bc3bc26cb33292>,
         <http://data.cimple.eu/claim-review/c63f344f95c8a061806d1a8ee360b4fa31c0e2a0e172afc0d9539e28>,
         <http://data.cimple.eu/claim-review/c6fd56a68ea454bf426dbc4aa829725a24d005a3c7da00b0ffaf5758>,
         <http://data.cimple.eu/claim-review/c7a48712b820d8d72fb86d0962c1cafcd14d7adb542462f2aed06e24>,

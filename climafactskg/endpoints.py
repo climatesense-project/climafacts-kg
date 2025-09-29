@@ -82,7 +82,7 @@ SELECT DISTINCT ?a WHERE {
         "http://schema.org/": "sdo",
         "http://www.w3.org/2001/XMLSchema#": "xsd",
         "http://www.w3.org/2004/02/skos/core#": "skos",
-        "https://purl.net/climafactskg/ns#": "cf",
+        "https://purl.net/climatesense/climafactskg/ns#": "cf",
     }
 
     return rdf_to_sparql_enpoint(

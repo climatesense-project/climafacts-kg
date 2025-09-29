@@ -1,6 +1,47 @@
 # CHANGELOG
 
 
+## Unreleased
+
+### Features
+
+- Migrate from TinyDB to Preserve (Sqlite backend)
+  ([`d82f146`](https://github.com/climatesense-project/climafacts-kg/commit/d82f1462f67811f4d157e2e0337b3b7fb8ac6544))
+
+- Added code for collecting misinformers and quotes - Updated dependencies in pyproject.toml -
+  Removed tinydb and tinydb-serialization from dependencies - Added preserve package with version
+  ^1.2.1 - Added jupyter package to dev dependencies
+
+
+## v1.1.0 (2025-07-31)
+
+### Documentation
+
+- Fix typo in README.md
+  ([`bdae25b`](https://github.com/climatesense-project/climafacts-kg/commit/bdae25b225b4b929c493a542f6e7db7f87f42c8e))
+
+- Update README.md
+  ([`4507914`](https://github.com/climatesense-project/climafacts-kg/commit/45079147ebc8fd2ead9ef341762f4fccba7503bf))
+
+### Features
+
+- Add new CARDS classifier based on Jaccard similarity, fix namespace and generated RDF
+  ([`ac0a1d2`](https://github.com/climatesense-project/climafacts-kg/commit/ac0a1d2b0c4336c59db4cea5e458d2bcd8dc9ccf))
+
+
+## v1.0.10 (2025-07-29)
+
+### Bug Fixes
+
+- Reformat workflow
+  ([`943f7c3`](https://github.com/climatesense-project/climafacts-kg/commit/943f7c3351fddf8ae650b9dc55c996dab5cbf443))
+
+### Documentation
+
+- Add badge to README.md
+  ([`ab896fc`](https://github.com/climatesense-project/climafacts-kg/commit/ab896fc9ede3f4d907e6ef988522888a2ba957b1))
+
+
 ## v1.0.9 (2025-07-29)
 
 ### Bug Fixes

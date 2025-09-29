@@ -41,7 +41,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
         Exception: Logs any exceptions encountered during article processing.
     """
     logging.info("Starting knowledge graph generation.")
-    ns = Namespace("https://purl.net/climafactskg/ns#")
+    ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
 
     g = Graph()
     g.namespace_manager = NamespaceManager(Graph())

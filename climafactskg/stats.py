@@ -32,7 +32,7 @@ if __name__ == "__main__":
     PREFIX sd: <http://www.w3.org/ns/sparql-service-description#>
     PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
     PREFIX sdo: <https://schema.org/>
-    PREFIX cf: <https://purl.net/climafactskg/ns#>
+    PREFIX cf: <https://purl.net/climatesense/climafactskg/ns#>
 
     SELECT (COUNT(DISTINCT ?c) as ?count) WHERE {
         ?c ?d ?e .
