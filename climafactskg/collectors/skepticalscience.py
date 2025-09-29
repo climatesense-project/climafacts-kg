@@ -180,10 +180,21 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
             content = fetch_url_content(main_url)
             article = parse_main_article(main_url, content)
 
+        if main_url in db and "lang" in db[main_url]:
+            logging.info(f"Skipping already processed URL: {main_url}")
+        else:
+            content = fetch_url_content(main_url)
+            article = parse_main_article(main_url, content)
+
             # Store the article in the db
             db[main_url] = article
             logging.info(f"Stored article for URL: {main_url}")
 
+            # Process the article levels:
+            logging.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
+            if "levels" in article:
+                for level in article["levels"]:
+                    logging.info(f"Processing level: {level['level']}")
             # Process the article levels:
             logging.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
             if "levels" in article:
@@ -194,13 +205,21 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
                         logging.info(f"Processing level URL: {level_url}")
                         # Parse the main article for each level URL
                         level_article = parse_main_article(level_url)
+                    for level_url in level["urls"]:
+                        logging.info(f"Processing level URL: {level_url}")
+                        # Parse the main article for each level URL
+                        level_article = parse_main_article(level_url)
 
                         # Store the article in the db
                         db[level_url] = level_article
                         logging.info(f"Stored level article for URL: {level_url}")
 
                     logging.info(f"Finished level: {level['level']}")
+                    logging.info(f"Finished level: {level['level']}")
 
+            if "languages" in article:
+                for lang in article["languages"]:
+                    logging.info(f"Processing language : {lang['lang']}")
             if "languages" in article:
                 for lang in article["languages"]:
                     logging.info(f"Processing language : {lang['lang']}")
@@ -212,6 +231,7 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
                     db[lang["url"]] = lang_article
                     logging.info(f"Stored translated article for language URL: {lang['url']}")
 
+                    logging.info(f"Finished language: {lang['lang']}")
                     logging.info(f"Finished language: {lang['lang']}")
 
         logging.info(f"Finished processing URL {i}/{len(urls)}: {main_url}")
@@ -249,6 +269,8 @@ def classify_urls(db: preserve.Connector) -> None:
             db[url] = argument
         elif "cards_category" not in argument and argument["climate_myth"] is not None and argument["lang"] == "en":
             text = argument["climate_myth"]
+            argument["cards_category"] = classifier.classify(text)
+            db[url] = argument
             argument["cards_category"] = classifier.classify(text)
             db[url] = argument
     logging.info("All arguments classified.")

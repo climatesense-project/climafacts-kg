@@ -60,6 +60,7 @@ def process_claims(db: preserve.Connector, claims_df: pd.DataFrame) -> None:
                     "lang": lang,
                 }
                 db[mapping["url"]] = mapping
+                db[mapping["url"]] = mapping
         else:
             logger.info(f"Skipping already processed claim with URL: {row.get('rev')}")
 

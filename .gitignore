@@ -188,9 +188,10 @@ pyrightconfig.json
 .env
 .cache/
 notebooks/*.json
-notebooks/
+notebooks/*.ipynb
 
 data/*.json
+data/*.db
 data/*.db
 data/climafacts_kg.rdf
 data/cimplekg/

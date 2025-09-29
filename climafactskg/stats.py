@@ -12,6 +12,7 @@ def count_unique_values(
         unique_values = Counter(values)
 
         print(f"Unique values for '{key}': {len(unique_values)}")
+        print(f"Unique values for '{key}': {len(unique_values)}")
 
     return unique_values
 
@@ -21,8 +22,12 @@ if __name__ == "__main__":
 
     load_dotenv()
     db = "data/skepticalscience_arguments_db.db"
+    db = "data/skepticalscience_arguments_db.db"
 
     print("---------- ClimaFactsKG ----------")
+    count_unique_values(db, key="lang")
+    count_unique_values(db, key="main_url")
+    print(count_unique_values(db, key="cards_category"))
     count_unique_values(db, key="lang")
     count_unique_values(db, key="main_url")
     print(count_unique_values(db, key="cards_category"))
