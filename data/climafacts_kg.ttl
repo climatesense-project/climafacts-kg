@@ -35587,6 +35587,8 @@ Allora qual’è il punto attuale della situazione? Il documento  "Executive Su
 
 <http://data.cimple.eu/claim-review/26d493bfc1c9211cafce9c2ef76fa94441067e0e0f5c3f1a8cb71972> schema:about :5_2 .
 
+<http://data.cimple.eu/claim-review/26fba951dea7eed9f9a8972a8975d3b6b474f41a8ecdc04224638c5f> schema:about :5_3 .
+
 <http://data.cimple.eu/claim-review/27717aae331d65ea79540a8a8e7d9708fa77c067ddd3213647e914ae> schema:about :5_2 .
 
 <http://data.cimple.eu/claim-review/27efecf51a21c77787bd0b7afdab0ac3071393e454b00f652ca26bc7> schema:about :5_2 .
@@ -36354,6 +36356,8 @@ Allora qual’è il punto attuale della situazione? Il documento  "Executive Su
 <http://data.cimple.eu/claim-review/c1bfd6d047afce2bc9209d1a940b55504d8a447010c14c2c2d08905c> schema:about :5_2 .
 
 <http://data.cimple.eu/claim-review/c1dad99fe116e72dbfc47a823cfc411d3edbb5a168a920523df713cb> schema:about :5_1 .
+
+<http://data.cimple.eu/claim-review/c1f91f3778d698ab565e1e03ce91c2fb6eb936b5d98cfe0c7edbe868> schema:about :5_2 .
 
 <http://data.cimple.eu/claim-review/c249f016d1f68abce237dd4b93e2547fd22efdc5ed9530e3929d0303> schema:about :5_2 .
 
@@ -59534,56 +59538,6 @@ Scientists need to back up their opinions with research and data that   survive 
 "The Petition Project" innefattar över 31 000 forskare som signerat namninsamlingen som att "det finns inga övertygande vetenskapliga bevis för att människans utsläpp av koldioxid, inom en överblickbar framtid, kommer orsaka en katastrofisk uppvärmning av Jordens atmosfär." (Petition Project)"""@sv ;
     schema:url "https://skepticalscience.com/global-warming-scientific-consensus.htm"^^schema:URL .
 
-:5_3 a skos:Concept ;
-    skos:broader :5 ;
-    skos:inScheme :CARDS ;
-    skos:narrower :5_3_1,
-        :5_3_2 ;
-    skos:prefLabel "Climate is conspiracy"@en ;
-    schema:subjectOf <http://data.cimple.eu/claim-review/05c4f32c862a482b30163a778813073507059c61cf110387476b6e82>,
-        <http://data.cimple.eu/claim-review/062a54990d10a6619edc895fe3dc5547daf8c20e168024dafab9fb93>,
-        <http://data.cimple.eu/claim-review/0d4447fb0a3fba5bd78a3074fa1d97d06794103fe9db0de643e51c7d>,
-        <http://data.cimple.eu/claim-review/1c78b33eddbbed39810685de69415015ede7191bf8377e0be7b0b25a>,
-        <http://data.cimple.eu/claim-review/1d1fb3616c4f7980252be63e82caa383187ae093b0ed6528d9e38818>,
-        <http://data.cimple.eu/claim-review/1dee295b6c4c6a04b82889c56f73f12308807ddef4397e288c143734>,
-        <http://data.cimple.eu/claim-review/20d4ef0a28e7ae684f1597fde3a7fd19848bc63b653c21d652211d6a>,
-        <http://data.cimple.eu/claim-review/2973be7ba7c376724934e430cc1a73f2df8528b3fc954b06fd4b05c5>,
-        <http://data.cimple.eu/claim-review/2ecb938547e4cbe56679fdc723c5e691d9162a65a3fab89cf3013114>,
-        <http://data.cimple.eu/claim-review/352aa88bc3e9b603b0d98cd5c6a9f7f135c2736665dce2e59ba5823f>,
-        <http://data.cimple.eu/claim-review/44c770b098fc3d298cf862dbc524a7b96240f2b3078831a751a45eba>,
-        <http://data.cimple.eu/claim-review/574bf6cbbebf4c4e70d0a696465ae7225c62b97c9b59f9f81ed2d0cc>,
-        <http://data.cimple.eu/claim-review/64f8e63464a28b136fc14dec9c240d3365357176abd2acd51d34c05c>,
-        <http://data.cimple.eu/claim-review/6d9e9485910e4e7b0ddc20109fb70345e1042ccdedf3605874fc769e>,
-        <http://data.cimple.eu/claim-review/6edd65f95629e7509cf7f3820bb37506df3871f685eabbfa28be320d>,
-        <http://data.cimple.eu/claim-review/70fb2d490c70e3e717794541258e3a92288e4479dce64d57286a7bac>,
-        <http://data.cimple.eu/claim-review/72100e4a36dfcfae5b2afd87b6ceded9cbf7b1d8efa54fe50efd109f>,
-        <http://data.cimple.eu/claim-review/72ca4efdf74cdc1d0f2a7e322280760f9dc3a2b054ae7ca623ce6e27>,
-        <http://data.cimple.eu/claim-review/76ea3ed447e9987f29ecf4dd7a171250114a4178a6cf8af218d5b5ed>,
-        <http://data.cimple.eu/claim-review/80fdf22dde432f224f35a09d1ffecfabce8139597612254d38fdb8f5>,
-        <http://data.cimple.eu/claim-review/84e36d96de6eb87b3a54f32a9af299cb9f6f00956ad9d36ba765a134>,
-        <http://data.cimple.eu/claim-review/85b26547c9aa97423f2d770e7111bb7f83e0051b8d844ec21fd64722>,
-        <http://data.cimple.eu/claim-review/9107af8dd2dd7e0c88f50397d75bbb4997d4173c604a0122846ef100>,
-        <http://data.cimple.eu/claim-review/9cd2f0cf2409e60e03b8323681919ed6cd9f40271c1d6eb2af36fcd1>,
-        <http://data.cimple.eu/claim-review/a33e760be7e97bc2bb4ef9640374e32c142ac72997a573e9961fa91c>,
-        <http://data.cimple.eu/claim-review/a83e7c41a8fca8c43628c51a3bf5df95c519e2264f984163a3f9bc8f>,
-        <http://data.cimple.eu/claim-review/aeca96d9666a8c110b19a205ab98fe7be3ca4642f81358a2d78a6536>,
-        <http://data.cimple.eu/claim-review/b0bce836006ce1dc77a62db4c5dd7320e873c36dae12e3dd03bc118d>,
-        <http://data.cimple.eu/claim-review/b74daac27e5377a035d7b8025e4da2cf8ad913d8d813807ace234288>,
-        <http://data.cimple.eu/claim-review/c4f4c9d232c2d8793aa398e530b5bd27d96193b7866ce5a427258658>,
-        <http://data.cimple.eu/claim-review/d42c1800976d5cdc2d98df32b4b01166bb610ea6945e654cd63a2f43>,
-        <http://data.cimple.eu/claim-review/d847df7538004635fd83fcf111d7332bbc7a20cbbbc8ced47a1c8b2e>,
-        <http://data.cimple.eu/claim-review/dc19986756272f607d503a0d80a6ada8927dbcc4338978ec8aeade83>,
-        <http://data.cimple.eu/claim-review/ddd9a4586b7d81938cc14c0016674a6251aab189ce813f877a2a04c0>,
-        <http://data.cimple.eu/claim-review/e29d576664657269c408ee159fbe6dcd4cf918365b561f9f8e8bf696>,
-        <http://data.cimple.eu/claim-review/e2bedd3cb782fbd2d569bcc1eb5556d77b87c282b66af51ea5cb8380>,
-        <http://data.cimple.eu/claim-review/f59aa69647c117b050d3211a27aabefbe5ccc11787974e859cb1c539>,
-        :claimreview_5ae7176dc8987347347422f252761346,
-        :claimreview_604a1c4065eece81d08250e8239e1a39,
-        :claimreview_60bfbd139f47c6403cd52b13acfad511,
-        :claimreview_6c1e9f75891e4ba1a57bdd914dce8b1f,
-        :claimreview_6d796ad7fd18887e458a2bc5f97a0bbe,
-        :claimreview_944a1d01ec4f80b2021476d2ab6aed0e .
-
 :claimreview_72928ebae3a966c702ab8c164af2a7aa a schema:Claim,
         schema:ClaimReview ;
     rdfs:seeAlso :claimreview_6cd3778a50674862113c3739e25236c0 ;
@@ -59698,6 +59652,57 @@ These and other areas of concern are covered in far more detail in the 36-page S
 "Dvetisíc rokov písanej histórie ľudstva hovorí, že teplejšie obdobia ľuďom prospeli. Boli to drsné a nestabilné Obdobie temna a Malá doba ľadová, ktoré priniesli väčšie nepokoje, predčasný mráz, šírenie hladu a epidémie chorôb." (Dennis Avery)"""@sk,
         "»Dva tisoč let zapisane človeške zgodovine pripoveduje, da so bila topla obdobja ugodna za človeštvo. Ostro, nestabilno obdobje temačnega srednjega veka in male ledene dobe je prineslo močnejša neurja, zmrzal ob nenavadnem času, splošno lakoto in epidemije bolezni.« (Dennis Avery)"@sl ;
     schema:url "https://skepticalscience.com/global-warming-positives-negatives.htm"^^schema:URL .
+
+:5_3 a skos:Concept ;
+    skos:broader :5 ;
+    skos:inScheme :CARDS ;
+    skos:narrower :5_3_1,
+        :5_3_2 ;
+    skos:prefLabel "Climate is conspiracy"@en ;
+    schema:subjectOf <http://data.cimple.eu/claim-review/05c4f32c862a482b30163a778813073507059c61cf110387476b6e82>,
+        <http://data.cimple.eu/claim-review/062a54990d10a6619edc895fe3dc5547daf8c20e168024dafab9fb93>,
+        <http://data.cimple.eu/claim-review/0d4447fb0a3fba5bd78a3074fa1d97d06794103fe9db0de643e51c7d>,
+        <http://data.cimple.eu/claim-review/1c78b33eddbbed39810685de69415015ede7191bf8377e0be7b0b25a>,
+        <http://data.cimple.eu/claim-review/1d1fb3616c4f7980252be63e82caa383187ae093b0ed6528d9e38818>,
+        <http://data.cimple.eu/claim-review/1dee295b6c4c6a04b82889c56f73f12308807ddef4397e288c143734>,
+        <http://data.cimple.eu/claim-review/20d4ef0a28e7ae684f1597fde3a7fd19848bc63b653c21d652211d6a>,
+        <http://data.cimple.eu/claim-review/26fba951dea7eed9f9a8972a8975d3b6b474f41a8ecdc04224638c5f>,
+        <http://data.cimple.eu/claim-review/2973be7ba7c376724934e430cc1a73f2df8528b3fc954b06fd4b05c5>,
+        <http://data.cimple.eu/claim-review/2ecb938547e4cbe56679fdc723c5e691d9162a65a3fab89cf3013114>,
+        <http://data.cimple.eu/claim-review/352aa88bc3e9b603b0d98cd5c6a9f7f135c2736665dce2e59ba5823f>,
+        <http://data.cimple.eu/claim-review/44c770b098fc3d298cf862dbc524a7b96240f2b3078831a751a45eba>,
+        <http://data.cimple.eu/claim-review/574bf6cbbebf4c4e70d0a696465ae7225c62b97c9b59f9f81ed2d0cc>,
+        <http://data.cimple.eu/claim-review/64f8e63464a28b136fc14dec9c240d3365357176abd2acd51d34c05c>,
+        <http://data.cimple.eu/claim-review/6d9e9485910e4e7b0ddc20109fb70345e1042ccdedf3605874fc769e>,
+        <http://data.cimple.eu/claim-review/6edd65f95629e7509cf7f3820bb37506df3871f685eabbfa28be320d>,
+        <http://data.cimple.eu/claim-review/70fb2d490c70e3e717794541258e3a92288e4479dce64d57286a7bac>,
+        <http://data.cimple.eu/claim-review/72100e4a36dfcfae5b2afd87b6ceded9cbf7b1d8efa54fe50efd109f>,
+        <http://data.cimple.eu/claim-review/72ca4efdf74cdc1d0f2a7e322280760f9dc3a2b054ae7ca623ce6e27>,
+        <http://data.cimple.eu/claim-review/76ea3ed447e9987f29ecf4dd7a171250114a4178a6cf8af218d5b5ed>,
+        <http://data.cimple.eu/claim-review/80fdf22dde432f224f35a09d1ffecfabce8139597612254d38fdb8f5>,
+        <http://data.cimple.eu/claim-review/84e36d96de6eb87b3a54f32a9af299cb9f6f00956ad9d36ba765a134>,
+        <http://data.cimple.eu/claim-review/85b26547c9aa97423f2d770e7111bb7f83e0051b8d844ec21fd64722>,
+        <http://data.cimple.eu/claim-review/9107af8dd2dd7e0c88f50397d75bbb4997d4173c604a0122846ef100>,
+        <http://data.cimple.eu/claim-review/9cd2f0cf2409e60e03b8323681919ed6cd9f40271c1d6eb2af36fcd1>,
+        <http://data.cimple.eu/claim-review/a33e760be7e97bc2bb4ef9640374e32c142ac72997a573e9961fa91c>,
+        <http://data.cimple.eu/claim-review/a83e7c41a8fca8c43628c51a3bf5df95c519e2264f984163a3f9bc8f>,
+        <http://data.cimple.eu/claim-review/aeca96d9666a8c110b19a205ab98fe7be3ca4642f81358a2d78a6536>,
+        <http://data.cimple.eu/claim-review/b0bce836006ce1dc77a62db4c5dd7320e873c36dae12e3dd03bc118d>,
+        <http://data.cimple.eu/claim-review/b74daac27e5377a035d7b8025e4da2cf8ad913d8d813807ace234288>,
+        <http://data.cimple.eu/claim-review/c4f4c9d232c2d8793aa398e530b5bd27d96193b7866ce5a427258658>,
+        <http://data.cimple.eu/claim-review/d42c1800976d5cdc2d98df32b4b01166bb610ea6945e654cd63a2f43>,
+        <http://data.cimple.eu/claim-review/d847df7538004635fd83fcf111d7332bbc7a20cbbbc8ced47a1c8b2e>,
+        <http://data.cimple.eu/claim-review/dc19986756272f607d503a0d80a6ada8927dbcc4338978ec8aeade83>,
+        <http://data.cimple.eu/claim-review/ddd9a4586b7d81938cc14c0016674a6251aab189ce813f877a2a04c0>,
+        <http://data.cimple.eu/claim-review/e29d576664657269c408ee159fbe6dcd4cf918365b561f9f8e8bf696>,
+        <http://data.cimple.eu/claim-review/e2bedd3cb782fbd2d569bcc1eb5556d77b87c282b66af51ea5cb8380>,
+        <http://data.cimple.eu/claim-review/f59aa69647c117b050d3211a27aabefbe5ccc11787974e859cb1c539>,
+        :claimreview_5ae7176dc8987347347422f252761346,
+        :claimreview_604a1c4065eece81d08250e8239e1a39,
+        :claimreview_60bfbd139f47c6403cd52b13acfad511,
+        :claimreview_6c1e9f75891e4ba1a57bdd914dce8b1f,
+        :claimreview_6d796ad7fd18887e458a2bc5f97a0bbe,
+        :claimreview_944a1d01ec4f80b2021476d2ab6aed0e .
 
 :claimreview_9ed3c51cc0ea77255831222050277ff3 a schema:Claim,
         schema:ClaimReview ;
@@ -60701,6 +60706,7 @@ In conclusion, the recent, post 1975 steep rise in global temperatures are not r
         <http://data.cimple.eu/claim-review/c1541e5f16c4f94f832117d0cf7bf1538dfd99cace36d79a4a65bfc1>,
         <http://data.cimple.eu/claim-review/c162b3c0463dab5115daf4feed2a55fbd60341d30ca8b0d53617e657>,
         <http://data.cimple.eu/claim-review/c1bfd6d047afce2bc9209d1a940b55504d8a447010c14c2c2d08905c>,
+        <http://data.cimple.eu/claim-review/c1f91f3778d698ab565e1e03ce91c2fb6eb936b5d98cfe0c7edbe868>,
         <http://data.cimple.eu/claim-review/c249f016d1f68abce237dd4b93e2547fd22efdc5ed9530e3929d0303>,
         <http://data.cimple.eu/claim-review/c273eb321cab2840a07ec74a7f9db13ad6e78911228059d44693c284>,
         <http://data.cimple.eu/claim-review/c29e633b8f5ac336fb6434434b80159d10ae0782d51e478c643a843d>,
