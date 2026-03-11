@@ -1,16 +1,38 @@
 import logging
+import re
+import urllib.parse
 from typing import Optional
 
 import iso639
 import preserve
 from dotenv import load_dotenv
-from rdflib import OWL, RDF, RDFS, SDO, BNode, Graph, Literal, Namespace
+from rdflib import OWL, RDF, RDFS, SDO, XSD, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import NamespaceManager
 
 from climafactskg.builders.cimplekg import generate_cimplekg_mappings
 from climafactskg.utils import hash_string
 
 logging.basicConfig(level=logging.INFO)
+
+# RFC 3986 characters that are safe to leave unencoded in a URI
+_URI_SAFE = ":/?#[]@!$&'()*+,;=-._~%"
+
+
+def _safe_uriref(url: str) -> URIRef:
+    """Return a URIRef for *url*, percent-encoding any characters that are illegal in an IRI."""
+    return URIRef(urllib.parse.quote(url, safe=_URI_SAFE))
+
+
+_LEVEL_SUFFIX_RE = re.compile(r"-(basic|intermediate|advanced)(\.htm)$", re.IGNORECASE)
+
+
+def _canonical_claim_url(url: str) -> str:
+    """Strip a difficulty-level suffix from a SkS URL to get the canonical myth URL.
+
+    E.g. ``foo-basic.htm`` → ``foo.htm``, ``foo-advanced.htm`` → ``foo.htm``.
+    URLs that don't have such a suffix are returned unchanged.
+    """
+    return _LEVEL_SUFFIX_RE.sub(r"\2", url)
 
 
 def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[list] = None) -> Graph:
@@ -57,26 +79,27 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
             logging.info(f"Skipping URL (ignored): {url}")
             continue
 
-        # TODO Add all the levels instead of the first level
-        if "level" in arg and arg["level"] is not None and lang == "en":
-            if arg["level"] != arg["levels"][0]["level"]:
-                logging.warning(f'Skipping level "{arg["level"]}" for: {url}')
-                continue
-
         logging.info(f"Processing article URL: {url}")
         try:
             claimreview_id = f"claimreview_{hash_string(url)}"
 
             g.add((ns[claimreview_id], RDF.type, SDO.ClaimReview))
-            g.add((ns[claimreview_id], SDO.url, Literal(url, datatype=SDO.URL)))
+            g.add((ns[claimreview_id], SDO.url, _safe_uriref(url)))
+
+            # Emit educationalLevel and link to canonical ClaimReview for level variants:
+            if arg.get("level"):
+                g.add((ns[claimreview_id], SDO.educationalLevel, Literal(arg["level"])))
+                canonical_cr_id = f"claimreview_{hash_string(arg['main_url'])}"
+                if canonical_cr_id != claimreview_id:
+                    g.add((ns[claimreview_id], RDFS.seeAlso, ns[canonical_cr_id]))
 
             # Add rating:
             b = BNode()
             g.add((ns[claimreview_id], SDO.reviewRating, b))
             g.add((b, RDF.type, SDO.Rating))
-            g.add((b, SDO.ratingValue, Literal(0, datatype=SDO.Number)))
-            g.add((b, SDO.bestRating, Literal(1, datatype=SDO.Number)))
-            g.add((b, SDO.worstRating, Literal(0, datatype=SDO.Number)))
+            g.add((b, SDO.ratingValue, Literal(0, datatype=XSD.integer)))
+            g.add((b, SDO.bestRating, Literal(1, datatype=XSD.integer)))
+            g.add((b, SDO.worstRating, Literal(0, datatype=XSD.integer)))
             g.add(
                 (
                     b,
@@ -92,7 +115,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     (
                         ns[claimreview_id],
                         SDO.dateCreated,
-                        Literal(arg["last_update"], datatype=SDO.Date),
+                        Literal(arg["last_update"], datatype=XSD.date),
                     )
                 )
 
@@ -101,7 +124,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 (
                     ns[claimreview_id],
                     SDO.inLanguage,
-                    Literal(language, datatype=SDO.Text),
+                    Literal(language),
                 )
             )
 
@@ -110,7 +133,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 author_id = f"person_{hash_string(arg['author'])}"
                 g.add((ns[claimreview_id], SDO.author, ns[author_id]))
                 g.add((ns[author_id], RDF.type, SDO.Person))
-                g.add((ns[author_id], SDO.name, Literal(arg["author"], datatype=SDO.Text)))
+                g.add((ns[author_id], SDO.name, Literal(arg["author"])))
 
             # Add publisher information:
             g.add((ns[claimreview_id], SDO.publisher, ns["organization_sks"]))
@@ -119,14 +142,14 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 (
                     ns["organization_sks"],
                     SDO.name,
-                    Literal("Skeptical Science", lang=lang),
+                    Literal("Skeptical Science"),
                 )
             )
             g.add(
                 (
                     ns["organization_sks"],
                     SDO.url,
-                    Literal("https://skepticalscience.com", datatype=SDO.URL),
+                    URIRef("https://skepticalscience.com"),
                 )
             )
 
@@ -135,7 +158,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 (
                     ns[claimreview_id],
                     SDO.license,
-                    Literal("https://creativecommons.org/licenses/by/3.0/", datatype=SDO.URL),
+                    URIRef("https://creativecommons.org/licenses/by/3.0/"),
                 )
             )
 
@@ -185,8 +208,9 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     Literal(arg["what_the_science_says"], lang=lang),
                 )
             )
-            g.add((ns[claimreview_id], SDO.reviewBody, Literal(arg["content"], lang=lang)))
-            g.add((ns[claimreview_id], SDO.text, Literal(arg["content"], lang=lang)))
+            if arg.get("content"):
+                g.add((ns[claimreview_id], SDO.reviewBody, Literal(arg["content"], lang=lang)))
+                g.add((ns[claimreview_id], SDO.text, Literal(arg["content"], lang=lang)))
 
             # Add related arguments if present:
             if "related_arguments" in arg and arg["related_arguments"] is not None:
@@ -201,7 +225,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     )
                     g.add((ns[claimreview_id], RDFS.seeAlso, ns[related_claimreview_id]))
 
-            # Add main URL if different:
+            # Link level-variant ClaimReview to the canonical-URL ClaimReview:
             if arg["main_url"] != url:
                 main_claim_review_id = f"claimreview_{hash_string(arg['main_url'])}"
                 g.add((ns[claimreview_id], OWL.sameAs, ns[main_claim_review_id]))
@@ -213,7 +237,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     (
                         ns[language["code"]],
                         SDO.alternateName,
-                        Literal(language["code"], datatype=SDO.Text),
+                        Literal(language["code"]),
                     )
                 )
                 g.add(
@@ -225,7 +249,10 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 )
 
             # Add the reviewed claim:
-            claim_id = f"claimreview_{hash_string(arg['main_url'])}"
+            # All level variants (basic/intermediate/advanced) of the same myth
+            # share one sc:Claim node identified by the canonical (suffix-free) URL.
+            canonical_url = _canonical_claim_url(arg["main_url"])
+            claim_id = f"claim_{hash_string(canonical_url)}"
             g.add((ns[claimreview_id], SDO.claimReviewed, ns[claim_id]))
             g.add((ns[claim_id], RDF.type, SDO.Claim))
             g.add((ns[claim_id], SDO.text, Literal(arg["climate_myth"], lang=lang)))
@@ -236,7 +263,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     (
                         ns[claim_id],
                         SDO.citation,
-                        Literal(arg["climate_myth_source"]["url"], datatype=SDO.URL),
+                        _safe_uriref(arg["climate_myth_source"]["url"]),
                     )
                 )
 

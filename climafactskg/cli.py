@@ -4,8 +4,6 @@ import typer
 from dotenv import load_dotenv
 from typing_extensions import Annotated
 
-from climafactskg.collectors.skepticalscience import fetch_misinformers_urls
-
 load_dotenv()
 app = typer.Typer(add_completion=False)
 
@@ -41,13 +39,18 @@ def callback(
 def collect():
     """Collect data for the ClimaFactsKG knowledge graph."""
     from climafactskg.collectors.cimplekg import fetch_claims
-    from climafactskg.collectors.skepticalscience import fetch_arguments_urls
+    from climafactskg.collectors.skepticalscience import (
+        fetch_arguments_urls,
+        fetch_misinformers_urls,
+        fetch_skstiptionary,
+    )
 
     fetch_arguments_urls(
         ignore_urls=["https://skepticalscience.com/wigley-santer-2012-attribution.html"],
     )
     fetch_misinformers_urls()
     fetch_claims()
+    fetch_skstiptionary()
 
 
 @app.command()
@@ -61,6 +64,10 @@ def process(
         help="Path to the SkepticalScience misinformers database.",
     ),
     cimplekg_db: str = typer.Option("data/cimplekg_mappings_db.db", help="Path to the CimpleKG claims database."),
+    references_db: str = typer.Option(
+        "data/skepticalscience_references_db.db",
+        help="Path to the SkepticalScience references database.",
+    ),
 ):
     """Process collected data and store it in the knowledge graph."""
     import preserve
@@ -88,6 +95,9 @@ def process(
             ignore_urls=ignore_urls,
         )
 
+    with preserve.open(format="sqlite", filename=references_db) as db:
+        skepticalscience_collectors.process_skstiptionary(db)
+
 
 @app.command()
 def build(
@@ -97,6 +107,10 @@ def build(
     ),
     cards_ttl: str = typer.Option("data/cards.ttl", help="Path to the CARDS TTL file."),
     cimplekg_db: str = typer.Option("data/cimplekg_mappings_db.db", help="Path to the CimpleKG claims database."),
+    references_db: str = typer.Option(
+        "data/skepticalscience_references_db.db",
+        help="Path to the SkepticalScience references database.",
+    ),
     output: str = typer.Option(
         "data/climafacts_kg.ttl",
         help="Path to the output file for the ClimaFactsKG knowledge graph.",
@@ -104,7 +118,16 @@ def build(
     output_format: str = typer.Option("ttl", help="Format of the output file."),
 ):
     """Build the ClimaFactsKG knowledge graph."""
+    import os
+
+    import preserve
+    from rdflib import Namespace
+
     from climafactskg.builders.climafactskg import build_climafactskg
+    from climafactskg.builders.sksreferenceskg import (
+        generate_citations_graph,
+        generate_references_graph,
+    )
 
     ignore_urls = ["https://skepticalscience.com/wigley-santer-2012-attribution.html"]
 
@@ -114,6 +137,19 @@ def build(
         cimplekg_db=cimplekg_db,
         ignore_urls=ignore_urls,
     )
+
+    if os.path.exists(references_db):
+        with preserve.open(format="sqlite", filename=references_db) as ref_db:
+            g += generate_references_graph(ref_db)
+
+        with preserve.open(format="sqlite", filename=climafactskg_db) as art_db:
+            with preserve.open(format="sqlite", filename=references_db) as ref_db:
+                g += generate_citations_graph(art_db, ref_db)
+
+    # Re-bind friendly prefixes that can be lost during graph merging with +=
+    g.bind("bibo", Namespace("http://purl.org/ontology/bibo/"))
+    g.bind("cito", Namespace("http://purl.org/spar/cito/"))
+
     g.serialize(destination=output, format=output_format)
 
 

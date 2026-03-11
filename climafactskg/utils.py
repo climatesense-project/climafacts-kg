@@ -97,6 +97,146 @@ def extract_hierarchy(ul_element: bs4.element.Tag, base_url: str = "") -> list[D
     return hierarchy
 
 
+def js_object_to_dict(js_block: str, unquoted_keys: Optional[list] = None) -> dict:
+    """Parse a JavaScript object literal into a Python dict.
+
+    Handles the common differences between JS object literals and JSON:
+
+    - Unquoted property names.
+    - Trailing commas.
+    - Backslash escape sequences that are valid in JS but not in JSON.
+
+    Args:
+        js_block (str): A JS object literal string, e.g. the value assigned
+            to a ``var`` / ``const`` / ``let`` declaration.
+        unquoted_keys (list, optional): Explicit list of unquoted property names
+            to quote.  When provided, only these names are matched, which avoids
+            false positives inside string values that contain ``word:`` patterns
+            (e.g. HTML with ``Austin, TX: ...``).  When omitted, any JS
+            identifier immediately following ``{`` or ``,`` is quoted.
+
+    Returns:
+        dict: The parsed Python dictionary.
+
+    Raises:
+        json.JSONDecodeError: If the block cannot be parsed even after
+            the normalisation steps above.
+    """
+    if unquoted_keys:
+        pattern = r"([{,]\s*)(" + "|".join(re.escape(k) for k in unquoted_keys) + r")(\s*:)"
+    else:
+        pattern = r"([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)"
+    # Quote unquoted property names.
+    # Anchoring on [{,] prevents false matches inside quoted string values.
+    s = re.sub(pattern, r'\1"\2"\3', js_block)
+    # Remove trailing commas before } or ].
+    s = re.sub(r",(\s*[}\]])", r"\1", s)
+    # Drop backslashes that form invalid JSON escape sequences.
+    # \\ is kept as-is; any other \X is reduced to just X.
+    s = re.sub(
+        r'\\\\|\\([^"\\/bfnrtu])',
+        lambda m: m.group(0) if m.group(1) is None else m.group(1),
+        s,
+    )
+    return json.loads(s)
+
+
+_DOI_TEXT_RE = re.compile(r"\bdoi\s*:?\s*(10\.\d{4,}/\S+)", re.IGNORECASE)
+
+
+def parse_apa_citation_html(definition_html: str) -> dict:
+    """Extract structured bibliography fields from an APA-style HTML citation snippet.
+
+    Parses HTML such as those produced by Skeptical Science's sksTiptionary,
+    but is generic enough for any APA-formatted ``<p>`` block.
+
+    Args:
+        definition_html (str): HTML string containing the citation.  Expected
+            to have the citation in the first ``<p>`` element with the journal
+            title and volume in ``<em>`` tags.
+
+    Returns:
+        dict: Any subset of the following keys that could be extracted:
+            ``authors_raw``, ``year``, ``journal``, ``volume``, ``issue``,
+            ``pages``, ``doi``, ``url``.
+    """
+    soup = bs4.BeautifulSoup(definition_html, "html.parser")
+    out: dict = {}
+
+    # Non-DOI link (link to paper / PDF / abstract)
+    for a in soup.find_all("a", href=True):
+        href = str(a["href"])
+        if "doi.org" not in href and href.startswith(("http://", "https://")):
+            out["url"] = href
+            break
+
+    # DOI: prefer anchor whose href *starts* with a doi.org domain, then fall
+    # back to plain-text "doi: ...".  Using `in` is intentionally avoided here
+    # because URLs like https://example.com/"https:/doi.org/10..." would match.
+    _doi_href_re = re.compile(r"^https?://(?:dx\.)?doi\.org/10\.", re.IGNORECASE)
+    doi: Optional[str] = None
+    for a in soup.find_all("a", href=True):
+        if _doi_href_re.match(str(a["href"])):
+            doi = str(a["href"])
+            break
+    if doi is None:
+        m = _DOI_TEXT_RE.search(soup.get_text(" "))
+        if m:
+            doi = "https://doi.org/" + m.group(1).rstrip(".,;)")
+    if doi is not None:
+        out["doi"] = doi
+
+    # Structured fields come from the first <p> (the main citation line)
+    p = soup.find("p")
+    if not p:
+        return out
+
+    text = p.get_text(" ", strip=True)
+
+    # Year and authors_raw
+    m_yr = re.search(r"\((\d{4}[a-z]?)\)", text)
+    if m_yr:
+        out["year"] = m_yr.group(1)
+        raw = text[: m_yr.start()].strip()
+        if raw:
+            out["authors_raw"] = raw
+
+    # Journal and volume from <em> tags
+    em_tags = p.find_all("em")
+    if not em_tags:
+        return out
+
+    j_text = em_tags[0].get_text(strip=True)
+    # Some entries embed volume in the journal em: "Journal Name, 42"
+    m_jv = re.match(r"^(.*?),\s*(\d+)\s*$", j_text)
+    if m_jv:
+        out["journal"] = m_jv.group(1).strip()
+        out["volume"] = m_jv.group(2)
+        vol_em = em_tags[0]
+    elif len(em_tags) > 1 and re.match(r"^\s*\d+\s*$", em_tags[1].get_text()):
+        out["journal"] = j_text.strip()
+        out["volume"] = em_tags[1].get_text(strip=True)
+        vol_em = em_tags[1]
+    else:
+        out["journal"] = j_text.strip()
+        vol_em = em_tags[0]
+
+    # Issue and pages: text immediately after the volume em tag
+    after_parts = []
+    for sib in vol_em.next_siblings:
+        if hasattr(sib, "get_text"):
+            after_parts.append(sib.get_text(" "))
+        elif isinstance(sib, str):
+            after_parts.append(sib)
+    after = "".join(after_parts).strip()
+    m_ip = re.match(r"\s*\((\w+)\)\s*,?\s*([\w\-\u2013]+)", after)
+    if m_ip:
+        out["issue"] = m_ip.group(1)
+        out["pages"] = m_ip.group(2).rstrip(".")
+
+    return out
+
+
 def fetch_url_content(
     url: str,
     cache_dir: str = os.getenv("CLIMAFACTSKG_CACHE_DIR", tempfile.gettempdir()),

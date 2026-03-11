@@ -10,6 +10,7 @@ from climafactskg.classifiers.cards import CARDSClassifier
 from climafactskg.parsers.skepticalscience import (
     parse_main_article,
     parse_misinformer_article,
+    parse_skstiptionary_references,
     parse_translated_article,
 )
 from climafactskg.utils import fetch_url_content
@@ -301,3 +302,46 @@ def process_all(
         urls = []
     process_urls(db, urls, ignore_urls=ignore_urls)
     classify_urls(db)
+
+
+def fetch_skstiptionary(
+    url: str = "https://skepticalscience.com/public/assets/jsgen/skstiptionary_1752342798469.js",
+) -> str:
+    """Fetches the sksTiptionary JavaScript file from Skeptical Science.
+
+    Args:
+        url (str): URL of the sksTiptionary JS file.
+
+    Returns:
+        str: Raw JavaScript file content.
+    """
+    return fetch_url_content(url)
+
+
+def process_skstiptionary(
+    db: preserve.Connector, url: str = "https://skepticalscience.com/public/assets/jsgen/skstiptionary_1752342798469.js"
+) -> None:
+    """Downloads the sksTiptionary JS file, extracts research paper references, and stores them in the database.
+
+    Each reference is stored under its citation key (e.g. ``"Cook et al. (2013)"``).
+    Already-stored keys are skipped.
+
+    Args:
+        db (preserve.Connector): Database connector for storing parsed references.
+        url (str): URL of the sksTiptionary JS file.
+
+    Returns:
+        None
+    """
+    js_content = fetch_skstiptionary(url)
+    references = parse_skstiptionary_references(js_content)
+
+    logging.info(f"Found {len(references)} research paper references.")
+
+    for ref in references:
+        key = ref["key"]
+        if key in db:
+            logging.info(f"Skipping already stored reference: {key}")
+        else:
+            db[key] = ref
+            logging.info(f"Stored reference: {key}")

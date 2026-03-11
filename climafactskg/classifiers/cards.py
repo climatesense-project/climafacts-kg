@@ -636,7 +636,7 @@ class CARDSClassifier:
             17: "5_3",
         }
 
-    def classify(self, text: str) -> str:
+    def classify(self, text: str, skip_binary: bool = False) -> str:
         """Classifies the input text using pre-loaded binary and taxonomy classification models.
 
         The method performs two-stage classification:
@@ -645,28 +645,40 @@ class CARDSClassifier:
 
         Args:
             text (str): The input text to classify.
+            skip_binary (bool): If True, skips the binary classification step and returns only the taxonomy
+                classification. Defaults to False.
 
         Returns:
-            str: The predicted label. Returns "0_0" if the binary classifier predicts the negative class,
-                otherwise returns the taxonomy label corresponding to the predicted class.
+            str: The predicted label. If skip_binary is False, returns "0" if the binary classifier predicts
+                the negative class, otherwise returns the taxonomy label. If skip_binary is True, always returns
+                the taxonomy label corresponding to the predicted class.
         """
         text = text.strip()[: self.max_len]  # Ensure text is not longer than MAX_LEN
         tokenized_text = self.tokenizer(text, return_tensors="pt")
         tokenized_text = {k: v.to(self.device) for k, v in tokenized_text.items()}
 
         with torch.no_grad():
-            # Binary classification
+            if skip_binary:
+                # Only run taxonomy classification
+                outputs = self.taxonomy_model(**tokenized_text)
+                taxonomy_prediction = torch.argmax(outputs.logits, dim=1)
+                taxonomy_prediction = taxonomy_prediction.to("cpu").item()
+                return self.id2label[int(taxonomy_prediction)]
+
+            # Run binary classification first
             outputs = self.binary_model(**tokenized_text)
             binary_prediction = torch.argmax(outputs.logits, dim=1)
             binary_prediction = binary_prediction.to("cpu").item()
 
-            # Taxonomy classification
+            # Only run taxonomy if binary is positive
+            if binary_prediction == 0:
+                return "0"
+
+            # Run taxonomy classification
             outputs = self.taxonomy_model(**tokenized_text)
             taxonomy_prediction = torch.argmax(outputs.logits, dim=1)
             taxonomy_prediction = taxonomy_prediction.to("cpu").item()
-
-        prediction = "0" if binary_prediction == 0 else self.id2label[int(taxonomy_prediction)]
-        return prediction
+            return self.id2label[int(taxonomy_prediction)]
 
 
 def cards_classification(text: str) -> str:

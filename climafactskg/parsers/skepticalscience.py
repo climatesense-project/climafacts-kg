@@ -1,13 +1,27 @@
+import json
 import re
 import unicodedata
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urljoin
 
 import langcodes
 from bs4 import BeautifulSoup, Tag
 
-from climafactskg.utils import extract_hierarchy, fetch_url_content, remove_html_tags
+from climafactskg.utils import (
+    extract_hierarchy,
+    fetch_url_content,
+    js_object_to_dict,
+    parse_apa_citation_html,
+    remove_html_tags,
+)
+
+_LEVEL_SUFFIX_RE = re.compile(r"-(basic|intermediate|advanced)(\.htm)$", re.IGNORECASE)
+
+
+def _canonical_url(url: str) -> str:
+    """Strip a difficulty-level suffix from a SkS URL to get the canonical myth URL."""
+    return _LEVEL_SUFFIX_RE.sub(r"\2", url)
 
 
 def parse_taxonomy(
@@ -224,7 +238,7 @@ def parse_main_article(url: str, html: Optional[str] = None) -> dict:
             climate_myth_source = None
 
     # Get at glance if it exists:
-    h2_at_glance = soup.find("h2", string="At a glance")
+    h2_at_glance = soup.find("h2", string="At a glance")  # type: ignore
     if h2_at_glance:
         at_glance = ""
 
@@ -244,7 +258,7 @@ def parse_main_article(url: str, html: Optional[str] = None) -> dict:
         if further_details_element and further_details_element.parent:
             siblings = further_details_element.parent.find_next_siblings()
         else:
-            h2_further_details = soup.find("h2", string="Further details")
+            h2_further_details = soup.find("h2", string="Further details")  # type: ignore
             if h2_further_details is not None:
                 siblings = h2_further_details.find_next_siblings()
             else:
@@ -299,7 +313,7 @@ def parse_main_article(url: str, html: Optional[str] = None) -> dict:
     content = unicodedata.normalize("NFKD", content.strip())
 
     # Get related arguments:
-    if args := soup.find("h2", string="Related Arguments"):
+    if args := soup.find("h2", string="Related Arguments"):  # type: ignore
         related_arguments = [
             {"url": urljoin(url, str(a["href"])), "title": a.text.strip()}
             for a in args.parent.find_next_sibling("div").select("a")  # type: ignore
@@ -310,7 +324,7 @@ def parse_main_article(url: str, html: Optional[str] = None) -> dict:
     # Create a dictionary with all the information:
     article = {
         "url": url,
-        "main_url": url,
+        "main_url": _canonical_url(url),
         "level": level,
         "lang": "en",
         "title": title,
@@ -480,6 +494,199 @@ def parse_misinformer_article(url: str, html: Optional[str] = None) -> dict:
         "author_name": author_name,
         "quotes": quotes,
     }
+
+
+def parse_skstiptionary_references(js_content: str) -> list:
+    """Return research paper references from the sksTiptionary JS file.
+
+    Entries with ``citation == "4"`` are research papers; all others are IPCC /
+    NSIDC glossary definitions.  Each returned dict has keys ``key``, ``title``,
+    ``definition_html``, plus any bibliography fields extracted from the
+    definition HTML: ``authors_raw``, ``year``, ``journal``, ``volume``,
+    ``issue``, ``pages``, ``doi``, ``url``.
+    """
+    parts = js_content.split("sksCitations=", 1)
+    if len(parts) != 2:
+        raise ValueError("Could not locate sksCitations= in JS content.")
+
+    tiptionary_js = re.sub(r"^\s*sksTiptionary\s*=\s*", "", parts[0]).strip()
+
+    _keys = ["header", "definition", "altKeys", "level", "matchType", "citation", "xmatchtype"]
+    try:
+        tiptionary: dict = js_object_to_dict(tiptionary_js, unquoted_keys=_keys)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Failed to parse sksTiptionary as JSON: {exc}") from exc
+
+    references = []
+    for key, entry in tiptionary.items():
+        if not isinstance(entry, dict) or entry.get("citation") != "4":
+            continue
+
+        definition_html = entry.get("definition", "")
+        bib = parse_apa_citation_html(definition_html)
+        bib["key"] = key
+        bib["header"] = entry.get("header")
+        bib["title"] = entry.get("header")  # kept for backward compatibility
+        bib["matchType"] = entry.get("matchType")
+        alt = entry.get("altKeys")
+        bib["altKeys"] = alt if isinstance(alt, list) else ([alt] if alt else [])
+        bib["definition_html"] = definition_html
+        references.append(bib)
+
+    return references
+
+
+def parse_skstiptionary_full(js_content: str) -> Dict[str, Any]:
+    """Return the raw sksTiptionary dict (all entries, not just citation==4).
+
+    The dict preserves the original JS structure, including ``altKeys`` as a
+    nested dict (``{alt_string: {matchType: ..., xmatchtype: ...}}``) so it
+    can be passed directly to :class:`SksMatcher`.
+    """
+    parts = js_content.split("sksCitations=", 1)
+    if len(parts) != 2:
+        raise ValueError("Could not locate sksCitations= in JS content.")
+
+    tiptionary_js = re.sub(r"^\s*sksTiptionary\s*=\s*", "", parts[0]).strip()
+    _keys = ["header", "definition", "altKeys", "level", "matchType", "citation", "xmatchtype"]
+    try:
+        return js_object_to_dict(tiptionary_js, unquoted_keys=_keys)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Failed to parse sksTiptionary as JSON: {exc}") from exc
+
+
+class SksMatcher:
+    """Optimised keyword matcher using an alphanumeric prefix index.
+
+    Builds a fast lookup index from a sksTiptionary dict and scans arbitrary
+    text to find which tiptionary keys are mentioned.
+    """
+
+    WORD_START = re.compile(r"[a-zA-Z0-9]")
+
+    def __init__(self, tiptionary: Dict[str, Any], fast_key_len: int = 3):
+        self.fast_key_len = fast_key_len
+        self.fast_key_xref: Dict[str, List[Dict[str, Any]]] = {}
+        self._build_index(tiptionary)
+
+    def _get_match_type(self, key: str, match_type: Optional[str] = None) -> str:
+        """Infer match rules from string casing."""
+        if match_type:
+            return match_type
+        lower = key.lower()
+        if key == lower:
+            return "A"
+        if key == key.upper():
+            return "U"
+        words = key.split()
+        is_title = all(w[0].isupper() and w[1:].islower() for w in words if len(w) > 1)
+        return "T" if is_title else "E"
+
+    def _get_fast_key(self, text: str, pointer: int = 0) -> str:
+        """Extract an alphanumeric prefix of length ``fast_key_len``."""
+        fast_key: List[str] = []
+        scan_ptr = pointer
+        text_len = len(text)
+        while len(fast_key) < self.fast_key_len and scan_ptr < text_len:
+            char = text[scan_ptr]
+            if char.isalnum():
+                fast_key.append(char.lower())
+            scan_ptr += 1
+        return "".join(fast_key)
+
+    def _add_to_index(self, find_key: str, main_key: str, match_type: Optional[str]) -> None:
+        find_key = find_key.strip()
+        if len(find_key) < 2:
+            return
+        m_type = self._get_match_type(find_key, match_type)
+        f_key = self._get_fast_key(find_key)
+        if not f_key:
+            return
+        entry = {
+            "findKey": find_key,
+            "mainKey": main_key,
+            "matchType": m_type,
+            "len": len(find_key),
+        }
+        self.fast_key_xref.setdefault(f_key, []).append(entry)
+
+    def _build_index(self, tiptionary: Dict[str, Any]) -> None:
+        """Build prefix index and pre-sort buckets for greedy matching."""
+        for key_name, data in tiptionary.items():
+            self._add_to_index(key_name, key_name, data.get("matchType"))
+            if "header" in data:
+                self._add_to_index(data["header"], key_name, None)
+            alt_keys = data.get("altKeys")
+            if isinstance(alt_keys, dict):
+                for alt_str, alt_meta in alt_keys.items():
+                    m_type = alt_meta.get("matchType") or alt_meta.get("xmatchtype")
+                    for sub_key in alt_str.split(";"):
+                        self._add_to_index(sub_key, key_name, m_type)
+            elif isinstance(alt_keys, list):
+                for alt_str in alt_keys:
+                    if alt_str:
+                        self._add_to_index(str(alt_str), key_name, None)
+        for f_key in self.fast_key_xref:
+            self.fast_key_xref[f_key].sort(key=lambda x: x["len"], reverse=True)
+
+    def get_matching_keys(self, text: str) -> List[str]:
+        """Scan *text* and return all tiptionary main-keys whose terms appear in it."""
+        found_keys: Set[str] = set()
+        ptr = 0
+        text_len = len(text)
+        while ptr < text_len:
+            match = self.WORD_START.search(text, ptr)
+            if not match:
+                break
+            ptr = match.start()
+            f_key = self._get_fast_key(text, ptr)
+            match_found = False
+            if f_key in self.fast_key_xref:
+                for km in self.fast_key_xref[f_key]:
+                    target_len = km["len"]
+                    if ptr + target_len > text_len:
+                        continue
+                    segment = text[ptr : ptr + target_len]
+                    if km["matchType"] == "A":
+                        if segment.lower() == km["findKey"].lower():
+                            found_keys.add(km["mainKey"])
+                            ptr += target_len
+                            match_found = True
+                            break
+                    elif segment == km["findKey"]:
+                        found_keys.add(km["mainKey"])
+                        ptr += target_len
+                        match_found = True
+                        break
+            if not match_found:
+                ptr += 1
+                while ptr < text_len and text[ptr].isalnum():
+                    ptr += 1
+        return sorted(found_keys)
+
+
+def parse_skscitations(js_content: str) -> dict:
+    """Extracts the ``sksCitations`` mapping from the sksTiptionary JS file.
+
+    Args:
+        js_content (str): Raw content of the sksTiptionary JavaScript file.
+
+    Returns:
+        dict: Mapping of citation number strings to their label strings,
+        e.g. ``{"1": "Definition courtesy of IPCC AR4.", ...}``.
+
+    Raises:
+        ValueError: If the ``sksCitations`` block cannot be located or parsed.
+    """
+    parts = js_content.split("sksCitations=", 1)
+    if len(parts) != 2:
+        raise ValueError("Could not locate sksCitations= in JS content.")
+
+    citations_raw = parts[1].strip()
+    try:
+        return js_object_to_dict(citations_raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Failed to parse sksCitations as JSON: {exc}") from exc
 
 
 if __name__ == "__main__":
