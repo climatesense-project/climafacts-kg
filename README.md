@@ -21,7 +21,7 @@ ClimaFactsKG also integrates the scientific references cited in Skeptical Scienc
 
 ### 🔗 RDF Namespaces
 
-The ClimaFactsKG namespace is: https://purl.net/climafactskg/ns#.
+The ClimaFactsKG namespace is: https://purl.net/climatesense/climafactskg/ns#.
 
 ClimaFactsKG commonly uses the following namespaces and prefixes:
 
@@ -87,8 +87,8 @@ The following table shows the main entity and triple counts in the current Clima
 | `sc:ScholarlyArticle` / `bibo:AcademicArticle` nodes | 1,205 |
 | `sc:Periodical` / `bibo:Journal` nodes  | 420     |
 | `sc:Person` nodes (article authors)     | 4,586   |
-| `sc:citation` triples (source links)    | 512     |
-| `cito:cites` triples (scholarly links)  | 270     |
+| `sc:citation` triples (source links)    | 982     |
+| `cito:cites` triples (scholarly links)  | 485     |
 | Total RDF triples                       | 79,458  |
 
 ## 🖥️ ClimaFactsKG Source Code

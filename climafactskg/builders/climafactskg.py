@@ -14,6 +14,16 @@ from climafactskg.utils import hash_string
 
 logging.basicConfig(level=logging.INFO)
 
+
+def _normalize_text(value: str) -> str:
+    """Collapse all whitespace runs (including newlines) to a single space.
+
+    rdflib serialises any string containing newlines or double-quotes as a
+    triple-quoted Turtle literal. Normalising here keeps every text Literal on one logical line.
+    """
+    return " ".join(value.split())
+
+
 # RFC 3986 characters that are safe to leave unencoded in a URI
 _URI_SAFE = ":/?#[]@!$&'()*+,;=-._~%"
 
@@ -104,7 +114,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 (
                     b,
                     SDO.ratingExplanation,
-                    Literal(arg["what_the_science_says"], lang=lang),
+                    Literal(_normalize_text(arg["what_the_science_says"]), lang=lang),
                 )
             )
             g.add((b, SDO.name, Literal("False", datatype=SDO.Text)))
@@ -168,7 +178,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     (
                         ns[claimreview_id],
                         SDO.description,
-                        Literal(arg["description"], lang=lang),
+                        Literal(_normalize_text(arg["description"]), lang=lang),
                     )
                 )
 
@@ -183,7 +193,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     (
                         ns[claimreview_id],
                         SDO.abstract,
-                        Literal(arg["at_glance"], lang=lang),
+                        Literal(_normalize_text(arg["at_glance"]), lang=lang),
                     )
                 )
 
@@ -200,17 +210,17 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 g.add((ns[cards_category_id], SDO.subjectOf, ns[claimreview_id]))
 
             # Add content of the review:
-            g.add((ns[claimreview_id], SDO.name, Literal(arg["title"], lang=lang)))
+            g.add((ns[claimreview_id], SDO.name, Literal(_normalize_text(arg["title"]), lang=lang)))
             g.add(
                 (
                     ns[claimreview_id],
                     SDO.headline,
-                    Literal(arg["what_the_science_says"], lang=lang),
+                    Literal(_normalize_text(arg["what_the_science_says"]), lang=lang),
                 )
             )
             if arg.get("content"):
-                g.add((ns[claimreview_id], SDO.reviewBody, Literal(arg["content"], lang=lang)))
-                g.add((ns[claimreview_id], SDO.text, Literal(arg["content"], lang=lang)))
+                g.add((ns[claimreview_id], SDO.reviewBody, Literal(_normalize_text(arg["content"]), lang=lang)))
+                g.add((ns[claimreview_id], SDO.text, Literal(_normalize_text(arg["content"]), lang=lang)))
 
             # Add related arguments if present:
             if "related_arguments" in arg and arg["related_arguments"] is not None:
@@ -255,7 +265,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
             claim_id = f"claim_{hash_string(canonical_url)}"
             g.add((ns[claimreview_id], SDO.claimReviewed, ns[claim_id]))
             g.add((ns[claim_id], RDF.type, SDO.Claim))
-            g.add((ns[claim_id], SDO.text, Literal(arg["climate_myth"], lang=lang)))
+            g.add((ns[claim_id], SDO.text, Literal(_normalize_text(arg["climate_myth"]), lang=lang)))
 
             # Add the claim source if present:
             if "climate_myth_source" in arg and arg["climate_myth_source"] is not None:
