@@ -14,10 +14,13 @@ jobs:
       - name: Get latest release assets
         id: get_asset
         run: |
-          # Published under climafacts-kg/ (not the Pages root) so this repo's
-          # files can't collide with another repo's output on the same
-          # org-level Pages site / custom domain.
-          mkdir -p climafacts-kg
+          # No custom domain (no CNAME) — this is a standard GitHub Project
+          # Pages site, already served at
+          # https://climatesense-project.github.io/climafacts-kg/ with the
+          # repo-name path segment provided by GitHub's routing for free.
+          # Publishing at the artifact root here is correct; adding another
+          # climafacts-kg/ folder would double-nest the path and 404 the
+          # actual site root (no index.html there).
           ASSETS=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest")
           for FILE_NAME in climafacts_kg.rdf climafacts_kg.ttl cards.rdf cards.ttl; do
             RELEASE_URL=$(echo "$ASSETS" | jq -r ".assets[] | select(.name == \"${FILE_NAME}\") | .browser_download_url")
@@ -26,7 +29,7 @@ jobs:
               exit 1
             fi
             echo "Downloading '${FILE_NAME}' asset from: $RELEASE_URL"
-            curl -L -o "climafacts-kg/${FILE_NAME}" "$RELEASE_URL"
+            curl -L -o "$FILE_NAME" "$RELEASE_URL"
           done
           touch .nojekyll
       - name: Setup Pages
