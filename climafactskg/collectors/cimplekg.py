@@ -31,7 +31,7 @@ ORDER BY DESC(?date_published)
 
 def fetch_claims() -> pd.DataFrame:
     """Fetch claims from the CimpleKG SPARQL endpoint and return as a DataFrame."""
-    results = query_sparqlendpoint(CIMPLEKG_SPARQL_ENDPOINT, CIMPLEKG_QUERY)  # TODO Cache query results.
+    results = query_sparqlendpoint(CIMPLEKG_SPARQL_ENDPOINT, CIMPLEKG_QUERY)
 
     # Ensure results is a DataFrame
     if not isinstance(results, pd.DataFrame):

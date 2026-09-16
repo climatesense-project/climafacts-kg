@@ -41,7 +41,7 @@ ORDER BY DESC(?date_published)
 
 def fetch_claims() -> pd.DataFrame:
     """Fetch claims from the ClimateSenseKG SPARQL endpoint and return as a DataFrame."""
-    results = query_sparqlendpoint(CLIMATESENSEKG_SPARQL_ENDPOINT, CLIMATESENSEKG_QUERY)  # TODO Cache query results.
+    results = query_sparqlendpoint(CLIMATESENSEKG_SPARQL_ENDPOINT, CLIMATESENSEKG_QUERY)
 
     # Ensure results is a DataFrame
     if not isinstance(results, pd.DataFrame):

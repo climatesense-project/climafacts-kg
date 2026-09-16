@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 from datetime import datetime, timedelta
+from functools import lru_cache
 from typing import Dict, Optional
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
@@ -14,12 +15,37 @@ import requests
 from SPARQLWrapper import CSV, SPARQLWrapper
 
 
-def query_sparqlendpoint(endpoint_url, query) -> pd.DataFrame:
+@lru_cache(maxsize=32)
+def query_sparqlendpoint(
+    endpoint_url,
+    query,
+    cache_dir: Optional[str] = None,
+    cache_expiry: Optional[timedelta] = None,
+) -> pd.DataFrame:
     """Executes a SPARQL query against a specified endpoint and returns the results as a pandas DataFrame.
+
+    Wrapped in ``lru_cache`` so repeat calls with identical arguments within the
+    same process return instantly with no disk I/O — on top of (not instead of)
+    the disk cache below, which is what actually avoids re-fetching across
+    separate CLI invocations (e.g. `collect()` then `process()`, two different
+    processes). ``lru_cache`` has no TTL, so it can outlive the disk cache's
+    *cache_expiry* window in theory; harmless here since a single CLI run
+    finishes in minutes, nowhere near the (default 1-hour) expiry.
+
+    Results are cached to disk keyed by (endpoint_url, query) and reused while
+    within *cache_expiry*, so back-to-back calls in the same pipeline run
+    (e.g. `collect()` then `process()` each calling a collector's
+    `fetch_claims()`) don't re-download the same large result set twice.
 
     Parameters:
         endpoint_url (str): The URL of the SPARQL endpoint to query.
         query (str): The SPARQL query string to execute.
+        cache_dir (str, optional): Directory to store the cache. Defaults to the
+            ``CLIMAFACTSKG_CACHE_DIR`` env var, or the system temp directory.
+        cache_expiry (timedelta, optional): How long a cached result stays valid.
+            Defaults to the ``CLIMAFACTSKG_SPARQL_CACHE_EXPIRY`` env var
+            (seconds), or 12 hours — these endpoints get new content roughly
+            daily, so that's a reasonable freshness/redundant-fetch tradeoff.
 
     Returns:
         pandas.DataFrame: A DataFrame containing the query results, where each row corresponds to a result binding.
@@ -30,6 +56,23 @@ def query_sparqlendpoint(endpoint_url, query) -> pd.DataFrame:
     Example:
         df = query_sparqlendpoint("https://dbpedia.org/sparql", "SELECT ?s WHERE { ?s a dbo:Person } LIMIT 10")
     """
+    if cache_dir is None:
+        cache_dir = os.getenv("CLIMAFACTSKG_CACHE_DIR", tempfile.gettempdir())
+    if cache_expiry is None:
+        cache_expiry = timedelta(seconds=int(os.getenv("CLIMAFACTSKG_SPARQL_CACHE_EXPIRY", 12 * 3600)))
+
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_key = hash_string(f"{endpoint_url}|{query}")
+    cache_path = os.path.join(cache_dir, f"sparql_{cache_key}.csv")
+
+    if os.path.exists(cache_path):
+        cached_at = datetime.fromtimestamp(os.path.getmtime(cache_path))
+        if cached_at > datetime.now() - cache_expiry:
+            try:
+                return pd.read_csv(cache_path)
+            except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError):
+                pass  # fall through and re-fetch on a corrupt/stale cache file
+
     sparql = SPARQLWrapper(endpoint_url)
     sparql.setQuery(query)
     sparql.setReturnFormat(CSV)
@@ -43,6 +86,7 @@ def query_sparqlendpoint(endpoint_url, query) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
 
+    df.to_csv(cache_path, index=False)
     return df
 
 
