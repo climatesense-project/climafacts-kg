@@ -21,11 +21,13 @@ def generate_cimplekg_mappings(db: preserve.Connector) -> Graph:
         Graph: An RDFLib Graph containing the generated CimpleKG mappings.
     """
     logging.info("Starting CimpleKG mapping generation.")
-    ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
+    # CARDS concept URIs live in their own namespace, separate from ClimaFactsKG's
+    # instance-data namespace — see builders/climafactskg.py for the split rationale.
+    ns = Namespace("https://purl.net/climatesense/cards/ns#")
 
     g = Graph()
     g.namespace_manager = NamespaceManager(Graph())
-    g.namespace_manager.bind("", ns)
+    g.namespace_manager.bind("cards", ns)
 
     for _, mapping in db:
         url = mapping["url"]

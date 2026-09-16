@@ -61,7 +61,7 @@ class CARDSMatcher:
             cards_g.parse(cards_ttl, format=format, encoding="utf-8")
 
             query = """
-            PREFIX cf: <https://purl.net/climatesense/climafactskg/ns#>
+            PREFIX cf: <https://purl.net/climatesense/cards/ns#>
             PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
             SELECT DISTINCT ?c ?label WHERE {
                 ?c a skos:Concept;

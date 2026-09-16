@@ -224,6 +224,7 @@ def build(
     # Re-bind friendly prefixes that can be lost during graph merging with +=
     g.bind("bibo", Namespace("http://purl.org/ontology/bibo/"))
     g.bind("cito", Namespace("http://purl.org/spar/cito/"))
+    g.bind("cards", Namespace("https://purl.net/climatesense/cards/ns#"))
 
     g.serialize(destination=output, format=output_format)
 

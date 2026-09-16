@@ -11,19 +11,20 @@ jobs:
       pages: write
       id-token: write
     steps:
-      - name: Get latest release asset
+      - name: Get latest release assets
         id: get_asset
         run: |
-          FILE_NAME="climafacts_kg.rdf"
-          RELEASE_URL=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r ".assets[] | select(.name == \"${FILE_NAME}\") | .browser_download_url")
-          if [ -z "$RELEASE_URL" ]; then
-            echo "Error: File '${FILE_NAME}' not found in the latest release assets: '${RELEASE_URL}'"
-            exit 1
-          fi
-          echo "Downloading 'climafacts_kg.rdf' asset from: $RELEASE_URL"
-          curl -L -o "$FILE_NAME" "$RELEASE_URL"
+          ASSETS=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest")
+          for FILE_NAME in climafacts_kg.rdf climafacts_kg.ttl cards.rdf cards.ttl; do
+            RELEASE_URL=$(echo "$ASSETS" | jq -r ".assets[] | select(.name == \"${FILE_NAME}\") | .browser_download_url")
+            if [ -z "$RELEASE_URL" ]; then
+              echo "Error: File '${FILE_NAME}' not found in the latest release assets."
+              exit 1
+            fi
+            echo "Downloading '${FILE_NAME}' asset from: $RELEASE_URL"
+            curl -L -o "$FILE_NAME" "$RELEASE_URL"
+          done
           touch .nojekyll
-          echo "::set-output name=downloaded_file::${FILE_NAME}"
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload TTL to GH-Pages

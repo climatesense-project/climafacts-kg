@@ -24,6 +24,16 @@ def test_taxonomy_urls_end_with_id():
         assert entry["url"].endswith(f"#{entry['id']}"), f"url {entry['url']!r} does not match id {entry['id']!r}"
 
 
+def test_taxonomy_uses_cards_namespace():
+    # CARDS is a shared taxonomy (also used by CimpleKG), not owned by
+    # ClimaFactsKG — its concepts live under their own namespace rather than
+    # nested inside https://purl.net/climatesense/climafactskg/ns#.
+    for entry in TAXONOMY:
+        assert entry["url"].startswith("https://purl.net/climatesense/cards/ns#"), (
+            f"url {entry['url']!r} is not under the CARDS namespace"
+        )
+
+
 def test_taxonomy_parent_ids_exist():
     """Every non-top-level code's parent (one segment shorter) must also be present."""
     ids = {entry["id"] for entry in TAXONOMY}

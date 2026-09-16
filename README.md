@@ -22,13 +22,19 @@ ClimaFactsKG also integrates the scientific references cited in Skeptical Scienc
 
 ### 🔗 RDF Namespaces
 
-The ClimaFactsKG namespace is: https://purl.net/climatesense/climafactskg/ns#.
+The ClimaFactsKG instance-data namespace is: https://purl.net/climatesense/climafactskg/ns#.
+
+The CARDS taxonomy has its own separate namespace: https://purl.net/climatesense/cards/ns#. CARDS is a
+shared taxonomy also used to connect claims in [CimpleKG](https://github.com/CIMPLE-project/knowledge-base),
+not something owned by ClimaFactsKG specifically, so its concepts (`cards:1_1`, `cards:2_3`, ...) are kept
+under their own identity rather than nested inside the ClimaFactsKG namespace.
 
 ClimaFactsKG commonly uses the following namespaces and prefixes:
 
 | Prefix   | URI                                     |
 | :------- | :-------------------------------------- |
 |          | <https://purl.net/climatesense/climafactskg/ns#>     |
+| `cards` | <https://purl.net/climatesense/cards/ns#> |
 | `owl` | <http://www.w3.org/2002/07/owl#>        |
 | `rdfs` | <http://www.w3.org/2000/01/rdf-schema#> |
 | `sc` | <https://schema.org/>                   |

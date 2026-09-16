@@ -75,10 +75,15 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
     """
     logging.info("Starting knowledge graph generation.")
     ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
+    # CARDS concept URIs (cards_category_id below) live in their own namespace,
+    # independent of ClimaFactsKG's instance-data namespace — CARDS is a shared
+    # taxonomy also used by CimpleKG, not something ClimaFactsKG owns.
+    cards_ns = Namespace("https://purl.net/climatesense/cards/ns#")
 
     g = Graph()
     g.namespace_manager = NamespaceManager(Graph())
     g.namespace_manager.bind("", ns)
+    g.namespace_manager.bind("cards", cards_ns)
 
     # Iterate over all the articles in the database and create RDF triples:
     for _, arg in db:
@@ -206,10 +211,10 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     (
                         ns[claimreview_id],
                         SDO.about,
-                        ns[cards_category_id],
+                        cards_ns[cards_category_id],
                     )
                 )
-                g.add((ns[cards_category_id], SDO.subjectOf, ns[claimreview_id]))
+                g.add((cards_ns[cards_category_id], SDO.subjectOf, ns[claimreview_id]))
 
             # Add content of the review:
             g.add((ns[claimreview_id], SDO.name, Literal(_normalize_text(arg["title"]), lang=lang)))

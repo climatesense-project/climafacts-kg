@@ -51,6 +51,7 @@ jobs:
           cd ${{github.workspace}}
           pip install rdflib
           python -c "from rdflib import Graph; g = Graph(); g.parse('data/climafacts_kg.ttl', format='turtle'); g.serialize(destination='data/climafacts_kg.rdf', format='xml')"
+          python -c "from rdflib import Graph; g = Graph(); g.parse('data/cards.ttl', format='turtle'); g.serialize(destination='data/cards.rdf', format='xml')"
         shell: bash
       - if: steps.release-status.outputs.released == 'true'
         name: Add TTL and RDF to Release
@@ -60,6 +61,8 @@ jobs:
           cd ${{github.workspace}}
           gh release upload "${{steps.release-status.outputs.tag}}" data/climafacts_kg.ttl#climafacts_kg.ttl
           gh release upload "${{steps.release-status.outputs.tag}}" data/climafacts_kg.rdf#climafacts_kg.rdf
+          gh release upload "${{steps.release-status.outputs.tag}}" data/cards.ttl#cards.ttl
+          gh release upload "${{steps.release-status.outputs.tag}}" data/cards.rdf#cards.rdf
         shell: bash
 
       - if: steps.release-status.outputs.released == 'true'
