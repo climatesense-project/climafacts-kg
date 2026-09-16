@@ -7,7 +7,6 @@ import preserve
 from climafactskg.collectors.utils import classify_claim_reviews, process_all_claim_reviews, process_claim_reviews
 from climafactskg.utils import query_sparqlendpoint
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Investigated (2026-09-16): the endpoint's general graph has schema:mentions

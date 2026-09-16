@@ -13,8 +13,6 @@ from rdflib.namespace import NamespaceManager
 from climafactskg.builders.cimplekg import add_cards_category_link, generate_cimplekg_mappings
 from climafactskg.utils import hash_string
 
-logging.basicConfig(level=logging.INFO)
-
 
 def _normalize_text(value: str) -> str:
     """Collapse all whitespace runs (including newlines) to a single space.

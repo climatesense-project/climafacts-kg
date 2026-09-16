@@ -7,7 +7,6 @@ import preserve
 from climafactskg.collectors.utils import classify_claim_reviews, process_all_claim_reviews, process_claim_reviews
 from climafactskg.utils import query_sparqlendpoint
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 CIMPLEKG_SPARQL_ENDPOINT = "https://data.cimple.eu/sparql"

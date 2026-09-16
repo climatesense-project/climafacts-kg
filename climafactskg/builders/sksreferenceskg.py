@@ -18,8 +18,6 @@ from rdflib.namespace import NamespaceManager
 
 from climafactskg.utils import hash_string
 
-logging.basicConfig(level=logging.INFO)
-
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 CITO = Namespace("http://purl.org/spar/cito/")
 

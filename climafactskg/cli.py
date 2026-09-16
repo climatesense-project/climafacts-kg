@@ -13,6 +13,13 @@ load_dotenv()
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+# Single place logging is configured for the whole app. Library modules
+# (builders/, collectors/) only call logging.getLogger(__name__) — they used
+# to each call logging.basicConfig() at import time too, which is a library
+# anti-pattern (surprising for embedders, and only the first-imported module's
+# call actually took effect since basicConfig no-ops once the root logger has
+# handlers, making the resulting level/format order-dependent and accidental).
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(add_completion=False)

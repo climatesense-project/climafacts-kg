@@ -5,8 +5,6 @@ import preserve
 from rdflib import SDO, Graph, Namespace, URIRef
 from rdflib.namespace import NamespaceManager
 
-logging.basicConfig(level=logging.INFO)
-
 # Both engines have their own "not related" sentinel: "0" for transformer/
 # matcher, "0_0" for LLM (see taxonomy.py — both are real taxonomy nodes
 # meaning "not climate misinformation or related"). Neither should produce a

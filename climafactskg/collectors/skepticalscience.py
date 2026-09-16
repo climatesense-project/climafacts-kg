@@ -14,8 +14,6 @@ from climafactskg.parsers.skepticalscience import (
 )
 from climafactskg.utils import fetch_url_content
 
-logging.basicConfig(level=logging.INFO)
-
 
 def fetch_misinformers_urls(ignore_urls: Optional[list] = None) -> list:
     """Fetches and returns a sorted list of URLs for misinformers from Skeptical Science.
