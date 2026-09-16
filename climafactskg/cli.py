@@ -56,13 +56,21 @@ def collect():
         fetch_skstiptionary,
     )
 
-    fetch_arguments_urls(
-        ignore_urls=["https://skepticalscience.com/wigley-santer-2012-attribution.html"],
-    )
-    fetch_misinformers_urls()
-    cimplekg_collectors.fetch_claims()
-    climatesensekg_collectors.fetch_claims()
-    fetch_skstiptionary()
+    ignore_urls = ["https://skepticalscience.com/wigley-santer-2012-attribution.html"]
+
+    steps = [
+        ("skepticalscience arguments urls", lambda: fetch_arguments_urls(ignore_urls=ignore_urls)),
+        ("skepticalscience misinformers urls", fetch_misinformers_urls),
+        ("cimplekg claims", cimplekg_collectors.fetch_claims),
+        ("climatesensekg claims", climatesensekg_collectors.fetch_claims),
+        ("skepticalscience skstiptionary", fetch_skstiptionary),
+    ]
+
+    for name, run in steps:
+        try:
+            run()
+        except Exception:
+            logger.exception("Step %r failed; continuing with remaining steps.", name)
 
 
 @app.command()
