@@ -67,6 +67,44 @@ class TestProcessClaimReviews:
         assert set(a.keys()) == set(b.keys()) == {"url", "date_published", "claim", "lang"}
 
 
+class TestBatchClassifyCardsCategoryIsClimateRelated:
+    def test_related_category_sets_true(self, tmp_path):
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+            mock_classifier_cls = MagicMock()
+            mock_classifier_cls.return_value.classify_batch.return_value = ["1_1"]
+            with patch("climafactskg.classifiers.cards.transformer.CARDSClassifier", mock_classifier_cls):
+                batch_classify_cards_category(db, text_field="claim")
+            assert db["u1"]["is_climate_related"] is True
+
+    def test_transformer_not_related_sentinel_sets_false(self, tmp_path):
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+            mock_classifier_cls = MagicMock()
+            mock_classifier_cls.return_value.classify_batch.return_value = ["0"]
+            with patch("climafactskg.classifiers.cards.transformer.CARDSClassifier", mock_classifier_cls):
+                batch_classify_cards_category(db, text_field="claim")
+            assert db["u1"]["is_climate_related"] is False
+
+    def test_llm_not_related_sentinel_sets_false(self, tmp_path):
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+            mock_classifier_cls = MagicMock()
+            mock_classifier_cls.from_preset.return_value.classify_batch.return_value = ["0_0"]
+            with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", mock_classifier_cls):
+                batch_classify_cards_category(db, text_field="claim", classifier_engine="llm")
+            assert db["u1"]["is_climate_related"] is False
+
+    def test_failed_item_gets_no_is_climate_related_field(self, tmp_path):
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+            mock_classifier_cls = MagicMock()
+            mock_classifier_cls.from_preset.return_value.classify_batch.return_value = [None]
+            with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", mock_classifier_cls):
+                batch_classify_cards_category(db, text_field="claim", classifier_engine="llm")
+            assert "is_climate_related" not in db["u1"]
+
+
 class TestBatchClassifyCardsCategoryCachePath:
     def test_cache_path_is_forwarded_to_transformer_classifier(self, tmp_path):
         with _make_db(tmp_path) as db:

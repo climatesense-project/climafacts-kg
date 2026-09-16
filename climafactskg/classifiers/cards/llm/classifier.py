@@ -368,14 +368,18 @@ class CARDSLLMClassifier(CARDSClassifierBase):
     def _label_from_output(self, output: CARDSOutput) -> str:
         """Converts agent output to a single CARDS code string.
 
-        TODO: this collapses `is_climate_related` into the "0_0" code, discarding
-        the relatedness/category distinction the annotation data (see
-        climatesense_dataset_v1/v2 in datasets.py) tracks separately. Fine for
-        KG-building (builders/climafactskg.py only checks the final code either
-        way), but it means eval/optimization can't distinguish a relatedness-gate
-        miss from a category miss. Consider persisting `is_climate_related` as
-        its own field (see collectors/utils.py's entry dict) instead of
-        collapsing here, once there's a clean baseline to build it on.
+        This still collapses `is_climate_related` into the "0_0" code at the
+        label level — `collectors/utils.py:batch_classify_cards_category`
+        persists `is_climate_related` as its own DB field, but derives it from
+        the final category (`category not in NOT_RELATED_CATEGORIES`), not
+        from this output directly. That means the one case this can't recover
+        is `is_climate_related=True` with `cards_category=None` (related, but
+        no specific misinformation category matched) — it's stored as
+        "not related", same as a genuine `is_climate_related=False`. Distinguishing
+        that case would mean either the classifier interface returning a
+        richer result (a bigger, separately-scoped interface change) or a
+        second engine-specific field — not worth it until eval/optimization
+        actually need the distinction.
         """
         if not output.is_climate_related or output.cards_category is None:
             return "0_0"

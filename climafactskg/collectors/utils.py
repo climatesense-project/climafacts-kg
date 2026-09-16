@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 # deliberate later step, not implicit in this reprocessing pass.
 TRANSFORMER_CLASSIFIER_ID = "transformer:crarojasca/BinaryAugmentedCARDS,crarojasca/TaxonomyAugmentedCARDS"
 
+# "Not climate misinformation" sentinels used inconsistently across engines
+# (transformer/matcher: "0"; LLM: "0_0" — see taxonomy.py, both are valid
+# taxonomy nodes and evaluators.py already normalises between them for
+# scoring). Checking both here is what lets `is_climate_related` be derived
+# uniformly regardless of which engine produced the category.
+NOT_RELATED_CATEGORIES = frozenset({"0", "0_0"})
+
 
 def batch_classify_cards_category(
     db: preserve.Connector,
@@ -34,7 +41,9 @@ def batch_classify_cards_category(
 
     Entries are filtered by language and existing classification (unless *force*).
     The function classifies all pending texts in one batch call and then saves
-    both cards_category and cards_category_classifier to each corresponding entry.
+    ``cards_category``, ``cards_category_classifier``, and ``is_climate_related``
+    (derived from ``cards_category not in NOT_RELATED_CATEGORIES`` — true for
+    either engine's "not related" sentinel, ``"0"`` or ``"0_0"``) to each entry.
 
     Args:
         db: Database connector to read pending entries from and write results to.
@@ -129,6 +138,7 @@ def batch_classify_cards_category(
             continue
         entry["cards_category"] = category
         entry["cards_category_classifier"] = classifier_id
+        entry["is_climate_related"] = category not in NOT_RELATED_CATEGORIES
         db[url] = entry
 
     if failed:
