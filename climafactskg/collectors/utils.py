@@ -1,7 +1,9 @@
 import logging
 from typing import Optional
 
+import pandas as pd
 import preserve
+from langdetect import detect
 from rich.progress import track
 
 logger = logging.getLogger(__name__)
@@ -127,3 +129,93 @@ def batch_classify_cards_category(
         logger.warning(
             f"{failed}/{len(pending_urls)} {classify_item_name} failed to classify and remain pending for retry."
         )
+
+
+# ── Shared claim-review collector pipeline ───────────────────────────────────
+#
+# CimpleKG and ClimateSenseKG are both SPARQL-backed ClaimReview sources whose
+# queries happen to alias columns identically (rev/date_published/text). That
+# contract is declared explicitly here, once, instead of one collector module
+# silently importing another's internals (which is what happened before: see
+# git history on collectors/climatesensekg.py). Any new SPARQL ClaimReview
+# source can reuse these directly as long as its `fetch_claims()` DataFrame
+# has the same three columns; if it can't, write its own `process_claims`
+# rather than forcing the shape to fit.
+
+
+def process_claim_reviews(db: preserve.Connector, claims_df: pd.DataFrame) -> None:
+    """Store raw ClaimReview rows into *db*, skipping URLs already present.
+
+    Args:
+        db: Database connector to write new claims into.
+        claims_df: Must have ``rev`` (claim URL), ``date_published``, and
+            ``text`` columns — the shape produced by both the CimpleKG and
+            ClimateSenseKG SPARQL queries.
+    """
+    for _, row in track(claims_df.iterrows(), total=claims_df.shape[0], description="Processing claims"):
+        text = row.get("text")
+
+        if row.get("rev") not in db:
+            if isinstance(text, str) and text.strip():
+                lang = None
+                try:
+                    lang = detect(text)
+                except Exception as e:
+                    logger.warning(f"Language detection failed for text: {text[:30]}... Error: {e}")
+                mapping = {
+                    "url": row.get("rev"),
+                    "date_published": row.get("date_published"),
+                    "claim": text,
+                    "lang": lang,
+                }
+                db[mapping["url"]] = mapping
+        else:
+            logger.info(f"Skipping already processed claim with URL: {row.get('rev')}")
+
+
+def classify_claim_reviews(
+    db: preserve.Connector,
+    filter_lang: str = "en",
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
+) -> None:
+    """Classifies stored ClaimReview entries using CARDS classification (batch mode).
+
+    Thin wrapper around :func:`batch_classify_cards_category` fixed to the
+    ``claim`` text field used by :func:`process_claim_reviews`. See that
+    function's docstring for the full parameter reference.
+    """
+    batch_classify_cards_category(
+        db,
+        text_field="claim",
+        filter_lang=filter_lang,
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
+        collect_description="Collecting claims to classify",
+        save_description="Saving classifications",
+        empty_message="No claims to classify.",
+        classify_item_name="claims",
+    )
+
+
+def process_all_claim_reviews(
+    db: preserve.Connector,
+    claims_df: pd.DataFrame,
+    filter_lang: str = "en",
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
+) -> None:
+    """Store then classify a ClaimReview DataFrame.
+
+    See :func:`process_claim_reviews` and :func:`classify_claim_reviews` for
+    the two stages this runs in order.
+    """
+    logger.info("Processing claims...")
+    process_claim_reviews(db, claims_df)
+    logger.info("Classifying claims...")
+    classify_claim_reviews(
+        db, filter_lang=filter_lang, force=force, concurrency=concurrency, classifier_engine=classifier_engine
+    )

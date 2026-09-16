@@ -3,10 +3,8 @@ from typing import Optional
 
 import pandas as pd
 import preserve
-from langdetect import detect
-from rich.progress import track
 
-from climafactskg.collectors.utils import batch_classify_cards_category
+from climafactskg.collectors.utils import classify_claim_reviews, process_all_claim_reviews, process_claim_reviews
 from climafactskg.utils import query_sparqlendpoint
 
 logging.basicConfig(level=logging.INFO)
@@ -42,27 +40,13 @@ def fetch_claims() -> pd.DataFrame:
 
 
 def process_claims(db: preserve.Connector, claims_df: pd.DataFrame) -> None:
-    for _, row in track(claims_df.iterrows(), total=claims_df.shape[0], description="Processing claims"):
-        text = row.get("text")
+    """Store raw CimpleKG claims into *db*.
 
-        # Check if URL not already in database
-        if row.get("rev") not in db:
-            print(f"Processing claim with URL: {row.get('rev')}")
-            if isinstance(text, str) and text.strip():
-                lang = None
-                try:
-                    lang = detect(text)
-                except Exception as e:
-                    logger.warning(f"Language detection failed for text: {text[:30]}... Error: {e}")
-                mapping = {
-                    "url": row.get("rev"),
-                    "date_published": row.get("date_published"),
-                    "claim": text,
-                    "lang": lang,
-                }
-                db[mapping["url"]] = mapping
-        else:
-            logger.info(f"Skipping already processed claim with URL: {row.get('rev')}")
+    Delegates to the shared claim-review pipeline (see
+    :func:`climafactskg.collectors.utils.process_claim_reviews`) — CimpleKG's
+    ``rev``/``date_published``/``text`` column shape matches that contract.
+    """
+    process_claim_reviews(db, claims_df)
 
 
 def classify_claims(
@@ -72,39 +56,12 @@ def classify_claims(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
 ) -> None:
-    """Classifies claims in the provided database using CARDS classification (batch mode).
+    """Classify stored CimpleKG claims.
 
-    Iterates through claims in the database, optionally filtering by language.
-    For each claim that does not already have a 'cards_category' (unless *force* is
-    True) and contains a 'claim' text, the function classifies the claim using the
-    batch API and updates the database entries with the resulting categories.
-
-    Args:
-        db (preserve.Connector): The database connector to access and update claims.
-        filter_lang (str, optional): The language code to filter claims. Only claims
-            matching this language will be classified. Defaults to "en".
-        force (bool, optional): Re-classify claims that already have a
-            'cards_category'. Defaults to False.
-        concurrency (int, optional): Maximum number of concurrent LLM calls.
-            Defaults to the classifier preset's own tuned concurrency. Only used
-            when ``classifier_engine="llm"``.
-        classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
-            See :func:`batch_classify_cards_category`.
-
-    Returns:
-        None
+    Delegates to :func:`climafactskg.collectors.utils.classify_claim_reviews`.
     """
-    batch_classify_cards_category(
-        db,
-        text_field="claim",
-        filter_lang=filter_lang,
-        force=force,
-        concurrency=concurrency,
-        classifier_engine=classifier_engine,
-        collect_description="Collecting claims to classify",
-        save_description="Saving classifications",
-        empty_message="No claims to classify.",
-        classify_item_name="claims",
+    classify_claim_reviews(
+        db, filter_lang=filter_lang, force=force, concurrency=concurrency, classifier_engine=classifier_engine
     )
 
 
@@ -116,34 +73,17 @@ def process_all(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
 ) -> None:
-    """Process all claims data through the complete pipeline.
+    """Store then classify a CimpleKG claims DataFrame.
 
-    This function orchestrates the full claims processing workflow by first
-    processing the raw claims data and then classifying the processed claims.
-
-    Args:
-        db (preserve.Connector): Database connector instance for data operations.
-        claims_df (pd.DataFrame): DataFrame containing the raw claims data to be processed.
-        filter_lang (str, optional): Language filter for claim classification. Defaults to "en".
-        force (bool, optional): Re-classify already-classified claims. Defaults to False.
-        concurrency (int, optional): Maximum concurrent LLM calls. Defaults to the
-            classifier preset's own tuned concurrency. Only used when
-            ``classifier_engine="llm"``.
-        classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
-            See :func:`batch_classify_cards_category`.
-
-    Returns:
-        None: This function performs operations in-place and does not return any value.
-
-    Note:
-        The function logs progress messages at info level for both processing and
-        classification stages.
+    Delegates to :func:`climafactskg.collectors.utils.process_all_claim_reviews`.
     """
-    logger.info("Processing claims...")
-    process_claims(db, claims_df)
-    logger.info("Classifying claims...")
-    classify_claims(
-        db, filter_lang=filter_lang, force=force, concurrency=concurrency, classifier_engine=classifier_engine
+    process_all_claim_reviews(
+        db,
+        claims_df,
+        filter_lang=filter_lang,
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
     )
 
 

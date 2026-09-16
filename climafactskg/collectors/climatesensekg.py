@@ -1,9 +1,10 @@
 import logging
+from typing import Optional
 
 import pandas as pd
 import preserve
 
-from climafactskg.collectors.cimplekg import process_all
+from climafactskg.collectors.utils import classify_claim_reviews, process_all_claim_reviews, process_claim_reviews
 from climafactskg.utils import query_sparqlendpoint
 
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +50,55 @@ def fetch_claims() -> pd.DataFrame:
 
     logger.info(f"Number of results: {len(results)}")
     return results
+
+
+def process_claims(db: preserve.Connector, claims_df: pd.DataFrame) -> None:
+    """Store raw ClimateSenseKG claims into *db*.
+
+    Delegates to the shared claim-review pipeline (see
+    :func:`climafactskg.collectors.utils.process_claim_reviews`) —
+    ClimateSenseKG's ``rev``/``date_published``/``text`` column shape matches
+    that contract.
+    """
+    process_claim_reviews(db, claims_df)
+
+
+def classify_claims(
+    db: preserve.Connector,
+    filter_lang: str = "en",
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
+) -> None:
+    """Classify stored ClimateSenseKG claims.
+
+    Delegates to :func:`climafactskg.collectors.utils.classify_claim_reviews`.
+    """
+    classify_claim_reviews(
+        db, filter_lang=filter_lang, force=force, concurrency=concurrency, classifier_engine=classifier_engine
+    )
+
+
+def process_all(
+    db: preserve.Connector,
+    claims_df: pd.DataFrame,
+    filter_lang: str = "en",
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
+) -> None:
+    """Store then classify a ClimateSenseKG claims DataFrame.
+
+    Delegates to :func:`climafactskg.collectors.utils.process_all_claim_reviews`.
+    """
+    process_all_claim_reviews(
+        db,
+        claims_df,
+        filter_lang=filter_lang,
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
+    )
 
 
 if __name__ == "__main__":
