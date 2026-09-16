@@ -520,14 +520,15 @@ class CARDSLLMClassifier(CARDSClassifierBase):
         """Classifies multiple texts with concurrent LLM calls and batch cache I/O.
 
         Processing order:
-        1. **Pre-classifier pass** (sync, sequential): texts flagged as unrelated
-           are resolved to ``"0"`` immediately — no LLM call, no cache write.
-        2. **Cache batch-read** (sync): remaining texts are looked up in a single
-           preserve open; hits are resolved without an LLM call.
-        3. **Async concurrent LLM** (bounded by ``concurrency``): cache misses are
-           sent to the LLM concurrently via ``asyncio.run()``.
-        4. **Cache batch-write** (sync): all new results are persisted in a single
-           preserve open.
+        1. **Pre-classifier pass**: ``self._preclassifier_cache.get_or_compute()``
+           resolves cached labels, then runs the pre-classifier on the misses.
+           Texts labeled ``"unrelated"`` are resolved to ``"0"`` immediately —
+           no LLM call, no LLM-cache write.
+        2. **LLM pass**: ``self._output_cache.get_or_compute()`` resolves cached
+           outputs for the rest, then sends the misses to the LLM concurrently
+           (bounded by ``concurrency``) via ``asyncio.run()``. A miss that still
+           fails after retries is never cached (``should_cache`` filters out
+           exceptions) so it's retried on the next call instead of being stuck.
 
         Note: ``asyncio.run()`` creates a new event loop and must be called from a
         synchronous context. In async contexts (e.g. Jupyter), call

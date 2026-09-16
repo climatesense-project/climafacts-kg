@@ -156,6 +156,8 @@ ClimaFactsKG has a simple CLI interface accessible via the `climafactskg` comman
 
 `process` classifies with the local transformer engine by default (`--classifier transformer`, requires the `transformer` extra — see Installation above); pass `--classifier llm` to use the LLM-based path instead (core install, see provider table below). `build` merges SkepticalScience, CimpleKG, and ClimateSenseKG data plus the CARDS taxonomy into one `data/climafacts_kg.ttl`.
 
+`process --cache-path` (default: `data/cards_classification_cache.db`) is a Preserve SQLite cache shared across all sources below it in the pipeline (CimpleKG, ClimateSenseKG, SkepticalScience arguments), so identical claim/argument text is classified once instead of once per source. Pass an empty string to disable caching.
+
 #### `classify` — CARDS taxonomy classification
 
 Classifies a text string using one of three available classifiers.
@@ -173,7 +175,8 @@ Classifies a text string using one of three available classifiers.
 │ --preset      -p   TEXT  Named LLM preset (e.g. 'climatesense-nslp'). LLM only.                         │
 │ --provider         TEXT  LLM provider ('openai', 'ollama', 'openrouter', 'lmstudio'). LLM only.         │
 │ --model       -m   TEXT  LLM model name. LLM only.                                                      │
-│ --cache-path       TEXT  Path to a Preserve SQLite cache file. LLM only.                                │
+│ --cache-path       TEXT  Path to a Preserve SQLite cache file. LLM and transformer only.                │
+│ --context          TEXT  Optional fact-check context (e.g. reviewer verdict, sources).                 │
 │ --no-preclassifier       Disable the ClimateBERT pre-classifier gate. LLM only.                         │
 │ --list-presets           Print all registered LLM preset names and exit.                                │
 │ --help                   Show this message and exit.                                                     │
@@ -202,11 +205,14 @@ climafactskg classify "There is no consensus on climate change" \
 
 # List available LLM presets
 climafactskg classify "" --list-presets
+
+# With fact-check context (all three classifiers accept it)
+climafactskg classify "CO2 is just plant food" --context "Reviewer verdict: false, plants also need water and nutrients"
 ```
 
 ### 🧩 CARDS Classifiers (Python API)
 
-The `climafactskg.classifiers.cards` module exposes three classifiers for programmatic use.
+The `climafactskg.classifiers.cards` module exposes three classifiers for programmatic use. All three inherit `CARDSClassifierBase` and share the same interface: `classify(text, context=None) -> str` and `classify_batch(texts, contexts=None) -> list[str]`. `context` is optional fact-check context (e.g. reviewer verdict, sources) — matcher and transformer append it to the text before classifying; the LLM classifier routes it to a dedicated context-aware prompt.
 
 #### Transformer classifier (two-stage, default)
 
@@ -217,6 +223,12 @@ from climafactskg.classifiers.cards import CARDSClassifier
 
 clf = CARDSClassifier()
 clf.classify("Global warming stopped in 1998")  # → e.g. "1_0"
+clf.classify("The weather is nice", context="Reviewer verdict: consistent with rising global temperatures")
+
+# Batch classification with a shared cache (Preserve SQLite), keyed by
+# hash(model config | text[+context]) — safe to reuse across collector sources.
+clf = CARDSClassifier(cache_path="/tmp/cards.db")
+labels = clf.classify_batch(["text one", "text two"])
 ```
 
 #### Rule-based matcher

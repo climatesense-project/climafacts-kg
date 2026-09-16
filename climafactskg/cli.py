@@ -318,7 +318,10 @@ def classify(
     ),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model name. LLM only."),
     cache_path: Optional[str] = typer.Option(
-        None, "--cache-path", help="Path to a Preserve SQLite cache file. LLM only."
+        None, "--cache-path", help="Path to a Preserve SQLite cache file. LLM and transformer only."
+    ),
+    context: Optional[str] = typer.Option(
+        None, "--context", help="Optional fact-check context (e.g. reviewer verdict, sources)."
     ),
     no_preclassifier: bool = typer.Option(
         False, "--no-preclassifier", help="Disable the ClimateBERT pre-classifier gate. LLM only."
@@ -337,7 +340,7 @@ def classify(
         from climafactskg.classifiers.cards import CARDSMatcher
 
         clf = CARDSMatcher()
-        print(clf.classify(text))
+        print(clf.classify(text, context=context))
         return
 
     if classifier == "llm":
@@ -356,13 +359,13 @@ def classify(
         else:
             clf = CARDSLLMClassifier(use_preclassifier=not no_preclassifier, **overrides)
 
-        print(clf.classify(text))
+        print(clf.classify(text, context=context))
         return
 
     from climafactskg.classifiers.cards import CARDSClassifier
 
-    clf = CARDSClassifier()
-    print(clf.classify(text))
+    clf = CARDSClassifier(cache_path=cache_path)
+    print(clf.classify(text, context=context))
 
 
 @app.command()

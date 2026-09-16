@@ -7,9 +7,11 @@ replacing the old setup where climatesensekg.py silently imported cimplekg.py's
 functions directly and only worked by coincidental column-name match.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
 import preserve
-from climafactskg.collectors.utils import process_claim_reviews
+from climafactskg.collectors.utils import batch_classify_cards_category, process_claim_reviews
 
 
 def _make_db(tmp_path):
@@ -63,3 +65,49 @@ class TestProcessClaimReviews:
             b = db["http://data.climatesense-project.eu/claim/1"]
 
         assert set(a.keys()) == set(b.keys()) == {"url", "date_published", "claim", "lang"}
+
+
+class TestBatchClassifyCardsCategoryCachePath:
+    def test_cache_path_is_forwarded_to_transformer_classifier(self, tmp_path):
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+
+            mock_classifier_cls = MagicMock()
+            mock_classifier_cls.return_value.classify_batch.return_value = ["1_1"]
+            with patch("climafactskg.classifiers.cards.transformer.CARDSClassifier", mock_classifier_cls):
+                batch_classify_cards_category(db, text_field="claim", cache_path=str(tmp_path / "shared_cache.db"))
+
+            mock_classifier_cls.assert_called_once_with(cache_path=str(tmp_path / "shared_cache.db"))
+            assert db["u1"]["cards_category"] == "1_1"
+
+    def test_cache_path_is_forwarded_to_llm_classifier(self, tmp_path):
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+
+            mock_classifier_cls = MagicMock()
+            mock_classifier_cls.from_preset.return_value.classify_batch.return_value = ["1_1"]
+            with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", mock_classifier_cls):
+                batch_classify_cards_category(
+                    db,
+                    text_field="claim",
+                    classifier_engine="llm",
+                    cache_path=str(tmp_path / "shared_cache.db"),
+                )
+
+            mock_classifier_cls.from_preset.assert_called_once_with(
+                "xplainnlp-nslp", cache_path=str(tmp_path / "shared_cache.db")
+            )
+            assert db["u1"]["cards_category"] == "1_1"
+
+    def test_no_cache_path_omits_the_kwarg_for_llm_classifier(self, tmp_path):
+        # from_preset raises on unknown override kwargs, so cache_path must be
+        # omitted entirely (not passed as None) when the caller doesn't set one.
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+
+            mock_classifier_cls = MagicMock()
+            mock_classifier_cls.from_preset.return_value.classify_batch.return_value = ["1_1"]
+            with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", mock_classifier_cls):
+                batch_classify_cards_category(db, text_field="claim", classifier_engine="llm")
+
+            mock_classifier_cls.from_preset.assert_called_once_with("xplainnlp-nslp")
