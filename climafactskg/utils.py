@@ -351,24 +351,31 @@ def parse_apa_citation_html(definition_html: str) -> dict:
 
 def fetch_url_content(
     url: str,
-    cache_dir: str = os.getenv("CLIMAFACTSKG_CACHE_DIR", tempfile.gettempdir()),
-    cache_expiry: timedelta = timedelta(
-        seconds=int(os.getenv("CLIMAFACTSKG_KG_CACHE_EXPIRY", 3600))  # noqa: B008
-    ),  # noqa: B008
+    cache_dir: Optional[str] = None,
+    cache_expiry: Optional[timedelta] = None,
 ) -> str:
     """Fetch the content of a URL using a disk cache. Cache expires after a given period.
 
     Args:
         url (str): The URL to fetch.
-        cache_dir (str, optional): The directory to store the cache. Defaults to an environment variable or the system temporary directory.
-        cache_expiry (timedelta, optional): The cache expiry duration in seconds. Defaults to an environment variable or 1 hour.
+        cache_dir (str, optional): The directory to store the cache. Defaults to the
+            ``CLIMAFACTSKG_CACHE_DIR`` env var (read at call time, not import time),
+            or the system temp directory.
+        cache_expiry (timedelta, optional): The cache expiry duration. Defaults to the
+            ``CLIMAFACTSKG_KG_CACHE_EXPIRY`` env var in seconds (read at call time),
+            or 1 hour.
 
     Returns:
         str: The content of the URL.
 
     Raises:
         requests.RequestException: If the request fails.
-    """  # noqa: E501
+    """
+    if cache_dir is None:
+        cache_dir = os.getenv("CLIMAFACTSKG_CACHE_DIR", tempfile.gettempdir())
+    if cache_expiry is None:
+        cache_expiry = timedelta(seconds=int(os.getenv("CLIMAFACTSKG_KG_CACHE_EXPIRY", 3600)))
+
     # Ensure the cache directory exists
     os.makedirs(cache_dir, exist_ok=True)
 

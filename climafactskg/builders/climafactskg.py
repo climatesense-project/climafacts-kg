@@ -204,8 +204,10 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     )
                 )
 
-            # Add cards category if present:
-            if "cards_category" in arg and arg["cards_category"] is not None and arg["cards_category"] != "0_0":
+            # Add cards category if present. Both engines have their own "not
+            # related" sentinel ("0" for transformer/matcher, "0_0" for LLM) —
+            # exclude both, matching builders/cimplekg.py's equivalent check.
+            if arg.get("cards_category") not in (None, "0", "0_0"):
                 cards_category_id = arg["cards_category"]
                 g.add(
                     (

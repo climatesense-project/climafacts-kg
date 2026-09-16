@@ -95,12 +95,14 @@ SELECT DISTINCT ?a WHERE {
     )
 
 
-def serve_endpoint(endpoint: SparqlEndpoint, host: str = "0.0.0.0", port: int = 8000) -> None:
+def serve_endpoint(endpoint: SparqlEndpoint, host: str = "127.0.0.1", port: int = 8000) -> None:
     """Starts a Uvicorn server to serve the given SPARQL endpoint.
 
     Args:
         endpoint (SparqlEndpoint): The SPARQL endpoint instance to serve.
-        host (str, optional): The host address to bind the server to. Defaults to "0.0.0.0".
+        host (str, optional): The host address to bind the server to. Defaults to
+            "127.0.0.1" (local only) — matches the CLI's `serve` command default.
+            Pass "0.0.0.0" explicitly to expose it on the network.
         port (int, optional): The port number to bind the server to. Defaults to 8000.
 
     Returns:
