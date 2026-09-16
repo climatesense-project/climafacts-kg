@@ -10,7 +10,12 @@ from climafactskg.utils import query_sparqlendpoint
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# TODO Filter on climate relatedness in SPARQL query to avoid classifying non-climate claims.
+# Investigated (2026-09-16): the endpoint's general graph has schema:mentions
+# <http://dbpedia.org/resource/Climate_change> on ~13k ClaimReviews, which
+# could pre-filter this query. Decided not to: it would permanently drop any
+# climate claim not tagged with that exact DBpedia entity, silently and
+# unrecoverably (no record that it was excluded vs never existed). Classifying
+# everything costs more but has no recall risk — keep as-is.
 CLIMATESENSEKG_SPARQL_ENDPOINT = "https://climatesense-qlever-server.tools.eurecom.fr/"
 CLIMATESENSEKG_QUERY = """
 PREFIX schema: <http://schema.org/>

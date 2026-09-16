@@ -289,9 +289,26 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
         except Exception as e:
             logging.error(f"Error processing article URL {url}: {e}")
 
-    # TODO: Cross ref definitions and citations:
-    # https://skepticalscience.com/public/assets/jsgen/skstiptionary_1752342798469.js
-    # This file contains all the citations and definitions used across the website.
+    # Citations half done (2026-09-16): sksreferenceskg.py:generate_citations_graph
+    # already matches article text against sksTiptionary research-paper entries
+    # (citation=="4") and emits schema:citation/cito:cites triples.
+    #
+    # Definitions half still missing: the other tiptionary entries (IPCC/NSIDC
+    # glossary terms, e.g. "radiative forcing") are fetched by
+    # collectors/skepticalscience.py:fetch_skstiptionary but discarded —
+    # parse_skstiptionary_references() filters to citation=="4" only, so
+    # glossary definitions are never stored or linked. Building this out needs:
+    # (1) a parser for the non-citation entries (parse_skstiptionary_full()
+    #     already gives the raw dict — reuse it, don't re-parse);
+    # (2) DB storage for them (new table/db, or extend the references DB with
+    #     a type field so SksMatcher's tiptionary dict still covers both);
+    # (3) an RDF schema decision for a "term definition" link — schema:DefinedTerm
+    #     + schema:description, or skos:Concept + skos:definition;
+    # (4) a builder function mirroring generate_citations_graph's per-sentence
+    #     SksMatcher.get_matching_keys() loop, emitting the definition triples
+    #     instead of citation triples for matched glossary keys.
+    # Comparable in scope to the citations feature itself — scope as its own
+    # task, not a quick addition here.
 
     logging.info("Knowledge graph generation completed.")
     return g
