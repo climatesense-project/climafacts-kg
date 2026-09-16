@@ -4,9 +4,8 @@ from urllib.parse import urljoin
 
 import preserve
 from bs4 import BeautifulSoup
-from rich.progress import track
 
-from climafactskg.classifiers.cards import CARDSClassifier
+from climafactskg.collectors.utils import batch_classify_cards_category
 from climafactskg.parsers.skepticalscience import (
     parse_main_article,
     parse_misinformer_article,
@@ -181,12 +180,6 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
             content = fetch_url_content(main_url)
             article = parse_main_article(main_url, content)
 
-        if main_url in db and "lang" in db[main_url]:
-            logging.info(f"Skipping already processed URL: {main_url}")
-        else:
-            content = fetch_url_content(main_url)
-            article = parse_main_article(main_url, content)
-
             # Store the article in the db
             db[main_url] = article
             logging.info(f"Stored article for URL: {main_url}")
@@ -196,16 +189,7 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
             if "levels" in article:
                 for level in article["levels"]:
                     logging.info(f"Processing level: {level['level']}")
-            # Process the article levels:
-            logging.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
-            if "levels" in article:
-                for level in article["levels"]:
-                    logging.info(f"Processing level: {level['level']}")
 
-                    for level_url in level["urls"]:
-                        logging.info(f"Processing level URL: {level_url}")
-                        # Parse the main article for each level URL
-                        level_article = parse_main_article(level_url)
                     for level_url in level["urls"]:
                         logging.info(f"Processing level URL: {level_url}")
                         # Parse the main article for each level URL
@@ -216,11 +200,7 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
                         logging.info(f"Stored level article for URL: {level_url}")
 
                     logging.info(f"Finished level: {level['level']}")
-                    logging.info(f"Finished level: {level['level']}")
 
-            if "languages" in article:
-                for lang in article["languages"]:
-                    logging.info(f"Processing language : {lang['lang']}")
             if "languages" in article:
                 for lang in article["languages"]:
                     logging.info(f"Processing language : {lang['lang']}")
@@ -233,47 +213,49 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
                     logging.info(f"Stored translated article for language URL: {lang['url']}")
 
                     logging.info(f"Finished language: {lang['lang']}")
-                    logging.info(f"Finished language: {lang['lang']}")
 
         logging.info(f"Finished processing URL {i}/{len(urls)}: {main_url}")
 
 
-def classify_urls(db: preserve.Connector) -> None:
-    """Classify URLs in the database using the CARDS classifier.
+def classify_urls(
+    db: preserve.Connector,
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
+) -> None:
+    """Classify URLs in the database using CARDS classification (batch mode).
 
-    This function processes arguments stored in the database, applying classification
-    to English-language climate myths while managing existing classifications for
-    non-English content.
+    Iterates through arguments in the database, collecting English-language entries
+    that have a 'climate_myth' text. For each entry that does not already have a
+    'cards_category' (unless *force* is True), the function classifies the text using
+    the batch API and updates the database entries with the resulting categories.
 
     Args:
         db (preserve.Connector): Database connector containing URL-indexed arguments
-                                with fields like 'cards_category', 'lang', and 'climate_myth'
+                                with fields like 'cards_category', 'lang', and 'climate_myth'.
+        force (bool, optional): Re-classify arguments that already have a
+            'cards_category'. Defaults to False.
+        concurrency (int, optional): Maximum number of concurrent LLM calls.
+            Defaults to the classifier preset's own tuned concurrency. Only used
+            when ``classifier_engine="llm"``.
+        classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
+            See :func:`climafactskg.collectors.utils.batch_classify_cards_category`.
 
     Returns:
         None
-
-    Behavior:
-        - For non-English arguments with existing classifications: removes the classification
-        - For English arguments without classification but with climate_myth content:
-          applies CARDS classification to the climate_myth text
-        - Updates the database with modified argument data
-        - Logs completion message when all arguments are processed
-
-    Note:
-        Uses CARDSClassifier for text classification and track() for progress monitoring.
     """
-    classifier = CARDSClassifier()
-
-    for url, argument in track(db, description="Classifying arguments..."):
-        if "cards_category" in argument and argument["lang"] != "en":
-            argument["cards_category"] = None
-            db[url] = argument
-        elif "cards_category" not in argument and argument["climate_myth"] is not None and argument["lang"] == "en":
-            text = argument["climate_myth"]
-            argument["cards_category"] = classifier.classify(text)
-            db[url] = argument
-            argument["cards_category"] = classifier.classify(text)
-            db[url] = argument
+    batch_classify_cards_category(
+        db,
+        text_field="climate_myth",
+        filter_lang="en",
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
+        collect_description="Collecting arguments to classify",
+        save_description="Saving classifications",
+        empty_message="No arguments to classify.",
+        classify_item_name="arguments",
+    )
     logging.info("All arguments classified.")
 
 
@@ -281,6 +263,9 @@ def process_all(
     db: preserve.Connector,
     urls: Optional[list[str]] = None,
     ignore_urls: Optional[list] = None,
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
 ) -> None:
     """Process all URLs for skeptical science data collection and classification.
 
@@ -294,6 +279,12 @@ def process_all(
             defaults to an empty list. Defaults to None.
         ignore_urls (Optional[list], optional): List of URLs to ignore during
             processing. Defaults to None.
+        force (bool, optional): Re-classify already-classified arguments. Defaults to False.
+        concurrency (int, optional): Maximum concurrent LLM calls. Defaults to the
+            classifier preset's own tuned concurrency. Only used when
+            ``classifier_engine="llm"``.
+        classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
+            See :func:`climafactskg.collectors.utils.batch_classify_cards_category`.
 
     Returns:
         None: This function performs operations but does not return a value.
@@ -301,7 +292,7 @@ def process_all(
     if urls is None:
         urls = []
     process_urls(db, urls, ignore_urls=ignore_urls)
-    classify_urls(db)
+    classify_urls(db, force=force, concurrency=concurrency, classifier_engine=classifier_engine)
 
 
 def fetch_skstiptionary(

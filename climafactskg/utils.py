@@ -5,13 +5,13 @@ import re
 import tempfile
 from datetime import datetime, timedelta
 from typing import Dict, Optional
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import bs4
 import pandas as pd
 import preserve
 import requests
-from SPARQLWrapper import JSON, SPARQLWrapper
+from SPARQLWrapper import CSV, SPARQLWrapper
 
 
 def query_sparqlendpoint(endpoint_url, query) -> pd.DataFrame:
@@ -32,22 +32,18 @@ def query_sparqlendpoint(endpoint_url, query) -> pd.DataFrame:
     """
     sparql = SPARQLWrapper(endpoint_url)
     sparql.setQuery(query)
-    sparql.setReturnFormat(JSON)
-    results = sparql.query().convert()
-    rows = []
+    sparql.setReturnFormat(CSV)
 
-    if (
-        not isinstance(results, dict)
-        or "results" not in results
-        or not isinstance(results.get("results"), dict)
-        or "bindings" not in results["results"]
-    ):
+    response = sparql.query().response
+    try:
+        df = pd.read_csv(response)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError):
         return pd.DataFrame()
-    else:
-        for result in results["results"]["bindings"]:
-            row = {k: v["value"] for k, v in result.items()}
-            rows.append(row)
-        return pd.DataFrame(rows)
+
+    if df.empty:
+        return pd.DataFrame()
+
+    return df
 
 
 def remove_html_tags(text) -> str:
@@ -143,6 +139,78 @@ def js_object_to_dict(js_block: str, unquoted_keys: Optional[list] = None) -> di
 
 _DOI_TEXT_RE = re.compile(r"\bdoi\s*:?\s*(10\.\d{4,}/\S+)", re.IGNORECASE)
 
+# Query parameter names used by cloud-storage presigned URLs (S3 v2/v4, etc.)
+# that embed a credential — scraped citation links occasionally carry one of
+# these verbatim (e.g. an academia.edu-hosted PDF backed by S3).
+_CREDENTIAL_QUERY_PARAMS = frozenset(
+    {
+        "awsaccesskeyid",
+        "signature",
+        "expires",
+        "x-amz-algorithm",
+        "x-amz-credential",
+        "x-amz-date",
+        "x-amz-expires",
+        "x-amz-signedheaders",
+        "x-amz-signature",
+        "x-amz-security-token",
+    }
+)
+
+
+def _strip_credential_query_params(url: str) -> str:
+    """Strips known cloud-storage presigned-URL credential parameters from *url*.
+
+    Even though a presigned URL's signature is time-limited, the access key id
+    it's paired with is not, so these are stripped rather than stored verbatim.
+    """
+    parsed = urlsplit(url)
+    if not parsed.query:
+        return url
+    kept = [
+        (k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k.lower() not in _CREDENTIAL_QUERY_PARAMS
+    ]
+    return urlunsplit(parsed._replace(query=urlencode(kept)))
+
+
+# ── Generic inline-citation detection ────────────────────────────────────────
+# APA parenthetical: (IPCC, 2021) / (Hansen et al., 2010)
+_CITATION_PARENS_RE = re.compile(r"\([A-Z][^()]{0,80}\d{4}[a-z]?\)", re.UNICODE)
+# Narrative et al.: Hansen et al. (2010) found ...
+_CITATION_ETAL_RE = re.compile(r"\bet\s+al\.?\s*\(\d{4}[a-z]?\)", re.IGNORECASE)
+# Single/dual-author year: Smith (2018) / Smith & Jones (2018)
+_CITATION_AUTHOR_YEAR_RE = re.compile(
+    r"[A-Z][a-z]+(?:\s+(?:&|and)\s+[A-Z][a-z]+)?\s*\(\d{4}[a-z]?\)",
+    re.UNICODE,
+)
+# Numbered bibliography reference: [1], [2,3]
+_CITATION_NUM_RE = re.compile(r"\[\d[\d,\s]*\]")
+
+
+def has_scientific_citation(text: str) -> bool:
+    """Return True if *text* contains an inline scientific citation or reference.
+
+    Detects:
+    * APA parenthetical — ``(Hansen et al., 2010)`` / ``(IPCC, 2013)``
+    * Narrative et al.  — ``Hansen et al. (2010) found...``
+    * Author-year       — ``Smith (2018)`` / ``Smith & Jones (2018)``
+    * Inline DOI        — ``doi:10.xxxx/...``
+    * Numbered refs     — ``[1]``, ``[1,2]``
+
+    Args:
+        text: A single sentence or short text fragment.
+
+    Returns:
+        ``True`` if any citation pattern is detected.
+    """
+    return bool(
+        _CITATION_PARENS_RE.search(text)
+        or _CITATION_ETAL_RE.search(text)
+        or _CITATION_AUTHOR_YEAR_RE.search(text)
+        or _DOI_TEXT_RE.search(text)
+        or _CITATION_NUM_RE.search(text)
+    )
+
 
 def parse_apa_citation_html(definition_html: str) -> dict:
     """Extract structured bibliography fields from an APA-style HTML citation snippet.
@@ -167,7 +235,7 @@ def parse_apa_citation_html(definition_html: str) -> dict:
     for a in soup.find_all("a", href=True):
         href = str(a["href"])
         if "doi.org" not in href and href.startswith(("http://", "https://")):
-            out["url"] = href
+            out["url"] = _strip_credential_query_params(href)
             break
 
     # DOI: prefer anchor whose href *starts* with a doi.org domain, then fall
@@ -229,7 +297,7 @@ def parse_apa_citation_html(definition_html: str) -> dict:
         elif isinstance(sib, str):
             after_parts.append(sib)
     after = "".join(after_parts).strip()
-    m_ip = re.match(r"\s*\((\w+)\)\s*,?\s*([\w\-\u2013]+)", after)
+    m_ip = re.match(r"\s*\((\w+)\)\s*,?\s*([\w\-–]+)", after)
     if m_ip:
         out["issue"] = m_ip.group(1)
         out["pages"] = m_ip.group(2).rstrip(".")

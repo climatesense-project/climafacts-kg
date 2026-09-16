@@ -1,17 +1,18 @@
 import logging
+from typing import Optional
 
 import pandas as pd
 import preserve
 from langdetect import detect
 from rich.progress import track
 
-from climafactskg.classifiers.cards import CARDSClassifier
+from climafactskg.collectors.utils import batch_classify_cards_category
 from climafactskg.utils import query_sparqlendpoint
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
+CIMPLEKG_SPARQL_ENDPOINT = "https://data.cimple.eu/sparql"
 CIMPLEKG_QUERY = """
 PREFIX schema: <http://schema.org/>
 PREFIX cimple: <http://data.cimple.eu/ontology#>
@@ -30,7 +31,7 @@ ORDER BY DESC(?date_published)
 
 def fetch_claims() -> pd.DataFrame:
     """Fetch claims from the CimpleKG SPARQL endpoint and return as a DataFrame."""
-    results = query_sparqlendpoint("https://data.cimple.eu/sparql", CIMPLEKG_QUERY)  # TODO Cache query results.
+    results = query_sparqlendpoint(CIMPLEKG_SPARQL_ENDPOINT, CIMPLEKG_QUERY)  # TODO Cache query results.
 
     # Ensure results is a DataFrame
     if not isinstance(results, pd.DataFrame):
@@ -60,38 +61,61 @@ def process_claims(db: preserve.Connector, claims_df: pd.DataFrame) -> None:
                     "lang": lang,
                 }
                 db[mapping["url"]] = mapping
-                db[mapping["url"]] = mapping
         else:
             logger.info(f"Skipping already processed claim with URL: {row.get('rev')}")
 
 
-def classify_claims(db: preserve.Connector, filter_lang: str = "en") -> None:
-    """Classifies claims in the provided database using the CARDSClassifier.
+def classify_claims(
+    db: preserve.Connector,
+    filter_lang: str = "en",
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
+) -> None:
+    """Classifies claims in the provided database using CARDS classification (batch mode).
 
     Iterates through claims in the database, optionally filtering by language.
-    For each claim that does not already have a 'cards_category' and contains a 'claim' text,
-    the function classifies the claim and updates the database entry with the resulting category.
+    For each claim that does not already have a 'cards_category' (unless *force* is
+    True) and contains a 'claim' text, the function classifies the claim using the
+    batch API and updates the database entries with the resulting categories.
 
     Args:
         db (preserve.Connector): The database connector to access and update claims.
-        filter_lang (str, optional): The language code to filter claims. Only claims matching this
-            language will be classified. Defaults to "en".
+        filter_lang (str, optional): The language code to filter claims. Only claims
+            matching this language will be classified. Defaults to "en".
+        force (bool, optional): Re-classify claims that already have a
+            'cards_category'. Defaults to False.
+        concurrency (int, optional): Maximum number of concurrent LLM calls.
+            Defaults to the classifier preset's own tuned concurrency. Only used
+            when ``classifier_engine="llm"``.
+        classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
+            See :func:`batch_classify_cards_category`.
 
     Returns:
         None
     """
-    classifier = CARDSClassifier()
-    for url, claim in track(db, description="Classifying claims"):
-        if filter_lang and "lang" in claim and claim.get("lang") != filter_lang:
-            logger.info(f"Skipping claim with URL {claim.get('url')} due to language mismatch: {claim.get('lang')}")
-        else:
-            if "cards_category" not in claim and "claim" in claim:
-                text = claim["claim"]
-                claim["cards_category"] = classifier.classify(text)
-                db[url] = claim
+    batch_classify_cards_category(
+        db,
+        text_field="claim",
+        filter_lang=filter_lang,
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
+        collect_description="Collecting claims to classify",
+        save_description="Saving classifications",
+        empty_message="No claims to classify.",
+        classify_item_name="claims",
+    )
 
 
-def process_all(db: preserve.Connector, claims_df: pd.DataFrame, filter_lang: str = "en") -> None:
+def process_all(
+    db: preserve.Connector,
+    claims_df: pd.DataFrame,
+    filter_lang: str = "en",
+    force: bool = False,
+    concurrency: Optional[int] = None,
+    classifier_engine: str = "transformer",
+) -> None:
     """Process all claims data through the complete pipeline.
 
     This function orchestrates the full claims processing workflow by first
@@ -101,6 +125,12 @@ def process_all(db: preserve.Connector, claims_df: pd.DataFrame, filter_lang: st
         db (preserve.Connector): Database connector instance for data operations.
         claims_df (pd.DataFrame): DataFrame containing the raw claims data to be processed.
         filter_lang (str, optional): Language filter for claim classification. Defaults to "en".
+        force (bool, optional): Re-classify already-classified claims. Defaults to False.
+        concurrency (int, optional): Maximum concurrent LLM calls. Defaults to the
+            classifier preset's own tuned concurrency. Only used when
+            ``classifier_engine="llm"``.
+        classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
+            See :func:`batch_classify_cards_category`.
 
     Returns:
         None: This function performs operations in-place and does not return any value.
@@ -112,7 +142,9 @@ def process_all(db: preserve.Connector, claims_df: pd.DataFrame, filter_lang: st
     logger.info("Processing claims...")
     process_claims(db, claims_df)
     logger.info("Classifying claims...")
-    classify_claims(db, filter_lang=filter_lang)
+    classify_claims(
+        db, filter_lang=filter_lang, force=force, concurrency=concurrency, classifier_engine=classifier_engine
+    )
 
 
 if __name__ == "__main__":

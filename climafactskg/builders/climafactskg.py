@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import urllib.parse
 from typing import Optional
@@ -294,6 +295,7 @@ def build_climafactskg(
     climafactskg_db: str = "data/skepticalscience_arguments_db.db",
     cards_ttl: str = "data/cards.ttl",
     cimplekg_db: str = "data/cimplekg_claims_db.db",
+    climatesensekg_db: Optional[str] = "data/climatesensekg_claims_db.db",
     ignore_urls: Optional[list] = None,
 ) -> Graph:
     """Builds the ClimaFacts Knowledge Graph by integrating data from multiple sources.
@@ -307,6 +309,9 @@ def build_climafactskg(
             Defaults to "data/skepticalscience_arguments_db.json".
         cards_ttl (str): Path to the Turtle (.ttl) file containing CARDS data. Defaults to "data/cards.ttl".
         cimplekg_db (str): Path to the CimpleKG claims JSON database. Defaults to "data/cimplekg_claims_db.json".
+        climatesensekg_db (Optional[str]): Path to the ClimateSenseKG claims database. Same entry shape as
+            *cimplekg_db* (produced by the same collector code), so it's merged in with the same mapping
+            function. Pass ``None`` to skip. Defaults to "data/climatesensekg_claims_db.db".
         ignore_urls (Optional[list]): List of URLs to ignore when building the graph. Defaults to None.
 
     Returns:
@@ -337,6 +342,16 @@ def build_climafactskg(
     with preserve.open(format="sqlite", filename=cimplekg_db) as db:
         cimplekg_g = generate_cimplekg_mappings(db)
         g += cimplekg_g
+
+    if climatesensekg_db is not None and os.path.exists(climatesensekg_db):
+        logging.info(f"Loading ClimateSenseKG DB from: {climatesensekg_db}")
+        # Same entry shape as cimplekg_db (produced by the same collector code),
+        # so the mapping function is shared as-is.
+        with preserve.open(format="sqlite", filename=climatesensekg_db) as db:
+            climatesensekg_g = generate_cimplekg_mappings(db)
+            g += climatesensekg_g
+    elif climatesensekg_db is not None:
+        logging.info(f"ClimateSenseKG DB not found at {climatesensekg_db}, skipping.")
 
     logging.info("ClimaFactsKG build process completed.")
     return g

@@ -25,6 +25,20 @@ CITO = Namespace("http://purl.org/spar/cito/")
 
 _DOI_PREFIX_RE = re.compile(r"^https?://(?:dx\.)?doi\.org/", re.IGNORECASE)
 
+# Splits on sentence-ending punctuation followed by whitespace and a capital letter
+# or closing quote, which is reliable enough for clean scientific prose.
+_SENT_END_RE = re.compile(r"(?<=[.!?])\s{1,3}(?=[A-Z\"‘“])")
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Split *text* into sentences using a lightweight regex.
+
+    No minimum-length filter: short fragments (e.g. a bare "(Foster, 2010).")
+    can still carry a citation and must reach the matcher.
+    """
+    return [s.strip() for s in _SENT_END_RE.split(text) if s.strip()]
+
+
 # Strip "et al." / "..." truncation markers and trailing non-author text
 _ET_AL_RE = re.compile(r",?\s*(?:\.{3}|et al\.?)\s*", re.IGNORECASE)
 _TRAILING_TEXT_RE = re.compile(r'[\xa0\s]*["\u201c].+$', re.DOTALL)
@@ -290,16 +304,14 @@ def generate_citations_graph(
         if not text.strip():
             continue
 
-        matched = matcher.get_matching_keys(text)
-        if not matched:
-            continue
-
         claimreview_uri = ns[f"claimreview_{hash_string(url)}"]
-        for ref_key in matched:
-            ref_uri = ns[f"article_{hash_string(ref_key.lower().strip())}"]
-            g.add((claimreview_uri, SDO.citation, ref_uri))
-            g.add((claimreview_uri, CITO.cites, ref_uri))
-            citation_count += 1
+        for sentence in _split_sentences(text):
+            matched = matcher.get_matching_keys(sentence)
+            for ref_key in matched:
+                ref_uri = ns[f"article_{hash_string(ref_key.lower().strip())}"]
+                g.add((claimreview_uri, SDO.citation, ref_uri))
+                g.add((claimreview_uri, CITO.cites, ref_uri))
+                citation_count += 1
 
     article_count = sum(1 for _ in g.subjects(SDO.citation, None))
     logging.info("Generated %d citation links across %d articles.", citation_count, article_count)

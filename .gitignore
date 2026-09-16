@@ -196,4 +196,13 @@ data/*.db
 data/*.db
 data/climafacts_kg.rdf
 data/cimplekg/
+data/cards_annotations_v2/
+data/cards_annotations_v2b/
+data/cards/
+data/optimised_prompt.txt
 .vscode/settings.json
+
+.continue
+
+# macOS
+.DS_Store

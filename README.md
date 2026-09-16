@@ -4,6 +4,7 @@
 
 ![ClimaFactsKG license](https://img.shields.io/badge/ClimaFactsKG_license-CC%20BY%204.0-success.svg?style=flat)
 
+[![CI](https://github.com/climatesense-project/climafacts-kg/actions/workflows/ci.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/ci.yml)
 [![Create Release](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml)
 [![Publish ClimaFactsKG RDF](https://github.com/climatesense-project/climafacts-kg/actions/workflows/gh-pages-publish.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/gh-pages-publish.yml)
 
@@ -83,21 +84,48 @@ The following table shows the main entity and triple counts in the current Clima
 | Entity / Relationship                   | Count   |
 | :-------------------------------------- | ------: |
 | `sc:ClaimReview` nodes                  | 1,589   |
-| `sc:Claim` nodes (unique myths)         | 253     |
+| `sc:Claim` nodes (unique myths)         | 252     |
 | `sc:ScholarlyArticle` / `bibo:AcademicArticle` nodes | 1,205 |
 | `sc:Periodical` / `bibo:Journal` nodes  | 420     |
 | `sc:Person` nodes (article authors)     | 4,586   |
 | `sc:citation` triples (source links)    | 982     |
 | `cito:cites` triples (scholarly links)  | 485     |
-| Total RDF triples                       | 79,458  |
+| Total RDF triples                       | 91,444  |
+
+Run `climafactskg validate` for a live, always-up-to-date count of these figures.
 
 ## 🖥️ ClimaFactsKG Source Code
 
 The data and source code releases can be found on the [releases page](https://github.com/climatesense-project/climafacts-kg/releases).
 
+### 📦 Installation
+
+Core install covers `collect`, `build`, `serve`, `export`, and `process --classifier llm` (the LLM-based path). `process`'s *default* classifier is the local two-stage transformer (no API key or cost, matches the pre-refactor pipeline) — that one needs the `transformer` extra below, since it pulls in PyTorch/HuggingFace.
+
+```bash
+pip install climafactskg
+```
+
+The `matcher` and `transformer` CARDS classifiers, and the annotation-evaluation pipeline, pull in
+heavy optional dependencies (spaCy, PyTorch/HuggingFace, Google Sheets/Drive, GEPA). Install only
+what you need via extras:
+
+```bash
+pip install "climafactskg[matcher]"      # rule-based Jaccard-similarity classifier (spaCy)
+pip install "climafactskg[transformer]"  # two-stage HuggingFace classifier (pulls PyTorch)
+pip install "climafactskg[eval]"         # CARDS eval/optimization pipeline (GEPA, pydantic-evals, Sheets)
+pip install "climafactskg[all]"          # everything
+```
+
+With Poetry, from a checkout of this repository:
+
+```bash
+poetry install --extras "matcher transformer eval"   # or: --all-extras
+```
+
 ### ⌨️ Command Line Interface (CLI)
 
-ClimaFactsKG has a simple CLI interface that be accessed using the `climafactskg` command. The command line interface can be used for serving ClimaFactsKG (after [downloading](https://purl.net/climatesense/climafactskg/ns) or generating the RDF file).
+ClimaFactsKG has a simple CLI interface accessible via the `climafactskg` command.
 
 ```
  Usage: climafactskg [OPTIONS] COMMAND [ARGS]...
@@ -112,10 +140,148 @@ ClimaFactsKG has a simple CLI interface that be accessed using the `climafactskg
 │ collect    Collect data for the ClimaFactsKG knowledge graph.                                            │
 │ process    Process collected data and store it in the knowledge graph.                                   │
 │ build      Build the ClimaFactsKG knowledge graph.                                                       │
-│ classify   Classify text using CARDS.                                                                    │
+│ validate   Validate an RDF graph file (parses OK, non-empty, has ClaimReview nodes). Runs automatically  │
+│            at the end of `build` too.                                                                    │
+│ classify   Classify text using the CARDS taxonomy.                                                       │
 │ serve      Create a SPARQL endpoint for serving a knowledge graph.                                       │
 │ export     Export a Preserve database to a JSON file.                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+`process` classifies with the local transformer engine by default (`--classifier transformer`, requires the `transformer` extra — see Installation above); pass `--classifier llm` to use the LLM-based path instead (core install, see provider table below). `build` merges SkepticalScience, CimpleKG, and ClimateSenseKG data plus the CARDS taxonomy into one `data/climafacts_kg.ttl`.
+
+#### `classify` — CARDS taxonomy classification
+
+Classifies a text string using one of three available classifiers.
+
+```
+ Usage: climafactskg classify [OPTIONS] TEXT
+
+ Classify text using the CARDS taxonomy.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ TEXT    Text to classify using CARDS.                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --classifier  -c   TEXT  Classifier: 'transformer' (default), 'matcher', or 'llm'.                      │
+│ --preset      -p   TEXT  Named LLM preset (e.g. 'climatesense-nslp'). LLM only.                         │
+│ --provider         TEXT  LLM provider ('openai', 'ollama', 'openrouter', 'lmstudio'). LLM only.         │
+│ --model       -m   TEXT  LLM model name. LLM only.                                                      │
+│ --cache-path       TEXT  Path to a Preserve SQLite cache file. LLM only.                                │
+│ --no-preclassifier       Disable the ClimateBERT pre-classifier gate. LLM only.                         │
+│ --list-presets           Print all registered LLM preset names and exit.                                │
+│ --help                   Show this message and exit.                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+**Examples:**
+
+```bash
+# Two-stage transformer classifier (default)
+climafactskg classify "CO2 is just plant food, not a pollutant"
+
+# Rule-based Jaccard-similarity matcher
+climafactskg classify "Global warming stopped in 1998" --classifier matcher
+
+# LLM classifier using a named preset
+climafactskg classify "The sun drives all climate change" --classifier llm --preset climatesense-nslp
+
+# LLM classifier with explicit provider and model, with result caching
+climafactskg classify "CO2 is just plant food" \
+  --classifier llm --provider openai --model gpt-4o-mini --cache-path /tmp/cards.db
+
+# LLM via a local Ollama instance
+climafactskg classify "There is no consensus on climate change" \
+  --classifier llm --provider ollama --model llama3.3
+
+# List available LLM presets
+climafactskg classify "" --list-presets
+```
+
+### 🧩 CARDS Classifiers (Python API)
+
+The `climafactskg.classifiers.cards` module exposes three classifiers for programmatic use.
+
+#### Transformer classifier (two-stage, default)
+
+Uses a ClimateBERT-based binary relevance filter followed by a fine-tuned CARDS taxonomy model. No API key required.
+
+```python
+from climafactskg.classifiers.cards import CARDSClassifier
+
+clf = CARDSClassifier()
+clf.classify("Global warming stopped in 1998")  # → e.g. "1_0"
+```
+
+#### Rule-based matcher
+
+Fast Jaccard-similarity lookup against the CARDS taxonomy keyword database. Useful as a lightweight baseline.
+
+```python
+from climafactskg.classifiers.cards import CARDSMatcher
+
+clf = CARDSMatcher()
+clf.classify("CO2 is not the main driver of warming")  # → e.g. "2_1"
+```
+
+#### LLM classifier
+
+Structured-output LLM classifier built on [pydantic-ai](https://github.com/pydantic/pydantic-ai). Supports any OpenAI-compatible provider and includes an optional ClimateBERT pre-filter and [Preserve](https://github.com/kylepollina/preserve) SQLite result cache.
+
+Supported providers:
+
+| Provider string | Backend | Credentials |
+| :-------------- | :------ | :---------- |
+| `"openai"` | OpenAI API | `OPENAI_API_KEY` env var |
+| `"anthropic"` | Anthropic API | `ANTHROPIC_API_KEY` env var |
+| `"groq"` | Groq API | `GROQ_API_KEY` env var |
+| `"openrouter"` | OpenRouter API | `OPENROUTER_API_KEY` env var |
+| `"ollama"` | Local Ollama server | `OLLAMA_BASE_URL` (default: `http://localhost:11434/v1`) |
+| `"lmstudio"` | Local LM Studio server | `LMSTUDIO_BASE_URL` (default: `http://localhost:1234/v1`) |
+
+```python
+from climafactskg.classifiers.cards import CARDSLLMClassifier
+
+# Default provider/model from CARDS_LLM_PROVIDER / CARDS_LLM_MODEL env vars
+clf = CARDSLLMClassifier()
+clf.classify("Global warming stopped in 1998")  # → e.g. "1_0"
+
+# Explicit provider and model, with caching
+clf = CARDSLLMClassifier(
+    provider="openai",
+    model="gpt-4o-mini",
+    cache_path="/tmp/cards.db",
+)
+
+# From a named preset
+clf = CARDSLLMClassifier.from_preset("climatesense-nslp", cache_path="/tmp/cards.db")
+
+# List registered presets
+from climafactskg.classifiers.cards import registered_presets
+print(registered_presets())  # → ('climatesense-nslp', 'xplainnlp-nslp')
+
+# Batch classification (concurrent LLM calls)
+labels = clf.classify_batch(["text one", "text two", "text three"], concurrency=4)
+```
+
+**Built-in presets:**
+
+| Preset name | Provider | Model |
+| :---------- | :------- | :---- |
+| `climatesense-nslp` | `openrouter` | `openai/gpt-5.2` |
+| `xplainnlp-nslp` | `lmstudio` | `qwen/qwen3-8b` |
+
+Custom presets can be registered with the `@register_preset` decorator:
+
+```python
+import dataclasses
+from climafactskg.classifiers.cards import CARDSLLMConfig, register_preset
+
+@register_preset("my-preset")
+@dataclasses.dataclass
+class MyCARDSLLMConfig(CARDSLLMConfig):
+    provider: str = "ollama"
+    model: str = "llama3.3"
 ```
 
 ## ©️ Licenses
