@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from rdflib import OWL, RDF, RDFS, SDO, XSD, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import NamespaceManager
 
-from climafactskg.builders.cimplekg import generate_cimplekg_mappings
+from climafactskg.builders.cimplekg import add_cards_category_link, generate_cimplekg_mappings
 from climafactskg.utils import hash_string
 
 logging.basicConfig(level=logging.INFO)
@@ -204,19 +204,8 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     )
                 )
 
-            # Add cards category if present. Both engines have their own "not
-            # related" sentinel ("0" for transformer/matcher, "0_0" for LLM) —
-            # exclude both, matching builders/cimplekg.py's equivalent check.
-            if arg.get("cards_category") not in (None, "0", "0_0"):
-                cards_category_id = arg["cards_category"]
-                g.add(
-                    (
-                        ns[claimreview_id],
-                        SDO.about,
-                        cards_ns[cards_category_id],
-                    )
-                )
-                g.add((cards_ns[cards_category_id], SDO.subjectOf, ns[claimreview_id]))
+            # Add cards category if present.
+            add_cards_category_link(g, cards_ns, ns[claimreview_id], arg.get("cards_category"))
 
             # Add content of the review:
             g.add((ns[claimreview_id], SDO.name, Literal(_normalize_text(arg["title"]), lang=lang)))
