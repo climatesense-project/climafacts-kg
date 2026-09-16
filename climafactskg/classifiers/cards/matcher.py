@@ -8,6 +8,7 @@ import spacy
 from rdflib import Graph
 from spacy.tokens import Doc
 
+from .base import CARDSClassifierBase
 from .taxonomy import TAXONOMY
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ if not spacy.language.Language.has_factory("clean_component"):
     spacy.language.Language.component("clean_component", func=_clean_component)
 
 
-class CARDSMatcher:
+class CARDSMatcher(CARDSClassifierBase):
     """CARDSMatcher: classifies text against the CARDS taxonomy using Jaccard similarity.
 
     By default uses the built-in 61-entry taxonomy. Pass a CARDS RDF/TTL file to
@@ -129,16 +130,19 @@ class CARDSMatcher:
         union = len(set1) + len(set2) - intersection
         return float(intersection) / union if union > 0 else 0.0
 
-    def classify(self, text: str, min_threshold: float = 0.25) -> str:
+    def classify(self, text: str, context: Optional[str] = None, min_threshold: float = 0.25) -> str:
         """Classifies a single text against the CARDS taxonomy using Jaccard similarity.
 
         Args:
             text (str): The input text to classify.
+            context (str, optional): Extra text (e.g. fact-check context) appended
+                to *text* before matching. ``None`` (default) matches on *text* alone.
             min_threshold (float): Minimum Jaccard similarity required to assign a category.
 
         Returns:
             str: The predicted CARDS taxonomy code, or "0" if no match exceeds the threshold.
         """
+        text = f"{text}\n\n{context}" if context else text
         cleaned_text = self.clean(text)
         text_tokens = set(cleaned_text.split())
 
@@ -166,6 +170,7 @@ class CARDSMatcher:
     def classify_batch(
         self,
         texts: list[str],
+        contexts: Optional[list[Optional[str]]] = None,
         min_threshold: float = 0.25,
         max_workers: Optional[int] = None,
     ) -> list[str]:
@@ -176,6 +181,8 @@ class CARDSMatcher:
 
         Args:
             texts (list[str]): Texts to classify.
+            contexts (list[str | None], optional): Optional per-item context,
+                same length as *texts* if given.
             min_threshold (float): Minimum Jaccard similarity threshold.
             max_workers (int | None): Maximum number of threads. Defaults to
                 ``min(32, os.cpu_count() + 4)`` (ThreadPoolExecutor default).
@@ -183,8 +190,11 @@ class CARDSMatcher:
         Returns:
             list[str]: CARDS taxonomy codes in the same order as the input.
         """
-        import functools
-
-        fn = functools.partial(self.classify, min_threshold=min_threshold)
+        effective_contexts = contexts if contexts is not None else [None] * len(texts)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            return list(executor.map(fn, texts))
+            return list(
+                executor.map(
+                    lambda pair: self.classify(pair[0], context=pair[1], min_threshold=min_threshold),
+                    zip(texts, effective_contexts),
+                )
+            )

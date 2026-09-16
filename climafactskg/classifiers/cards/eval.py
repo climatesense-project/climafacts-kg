@@ -55,6 +55,8 @@ from rich.rule import Rule
 from rich.table import Table
 from sklearn.metrics import precision_recall_fscore_support
 
+from .base import CARDSClassifierBase
+
 # Re-export dataset factories and CARDSInput
 from .datasets import (  # noqa: F401
     CARDSInput,
@@ -117,9 +119,16 @@ def evaluate(classifier, dataset: Dataset):
     classifier_name = type(classifier).__name__
     logger.info("Starting evaluation: %s on '%s' (%d cases)", classifier_name, dataset.name, len(cases))
 
+    # All three CARDS engines (CARDSClassifierBase subclasses) accept `context`
+    # via classify/classify_batch. Duck-typed classifiers that don't inherit it
+    # (arbitrary external `classify(text) -> str` objects, per this function's
+    # docstring) fall back to plain text — passing `context=` to something that
+    # doesn't accept it would raise a TypeError.
+    supports_context = isinstance(classifier, CARDSClassifierBase)
+
     if hasattr(classifier, "classify_batch"):
         logger.info("Running classify_batch")
-        if any(contexts) and hasattr(classifier, "_user_prompt_with_context"):
+        if any(contexts) and supports_context:
             preds = classifier.classify_batch(texts, contexts=contexts)
         else:
             preds = classifier.classify_batch(texts)
@@ -127,7 +136,7 @@ def evaluate(classifier, dataset: Dataset):
         from rich.progress import track
 
         logger.info("Running sequential classify")
-        use_context = any(contexts) and hasattr(classifier, "_user_prompt_with_context")
+        use_context = any(contexts) and supports_context
         preds = [
             classifier.classify(t, context=ctx) if use_context else classifier.classify(t)
             for t, ctx in track(zip(texts, contexts), description="Classifying...", total=len(texts))
@@ -202,14 +211,15 @@ def benchmark_configs(
         texts = [inp.text if isinstance(inp, CARDSInput) else inp for inp in inputs]
         contexts = [inp.context if isinstance(inp, CARDSInput) else None for inp in inputs]
 
+        supports_context = isinstance(classifier, CARDSClassifierBase)
         try:
             if hasattr(classifier, "classify_batch"):
-                if any(contexts) and hasattr(classifier, "_user_prompt_with_context"):
+                if any(contexts) and supports_context:
                     preds = classifier.classify_batch(texts, contexts=contexts)
                 else:
                     preds = classifier.classify_batch(texts)
             else:
-                use_context = any(contexts) and hasattr(classifier, "_user_prompt_with_context")
+                use_context = any(contexts) and supports_context
                 preds = [
                     classifier.classify(t, context=ctx) if use_context else classifier.classify(t)
                     for t, ctx in zip(texts, contexts)

@@ -22,6 +22,7 @@ LLM classifier defaults (overridable at init):
     CARDS_USER_PROMPT           — canonical user prompt template
 
 Classifiers:
+    CARDSClassifierBase         — shared classify/classify_batch interface
     CARDSMatcher                — Jaccard-similarity rule-based classifier
     CARDSClassifier             — Two-stage transformer classifier (binary + taxonomy)
     CARDSLLMClassifier          — LLM-based classifier with pre-filter and Preserve cache
@@ -35,6 +36,7 @@ Legacy:
     cards_classification        — Single-call helper (loads models on every invocation)
 """
 
+from .base import CARDSClassifierBase
 from .llm import (
     CARDS_LLM_DEFAULT_MODEL,
     CARDS_LLM_DEFAULT_PROVIDER,
@@ -78,6 +80,7 @@ def __getattr__(name: str):
 
 
 __all__ = [
+    "CARDSClassifierBase",
     "TAXONOMY",
     "TaxonomyCode",
     "CARDSLLMConfig",
