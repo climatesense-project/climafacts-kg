@@ -14,6 +14,10 @@ jobs:
       - name: Get latest release assets
         id: get_asset
         run: |
+          # Published under climafacts-kg/ (not the Pages root) so this repo's
+          # files can't collide with another repo's output on the same
+          # org-level Pages site / custom domain.
+          mkdir -p climafacts-kg
           ASSETS=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest")
           for FILE_NAME in climafacts_kg.rdf climafacts_kg.ttl cards.rdf cards.ttl; do
             RELEASE_URL=$(echo "$ASSETS" | jq -r ".assets[] | select(.name == \"${FILE_NAME}\") | .browser_download_url")
@@ -22,7 +26,7 @@ jobs:
               exit 1
             fi
             echo "Downloading '${FILE_NAME}' asset from: $RELEASE_URL"
-            curl -L -o "$FILE_NAME" "$RELEASE_URL"
+            curl -L -o "climafacts-kg/${FILE_NAME}" "$RELEASE_URL"
           done
           touch .nojekyll
       - name: Setup Pages
