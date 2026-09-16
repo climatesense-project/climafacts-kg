@@ -50,8 +50,8 @@ def rdf_to_sparql_enpoint(
 
 
 def climafactskg_to_sparql_endpoint(
-    file_path="climafacts/data/climafacts_kg.nt",
-    format: str = "nt",
+    file_path="data/climafacts_kg.ttl",
+    format: str = "ttl",
 ) -> SparqlEndpoint:
     """Creates and returns a SPARQL endpoint application for the ClimaFacts Knowledge Graph.
 
@@ -59,9 +59,8 @@ def climafactskg_to_sparql_endpoint(
     metadata such as a title, description, example query, and commonly used prefixes.
 
     Args:
-        file_path (str): Path to the RDF data file in N-Triples format. Defaults to
-            "climafacts/data/climafacts_kg.nt".
-        format (str): The serialization format of the RDF file (default is "nt" for N-Triples).
+        file_path (str): Path to the RDF data file. Defaults to "data/climafacts_kg.ttl".
+        format (str): The serialization format of the RDF file (default is "ttl" for Turtle).
 
     Returns:
         SparqlEndpoint: An application instance serving the SPARQL endpoint for the ClimaFacts Knowledge Graph.
@@ -110,6 +109,6 @@ def serve_endpoint(endpoint: SparqlEndpoint, host: str = "0.0.0.0", port: int = 
 
 
 if __name__ == "__main__":
-    file_path = "climafacts/data/climafacts_kg.nt"
+    file_path = "data/climafacts_kg.ttl"
     app = climafactskg_to_sparql_endpoint(file_path)
     serve_endpoint(app, host="0.0.0.0", port=8000)

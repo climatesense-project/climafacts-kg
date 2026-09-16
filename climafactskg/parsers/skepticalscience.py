@@ -111,9 +111,8 @@ def parse_main_article(url: str, html: Optional[str] = None) -> dict:
     # Get the author and last updated date:
     title_tag = soup.find("title")
     title = title_tag.text if title_tag else None
-    keywords = remove_html_tags(
-        soup.find("meta", attrs={"name": "keywords"})["content"]  # type: ignore
-    ).split(", ")
+    keywords_tag = soup.find("meta", attrs={"name": "keywords"})
+    keywords = remove_html_tags(keywords_tag["content"]).split(", ") if keywords_tag else []  # type: ignore
 
     if soup.find("meta", attrs={"name": "description"}):
         description = remove_html_tags(

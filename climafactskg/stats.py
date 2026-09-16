@@ -113,6 +113,17 @@ if __name__ == "__main__":
     else:
         print("No 'cards_category' field found in current CimpleKG mappings dataset.")
 
+    print("\n---------- ClimatesenseKG ----------")
+    # Note: mappings DB may not contain 'cards_category' in some snapshots.
+    climatesense_path = "data/climatesensekg_claims_db.db"
+    cnt = count_unique_values(climatesense_path, key="cards_category")
+    if cnt:
+        print(cnt)
+        total_claims = sum(cnt.values()) - cnt.get("0_0", 0) - cnt.get(None, 0) - cnt.get("0", 0)
+        print("Total claims (excluding '0'/'0_0' and None): {}".format(total_claims))
+    else:
+        print("No 'cards_category' field found in current ClimatesenseKG mappings dataset.")
+
     print("\n---------- ClimaFactsKG RDF Graph ----------")
     graph_path = "data/climafacts_kg.ttl"
     graph_stats = count_graph_stats(graph_path)
