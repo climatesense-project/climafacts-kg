@@ -216,9 +216,3 @@ class CARDSClassifier(CARDSClassifierBase):
             return computed
 
         return self._cache.get_or_compute(texts, key_fn=lambda t: f"{skip_binary}|{t}", compute_fn=_compute)
-
-
-def cards_classification(text: str) -> str:
-    """Legacy single-use helper. Loads models on every call; prefer CARDSClassifier for repeated use."""
-    classifier = CARDSClassifier()
-    return classifier.classify(text)

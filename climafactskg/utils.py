@@ -103,7 +103,6 @@ def remove_html_tags(text) -> str:
         >>> remove_html_tags("<p>Hello <b>World</b></p>")
         'Hello World'
     """
-    """Remove HTML tags from a string."""
     clean = re.compile("<.*?>")
     return re.sub(clean, "", text)
 
@@ -459,28 +458,6 @@ def print_dict_tree(
 
     if root_call:
         print(f"\nTotal items: {_counter[0]}")
-
-
-def deserialize_datetime(obj):
-    """Converts an ISO formatted datetime string to a `datetime.datetime` object.
-
-    If the input `obj` is a string representing a datetime in ISO format,
-    returns the corresponding `datetime.datetime` object. If the conversion
-    fails or `obj` is not a string, returns `obj` unchanged.
-
-    Args:
-        obj (Any): The object to deserialize, typically a string or datetime.
-
-    Returns:
-        Any: A `datetime.datetime` object if deserialization is successful,
-                otherwise the original `obj`.
-    """
-    if isinstance(obj, str):
-        try:
-            return datetime.fromisoformat(obj)
-        except ValueError:
-            pass
-    return obj
 
 
 def serialize_datetime(obj):

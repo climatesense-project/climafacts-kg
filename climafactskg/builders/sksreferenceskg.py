@@ -149,8 +149,8 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
                 if alt_key and alt_key != key:
                     g.add((article_uri, SDO.alternateName, Literal(alt_key)))
 
-            if ref.get("title"):
-                g.add((article_uri, SDO.name, Literal(ref["title"])))
+            if ref.get("header"):
+                g.add((article_uri, SDO.name, Literal(ref["header"])))
 
             # Year — kept as a plain literal to allow "2012a"-style suffixes
             if ref.get("year"):

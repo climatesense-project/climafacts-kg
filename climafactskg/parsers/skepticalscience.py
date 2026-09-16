@@ -499,7 +499,7 @@ def parse_skstiptionary_references(js_content: str) -> list:
     """Return research paper references from the sksTiptionary JS file.
 
     Entries with ``citation == "4"`` are research papers; all others are IPCC /
-    NSIDC glossary definitions.  Each returned dict has keys ``key``, ``title``,
+    NSIDC glossary definitions.  Each returned dict has keys ``key``, ``header``,
     ``definition_html``, plus any bibliography fields extracted from the
     definition HTML: ``authors_raw``, ``year``, ``journal``, ``volume``,
     ``issue``, ``pages``, ``doi``, ``url``.
@@ -525,7 +525,6 @@ def parse_skstiptionary_references(js_content: str) -> list:
         bib = parse_apa_citation_html(definition_html)
         bib["key"] = key
         bib["header"] = entry.get("header")
-        bib["title"] = entry.get("header")  # kept for backward compatibility
         bib["matchType"] = entry.get("matchType")
         alt = entry.get("altKeys")
         bib["altKeys"] = alt if isinstance(alt, list) else ([alt] if alt else [])

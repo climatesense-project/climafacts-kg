@@ -31,9 +31,6 @@ Classifiers:
 Prompt optimisation (requires ``gepa`` package):
     CARDSEvalsAdapter           — GEPA adapter bridging pydantic-ai + pydantic-evals
     optimize_prompt             — run GEPA optimisation for a named preset
-
-Legacy:
-    cards_classification        — Single-call helper (loads models on every invocation)
 """
 
 from .base import CARDSClassifierBase
@@ -55,15 +52,14 @@ from .llm import (
 )
 from .taxonomy import TAXONOMY
 
-# CARDSMatcher (spacy), CARDSClassifier/cards_classification (transformers/torch),
-# and CARDSEvalsAdapter/optimize_prompt (gepa/pydantic_evals) pull in heavy
+# CARDSMatcher (spacy), CARDSClassifier (transformers/torch), and
+# CARDSEvalsAdapter/optimize_prompt (gepa/pydantic_evals) pull in heavy
 # dependencies. They're loaded lazily on first attribute access so that
 # `from climafactskg.classifiers.cards.llm import CARDSLLMClassifier` — which
 # must import this package's __init__ first — doesn't pay for or require them.
 _LAZY_ATTRS = {
     "CARDSMatcher": ".matcher",
     "CARDSClassifier": ".transformer",
-    "cards_classification": ".transformer",
     "CARDSEvalsAdapter": ".optimization",
     "optimize_prompt": ".optimization",
 }
@@ -100,5 +96,4 @@ __all__ = [
     "CARDSOutput",
     "CARDSEvalsAdapter",
     "optimize_prompt",
-    "cards_classification",
 ]
