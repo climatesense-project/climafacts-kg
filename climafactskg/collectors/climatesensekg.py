@@ -69,13 +69,19 @@ def classify_claims(
     force: bool = False,
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
+    cache_path: Optional[str] = None,
 ) -> None:
     """Classify stored ClimateSenseKG claims.
 
     Delegates to :func:`climafactskg.collectors.utils.classify_claim_reviews`.
     """
     classify_claim_reviews(
-        db, filter_lang=filter_lang, force=force, concurrency=concurrency, classifier_engine=classifier_engine
+        db,
+        filter_lang=filter_lang,
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
+        cache_path=cache_path,
     )
 
 
@@ -86,6 +92,7 @@ def process_all(
     force: bool = False,
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
+    cache_path: Optional[str] = None,
 ) -> None:
     """Store then classify a ClimateSenseKG claims DataFrame.
 
@@ -98,6 +105,7 @@ def process_all(
         force=force,
         concurrency=concurrency,
         classifier_engine=classifier_engine,
+        cache_path=cache_path,
     )
 
 

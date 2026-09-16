@@ -108,6 +108,13 @@ def process(
         "--classifier",
         help="CARDS classifier engine: 'transformer' (default — matches the legacy classifier, no API cost) or 'llm'.",
     ),
+    cache_path: Optional[str] = typer.Option(
+        "data/cards_classification_cache.db",
+        "--cache-path",
+        help="Preserve SQLite cache for CARDS classification results, shared across all "
+        "sources below so identical claim/argument text is classified once. Pass an "
+        "empty string to disable caching.",
+    ),
 ):
     """Process collected data and store it in the knowledge graph."""
     import preserve
@@ -119,6 +126,7 @@ def process(
     load_dotenv()
 
     ignore_urls = ["https://skepticalscience.com/wigley-santer-2012-attribution.html"]
+    effective_cache_path = cache_path or None
 
     steps = [
         (
@@ -130,6 +138,7 @@ def process(
                 force=force,
                 concurrency=concurrency,
                 classifier_engine=classifier,
+                cache_path=effective_cache_path,
             ),
         ),
         (
@@ -141,6 +150,7 @@ def process(
                 force=force,
                 concurrency=concurrency,
                 classifier_engine=classifier,
+                cache_path=effective_cache_path,
             ),
         ),
         (
@@ -161,6 +171,7 @@ def process(
                 force=force,
                 concurrency=concurrency,
                 classifier_engine=classifier,
+                cache_path=effective_cache_path,
             ),
         ),
         (

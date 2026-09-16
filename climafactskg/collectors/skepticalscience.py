@@ -222,6 +222,7 @@ def classify_urls(
     force: bool = False,
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
+    cache_path: Optional[str] = None,
 ) -> None:
     """Classify URLs in the database using CARDS classification (batch mode).
 
@@ -240,6 +241,9 @@ def classify_urls(
             when ``classifier_engine="llm"``.
         classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
             See :func:`climafactskg.collectors.utils.batch_classify_cards_category`.
+        cache_path (str, optional): Preserve SQLite cache path, shared across
+            sources to avoid reclassifying identical text. Defaults to None
+            (no caching).
 
     Returns:
         None
@@ -251,6 +255,7 @@ def classify_urls(
         force=force,
         concurrency=concurrency,
         classifier_engine=classifier_engine,
+        cache_path=cache_path,
         collect_description="Collecting arguments to classify",
         save_description="Saving classifications",
         empty_message="No arguments to classify.",
@@ -266,6 +271,7 @@ def process_all(
     force: bool = False,
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
+    cache_path: Optional[str] = None,
 ) -> None:
     """Process all URLs for skeptical science data collection and classification.
 
@@ -285,6 +291,9 @@ def process_all(
             ``classifier_engine="llm"``.
         classifier_engine (str, optional): ``"transformer"`` (default) or ``"llm"``.
             See :func:`climafactskg.collectors.utils.batch_classify_cards_category`.
+        cache_path (str, optional): Preserve SQLite cache path, shared across
+            sources to avoid reclassifying identical text. Defaults to None
+            (no caching).
 
     Returns:
         None: This function performs operations but does not return a value.
@@ -292,7 +301,7 @@ def process_all(
     if urls is None:
         urls = []
     process_urls(db, urls, ignore_urls=ignore_urls)
-    classify_urls(db, force=force, concurrency=concurrency, classifier_engine=classifier_engine)
+    classify_urls(db, force=force, concurrency=concurrency, classifier_engine=classifier_engine, cache_path=cache_path)
 
 
 def fetch_skstiptionary(

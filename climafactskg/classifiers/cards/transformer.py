@@ -1,6 +1,10 @@
 """Two-stage transformer-based CARDS classifier (binary filter + 18-class taxonomy model)."""
 
 import logging
+from typing import Optional
+
+from .base import CARDSClassifierBase
+from .cache import ClassificationCache
 
 try:
     import torch
@@ -42,7 +46,7 @@ _TRANSFORMER_ID2LABEL: dict[int, str] = {
 logger = logging.getLogger(__name__)
 
 
-class CARDSClassifier:
+class CARDSClassifier(CARDSClassifierBase):
     """CARDSClassifier: classifies text using the CARDS taxonomy via transformer models.
 
     Performs two-stage classification:
@@ -63,6 +67,12 @@ class CARDSClassifier:
         binary_model_dir (str): HuggingFace model path for the binary classifier.
         taxonomy_model_dir (str): HuggingFace model path for the taxonomy classifier.
         max_len (int): Maximum tokenisation sequence length.
+        cache_path (str | None): Path to a Preserve SQLite cache for
+            ``classify_batch`` results, keyed by
+            ``hash(binary_model_dir|taxonomy_model_dir|max_len|text)`` — same
+            file can be shared across collector sources (e.g. CimpleKG and
+            ClimateSenseKG) so identical claim text is classified once. ``None``
+            (default) disables caching.
     """
 
     def __init__(
@@ -70,6 +80,7 @@ class CARDSClassifier:
         binary_model_dir: str = BINARY_MODEL_DIR,
         taxonomy_model_dir: str = TAXONOMY_MODEL_DIR,
         max_len: int = MAX_LEN,
+        cache_path: Optional[str] = None,
     ):
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
@@ -80,6 +91,8 @@ class CARDSClassifier:
 
         self.max_len = max_len
         self.id2label = _TRANSFORMER_ID2LABEL
+        fingerprint = f"transformer|{binary_model_dir}|{taxonomy_model_dir}|{max_len}"
+        self._cache = ClassificationCache(cache_path, fingerprint=fingerprint)
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             binary_model_dir,
@@ -98,16 +111,20 @@ class CARDSClassifier:
         self.taxonomy_model.to(self.device)
         self.taxonomy_model.eval()
 
-    def classify(self, text: str, skip_binary: bool = False) -> str:
+    def classify(self, text: str, context: Optional[str] = None, skip_binary: bool = False) -> str:
         """Classifies a single text using the binary and taxonomy models.
 
         Args:
             text (str): The input text to classify.
+            context (str, optional): Extra text (e.g. fact-check context) appended
+                to *text* before classification. ``None`` (default) classifies
+                *text* alone.
             skip_binary (bool): Skip the binary filter and run only the taxonomy model.
 
         Returns:
             str: A CARDS taxonomy code, or "0" if the binary model marks the text as irrelevant.
         """
+        text = f"{text}\n\n{context}" if context else text
         text = text.strip()[: self.max_len]
         tokenized = self.tokenizer(text, return_tensors="pt")
         tokenized = {k: v.to(self.device) for k, v in tokenized.items()}
@@ -160,7 +177,13 @@ class CARDSClassifier:
 
             return results
 
-    def classify_batch(self, texts: list[str], skip_binary: bool = False, batch_size: int = 32) -> list[str]:
+    def classify_batch(
+        self,
+        texts: list[str],
+        contexts: Optional[list[Optional[str]]] = None,
+        skip_binary: bool = False,
+        batch_size: int = 32,
+    ) -> list[str]:
         """Classifies multiple texts in mini-batches, one forward pass per stage per chunk.
 
         Texts are split into chunks of *batch_size* so throughput scales on both
@@ -171,6 +194,9 @@ class CARDSClassifier:
 
         Args:
             texts (list[str]): Texts to classify.
+            contexts (list[str | None], optional): Optional per-item context,
+                same length as *texts* if given; each is appended to its text
+                before classification.
             skip_binary (bool): Skip the binary filter; run only the taxonomy model.
             batch_size (int): Number of texts to tokenise/forward per chunk.
 
@@ -179,14 +205,17 @@ class CARDSClassifier:
         """
         from rich.progress import track
 
-        texts = [t.strip()[: self.max_len] for t in texts]
-        results: list[str] = []
-        chunks = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
+        effective_contexts = contexts if contexts is not None else [None] * len(texts)
+        texts = [(f"{t}\n\n{c}" if c else t).strip()[: self.max_len] for t, c in zip(texts, effective_contexts)]
 
-        for chunk in track(chunks, description=f"Classifying [transformer, batch_size={batch_size}]"):
-            results.extend(self._classify_chunk(chunk, skip_binary))
+        def _compute(pending: list[str]) -> list[str]:
+            chunks = [pending[i : i + batch_size] for i in range(0, len(pending), batch_size)]
+            computed: list[str] = []
+            for chunk in track(chunks, description=f"Classifying [transformer, batch_size={batch_size}]"):
+                computed.extend(self._classify_chunk(chunk, skip_binary))
+            return computed
 
-        return results
+        return self._cache.get_or_compute(texts, key_fn=lambda t: f"{skip_binary}|{t}", compute_fn=_compute)
 
 
 def cards_classification(text: str) -> str:

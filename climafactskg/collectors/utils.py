@@ -24,6 +24,7 @@ def batch_classify_cards_category(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
     cards_classifier_name: str = "xplainnlp-nslp",
+    cache_path: Optional[str] = None,
     collect_description: str = "Collecting items to classify",
     save_description: str = "Saving classifications",
     empty_message: str = "No items to classify.",
@@ -53,6 +54,10 @@ def batch_classify_cards_category(
             and doesn't silently reclassify entries tagged with the other engine.
         cards_classifier_name: Named LLM preset to use. Only used when
             ``classifier_engine="llm"``.
+        cache_path: Path to a Preserve SQLite cache shared across calls and,
+            when the same path is passed by multiple collector sources, across
+            sources too — identical claim text classified once instead of once
+            per source. ``None`` (default) disables caching.
         collect_description: Progress-bar label for the collection pass.
         save_description: Progress-bar label for the save pass.
         empty_message: Log message when there are no pending entries.
@@ -70,12 +75,13 @@ def batch_classify_cards_category(
     if classifier_engine == "transformer":
         from climafactskg.classifiers.cards import CARDSClassifier
 
-        classifier = CARDSClassifier()
+        classifier = CARDSClassifier(cache_path=cache_path)
         classifier_id = TRANSFORMER_CLASSIFIER_ID
     elif classifier_engine == "llm":
         from climafactskg.classifiers.cards.llm import CARDSLLMClassifier
 
-        classifier = CARDSLLMClassifier.from_preset(cards_classifier_name)
+        overrides = {"cache_path": cache_path} if cache_path is not None else {}
+        classifier = CARDSLLMClassifier.from_preset(cards_classifier_name, **overrides)
         classifier_id = cards_classifier_name
     else:
         raise ValueError(f"Unknown classifier_engine {classifier_engine!r}; expected 'transformer' or 'llm'")
@@ -179,6 +185,7 @@ def classify_claim_reviews(
     force: bool = False,
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
+    cache_path: Optional[str] = None,
 ) -> None:
     """Classifies stored ClaimReview entries using CARDS classification (batch mode).
 
@@ -193,6 +200,7 @@ def classify_claim_reviews(
         force=force,
         concurrency=concurrency,
         classifier_engine=classifier_engine,
+        cache_path=cache_path,
         collect_description="Collecting claims to classify",
         save_description="Saving classifications",
         empty_message="No claims to classify.",
@@ -207,6 +215,7 @@ def process_all_claim_reviews(
     force: bool = False,
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
+    cache_path: Optional[str] = None,
 ) -> None:
     """Store then classify a ClaimReview DataFrame.
 
@@ -217,5 +226,10 @@ def process_all_claim_reviews(
     process_claim_reviews(db, claims_df)
     logger.info("Classifying claims...")
     classify_claim_reviews(
-        db, filter_lang=filter_lang, force=force, concurrency=concurrency, classifier_engine=classifier_engine
+        db,
+        filter_lang=filter_lang,
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
+        cache_path=cache_path,
     )

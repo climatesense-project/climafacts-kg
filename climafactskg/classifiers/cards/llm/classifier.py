@@ -9,13 +9,14 @@ import random
 import re
 from typing import Optional
 
-import preserve
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_ai import Agent, PromptedOutput
 from pydantic_ai.exceptions import ModelHTTPError
 
 from climafactskg.utils import hash_string
 
+from ..base import CARDSClassifierBase
+from ..cache import ClassificationCache
 from .presets import (
     _REGISTRY,
     CARDS_LLM_DEFAULT_MODEL,
@@ -186,7 +187,7 @@ def _build_pydantic_ai_model(provider: str, model: str):
 # ---------------------------------------------------------------------------
 
 
-class CARDSLLMClassifier:
+class CARDSLLMClassifier(CARDSClassifierBase):
     """CARDSLLMClassifier: classifies text using the CARDS taxonomy via an LLM.
 
     Uses a two-stage relevance gate:
@@ -261,7 +262,6 @@ class CARDSLLMClassifier:
         self._user_prompt = user_prompt
         self._user_prompt_with_context = user_prompt_with_context
         self._max_context_chars = max_context_chars
-        self._cache_path = cache_path
         self._default_concurrency = default_concurrency
         self._model_settings: dict = {"temperature": temperature}
         if top_p is not None:
@@ -290,9 +290,16 @@ class CARDSLLMClassifier:
             pre_id = type(self._preclassifier).__name__
             if model_name := getattr(self._preclassifier, "model_name", None):
                 pre_id = f"{pre_id}|{model_name}"
-            self._pre_prefix = f"preclassifier|{pre_id}"
+            pre_prefix = f"preclassifier|{pre_id}"
         else:
-            self._pre_prefix = None
+            pre_prefix = None
+        self._preclassifier_cache = ClassificationCache(cache_path, fingerprint=pre_prefix or "")
+        self._output_cache = ClassificationCache(
+            cache_path,
+            fingerprint=self._run_prefix,
+            serialize=lambda output: output.model_dump(),
+            deserialize=lambda data: CARDSOutput.model_validate(data),
+        )
 
         agent_output_type = PromptedOutput(CARDSOutput) if output_mode == "prompted" else CARDSOutput
         self._agent: Agent[None, CARDSOutput] = Agent(
@@ -456,20 +463,14 @@ class CARDSLLMClassifier:
         """Returns the preclassifier label for *text*, using the cache when available.
 
         Returns ``None`` when no preclassifier is configured.
-        Cache key: ``preclassifier|<ClassName>[|<model_name>]|<text_hash>``.
         """
         if self._preclassifier is None:
             return None
-        pre_key = f"{self._pre_prefix}|{hash_string(text)}"
-        if self._cache_path is not None:
-            with preserve.open(format="sqlite", filename=self._cache_path) as db:
-                if pre_key in db:
-                    logger.debug("Preclassifier cache hit for key %s", pre_key)
-                    return db[pre_key]["result"]
-                label = self._preclassifier.classify(text)
-                db[pre_key] = {"text": text, "result": label}
-                return label
-        return self._preclassifier.classify(text)
+        return self._preclassifier_cache.get_or_compute(
+            [text],
+            key_fn=lambda t: t,
+            compute_fn=lambda pending: [self._preclassifier.classify(t) for t in pending],
+        )[0]
 
     # ------------------------------------------------------------------
     # Public API
@@ -502,29 +503,12 @@ class CARDSLLMClassifier:
         if not skip_preclassifier and self._preclassify(text) == "unrelated":
             return "0"
 
-        cache_key = (
-            hash_string(f"{self._run_prefix}|{text}|{context}")
-            if context
-            else hash_string(f"{self._run_prefix}|{text}")
-        )
-
-        if self._cache_path is not None:
-            with preserve.open(format="sqlite", filename=self._cache_path) as db:
-                if cache_key in db:
-                    logger.debug("Cache hit for key %s", cache_key)
-                    return self._label_from_output(CARDSOutput.model_validate(db[cache_key]["output"]))
-
-                output = self._call_llm(text, context)
-                db[cache_key] = {
-                    "text": text,
-                    "provider": self._provider,
-                    "model": self._model,
-                    "system_prompt_hash": hash_string(self._system_prompt),
-                    "output": output.model_dump(),
-                }
-            return self._label_from_output(output)
-
-        return self._label_from_output(self._call_llm(text, context))
+        output = self._output_cache.get_or_compute(
+            [(text, context)],
+            key_fn=lambda pair: f"{pair[0]}|{pair[1]}" if pair[1] else pair[0],
+            compute_fn=lambda pending: [self._call_llm(t, ctx) for t, ctx in pending],
+        )[0]
+        return self._label_from_output(output)
 
     def classify_batch(
         self,
@@ -587,29 +571,18 @@ class CARDSLLMClassifier:
 
             # Gate 1: pre-classifier — resolve unrelated texts without LLM
             if not skip_preclassifier and self._preclassifier is not None:
-                pre_keys = [f"{self._pre_prefix}|{hash_string(t)}" for t in texts]
-                pre_misses: list[int] = []
-                pre_labels: dict[int, str] = {}
-                # batch-read preclassifier cache
-                if self._cache_path is not None:
-                    with preserve.open(format="sqlite", filename=self._cache_path) as db:
-                        for i, key in enumerate(pre_keys):
-                            if key in db:
-                                pre_labels[i] = db[key]["result"]
-                            else:
-                                pre_misses.append(i)
-                else:
-                    pre_misses = list(range(len(texts)))
-                # run preclassifier only for misses
-                new_pre: dict[int, str] = {i: self._preclassifier.classify(texts[i]) for i in pre_misses}
-                # batch-write preclassifier cache
-                if self._cache_path is not None and new_pre:
-                    with preserve.open(format="sqlite", filename=self._cache_path) as db:
-                        for i, label in new_pre.items():
-                            db[pre_keys[i]] = {"text": texts[i], "result": label}
-                pre_labels.update(new_pre)
-                for i, _ in enumerate(texts):
-                    if pre_labels.get(i) == "unrelated":
+
+                def _compute_pre(pending: list[str]) -> list[str]:
+                    return [self._preclassifier.classify(t) for t in pending]
+
+                def _advance_on_hit(_text: str, _label: str) -> None:
+                    progress.advance(task_id)
+
+                pre_labels = self._preclassifier_cache.get_or_compute(
+                    texts, key_fn=lambda t: t, compute_fn=_compute_pre, on_hit=_advance_on_hit
+                )
+                for i, label in enumerate(pre_labels):
+                    if label == "unrelated":
                         results[i] = "0"
                         progress.advance(task_id)
                     else:
@@ -620,78 +593,44 @@ class CARDSLLMClassifier:
             if not pending_indices:
                 return results  # type: ignore[return-value]
 
-            pending_texts = [texts[i] for i in pending_indices]
-            pending_contexts = [effective_contexts[i] for i in pending_indices]
-            cache_keys = [
-                hash_string(f"{self._run_prefix}|{t}|{ctx}") if ctx else hash_string(f"{self._run_prefix}|{t}")
-                for t, ctx in zip(pending_texts, pending_contexts)
-            ]
+            pending_pairs = [(texts[i], effective_contexts[i]) for i in pending_indices]
 
-            miss_positions: list[int] = []
-            llm_texts: list[str] = []
-            llm_contexts: list[str | None] = []
+            def _compute_llm(pending: list[tuple[str, str | None]]) -> list[CARDSOutput | Exception]:
+                effective_concurrency = concurrency if concurrency is not None else self._default_concurrency
+                pending_texts = [t for t, _ in pending]
+                pending_contexts = [ctx for _, ctx in pending]
+                return asyncio.run(
+                    self._classify_batch_async(
+                        pending_texts, pending_contexts, effective_concurrency, progress, task_id
+                    )
+                )
 
-            # Cache batch-read
-            if self._cache_path is not None:
-                with preserve.open(format="sqlite", filename=self._cache_path) as db:
-                    for pos, (text, ctx, key) in enumerate(zip(pending_texts, pending_contexts, cache_keys)):
-                        if key in db:
-                            output = CARDSOutput.model_validate(db[key]["output"])
-                            results[pending_indices[pos]] = self._label_from_output(output)
-                            logger.debug("Cache hit for key %s", key)
-                            progress.advance(task_id)
-                        else:
-                            miss_positions.append(pos)
-                            llm_texts.append(text)
-                            llm_contexts.append(ctx)
-            else:
-                miss_positions = list(range(len(pending_texts)))
-                llm_texts = pending_texts
-                llm_contexts = pending_contexts
+            def _advance_output_hit(_pair: tuple[str, str | None], _output: CARDSOutput) -> None:
+                progress.advance(task_id)
 
-            if not llm_texts:
-                return results  # type: ignore[return-value]
-
-            # Async concurrent LLM for cache misses
-            effective_concurrency = concurrency if concurrency is not None else self._default_concurrency
-            llm_outputs: list[CARDSOutput | Exception] = asyncio.run(
-                self._classify_batch_async(llm_texts, llm_contexts, effective_concurrency, progress, task_id)
+            outputs = self._output_cache.get_or_compute(
+                pending_pairs,
+                key_fn=lambda pair: f"{pair[0]}|{pair[1]}" if pair[1] else pair[0],
+                compute_fn=_compute_llm,
+                should_cache=lambda output: not isinstance(output, Exception),
+                on_hit=_advance_output_hit,
             )
 
         failures: list[tuple[int, Exception]] = [
-            (rel_pos, output) for rel_pos, output in zip(miss_positions, llm_outputs) if isinstance(output, Exception)
+            (orig_idx, output) for orig_idx, output in zip(pending_indices, outputs) if isinstance(output, Exception)
         ]
-        successes = [
-            (rel_pos, output)
-            for rel_pos, output in zip(miss_positions, llm_outputs)
-            if not isinstance(output, Exception)
-        ]
-
-        # Cache batch-write + collect results (successes only; failures are never cached)
-        if self._cache_path is not None:
-            with preserve.open(format="sqlite", filename=self._cache_path) as db:
-                for rel_pos, output in successes:
-                    orig_idx = pending_indices[rel_pos]
-                    db[cache_keys[rel_pos]] = {
-                        "text": texts[orig_idx],
-                        "provider": self._provider,
-                        "model": self._model,
-                        "system_prompt_hash": hash_string(self._system_prompt),
-                        "output": output.model_dump(),
-                    }
-                    results[orig_idx] = self._label_from_output(output)
-        else:
-            for rel_pos, output in successes:
-                results[pending_indices[rel_pos]] = self._label_from_output(output)
+        for orig_idx, output in zip(pending_indices, outputs):
+            if not isinstance(output, Exception):
+                results[orig_idx] = self._label_from_output(output)
 
         if failures:
             logger.error(
                 "%d/%d LLM classification(s) failed after retries (%d succeeded); "
                 "failed items are left as None. First failure at text index %d: %r",
                 len(failures),
-                len(llm_outputs),
-                len(successes),
-                pending_indices[failures[0][0]],
+                len(outputs),
+                len(outputs) - len(failures),
+                failures[0][0],
                 failures[0][1],
             )
 
