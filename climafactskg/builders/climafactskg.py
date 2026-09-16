@@ -104,8 +104,9 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 if canonical_cr_id != claimreview_id:
                     g.add((ns[claimreview_id], RDFS.seeAlso, ns[canonical_cr_id]))
 
-            # Add rating:
-            b = BNode()
+            # Add rating. BNode id is content-derived (not rdflib's random default)
+            # so re-running build on the same data serializes deterministically.
+            b = BNode(hash_string(f"rating|{claimreview_id}"))
             g.add((ns[claimreview_id], SDO.reviewRating, b))
             g.add((b, RDF.type, SDO.Rating))
             g.add((b, SDO.ratingValue, Literal(0, datatype=XSD.integer)))

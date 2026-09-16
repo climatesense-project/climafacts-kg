@@ -156,10 +156,14 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
             if ref.get("year"):
                 g.add((article_uri, SDO.datePublished, Literal(ref["year"])))
 
-            # Authors — split into individual schema:Person nodes
+            # Authors — split into individual schema:Person nodes.
+            # BNode ids are derived from content (article + position + name) rather
+            # than left to rdflib's random default, so re-running the build on the
+            # same source data serializes multi-valued sc:author lists in a stable
+            # order instead of shuffling on every run.
             if ref.get("authors_raw"):
-                for author_name in _split_authors(ref["authors_raw"]):
-                    b = BNode()
+                for i, author_name in enumerate(_split_authors(ref["authors_raw"])):
+                    b = BNode(hash_string(f"author|{article_uri}|{i}|{author_name}"))
                     g.add((article_uri, SDO.author, b))
                     g.add((b, RDF.type, SDO.Person))
                     g.add((b, SDO.name, Literal(author_name)))
@@ -174,7 +178,7 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
                 if _doi_result is not None:
                     doi_uri, bare_doi = _doi_result
                     g.add((article_uri, SDO.sameAs, URIRef(doi_uri)))
-                    b = BNode()
+                    b = BNode(hash_string(f"doi|{article_uri}"))
                     g.add((article_uri, SDO.identifier, b))
                     g.add((b, RDF.type, SDO.PropertyValue))
                     g.add((b, SDO.propertyID, Literal("doi")))
