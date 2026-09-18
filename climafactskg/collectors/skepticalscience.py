@@ -14,6 +14,8 @@ from climafactskg.parsers.skepticalscience import (
 )
 from climafactskg.utils import fetch_url_content
 
+logger = logging.getLogger(__name__)
+
 
 def fetch_misinformers_urls(ignore_urls: Optional[list] = None) -> list:
     """Fetches and returns a sorted list of URLs for misinformers from Skeptical Science.
@@ -50,7 +52,7 @@ def fetch_misinformers_urls(ignore_urls: Optional[list] = None) -> list:
         misinformers_urls = [url for url in misinformers_urls if url not in ignore_urls]
 
     # Sort the URLs:
-    logging.info(f"Found {len(misinformers_urls)} misinformer URLs.")
+    logger.info(f"Found {len(misinformers_urls)} misinformer URLs.")
     return sorted(misinformers_urls)
 
 
@@ -70,20 +72,20 @@ def process_misinformers_urls(db: preserve.Connector, urls: list[str], ignore_ur
 
     urls = [url for url in urls if url not in ignore_urls]
 
-    logging.info(f"Processing {len(urls)} URLs.")
+    logger.info(f"Processing {len(urls)} URLs.")
 
     for i, main_url in enumerate(urls, start=1):
-        logging.info(f"Processing URL {i}/{len(urls)}: {main_url}")
+        logger.info(f"Processing URL {i}/{len(urls)}: {main_url}")
 
         if main_url in db:
-            logging.info(f"Skipping already processed URL: {main_url}")
+            logger.info(f"Skipping already processed URL: {main_url}")
         else:
             content = fetch_url_content(main_url)
             article = parse_misinformer_article(main_url, content)
 
             # Store the article in the db
             db[main_url] = article
-            logging.info(f"Stored article for URL: {main_url}")
+            logger.info(f"Stored article for URL: {main_url}")
 
 
 def fetch_arguments_urls(ignore_urls: Optional[list] = None) -> list:
@@ -167,52 +169,52 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
 
     urls = [url for url in urls if url not in ignore_urls]
 
-    logging.info(f"Processing {len(urls)} URLs.")
+    logger.info(f"Processing {len(urls)} URLs.")
 
     for i, main_url in enumerate(urls, start=1):
-        logging.info(f"Processing URL {i}/{len(urls)}: {main_url}")
+        logger.info(f"Processing URL {i}/{len(urls)}: {main_url}")
 
         if main_url in db and "lang" in db[main_url]:
-            logging.info(f"Skipping already processed URL: {main_url}")
+            logger.info(f"Skipping already processed URL: {main_url}")
         else:
             content = fetch_url_content(main_url)
             article = parse_main_article(main_url, content)
 
             # Store the article in the db
             db[main_url] = article
-            logging.info(f"Stored article for URL: {main_url}")
+            logger.info(f"Stored article for URL: {main_url}")
 
             # Process the article levels:
-            logging.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
+            logger.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
             if "levels" in article:
                 for level in article["levels"]:
-                    logging.info(f"Processing level: {level['level']}")
+                    logger.info(f"Processing level: {level['level']}")
 
                     for level_url in level["urls"]:
-                        logging.info(f"Processing level URL: {level_url}")
+                        logger.info(f"Processing level URL: {level_url}")
                         # Parse the main article for each level URL
                         level_article = parse_main_article(level_url)
 
                         # Store the article in the db
                         db[level_url] = level_article
-                        logging.info(f"Stored level article for URL: {level_url}")
+                        logger.info(f"Stored level article for URL: {level_url}")
 
-                    logging.info(f"Finished level: {level['level']}")
+                    logger.info(f"Finished level: {level['level']}")
 
             if "languages" in article:
                 for lang in article["languages"]:
-                    logging.info(f"Processing language : {lang['lang']}")
+                    logger.info(f"Processing language : {lang['lang']}")
 
-                    logging.info(f"Processing language URL: {lang['url']}")
+                    logger.info(f"Processing language URL: {lang['url']}")
                     lang_article = parse_translated_article(lang["url"], language_code=lang["code"])
 
                     # Store the  article in the db
                     db[lang["url"]] = lang_article
-                    logging.info(f"Stored translated article for language URL: {lang['url']}")
+                    logger.info(f"Stored translated article for language URL: {lang['url']}")
 
-                    logging.info(f"Finished language: {lang['lang']}")
+                    logger.info(f"Finished language: {lang['lang']}")
 
-        logging.info(f"Finished processing URL {i}/{len(urls)}: {main_url}")
+        logger.info(f"Finished processing URL {i}/{len(urls)}: {main_url}")
 
 
 def classify_urls(
@@ -259,7 +261,7 @@ def classify_urls(
         empty_message="No arguments to classify.",
         classify_item_name="arguments",
     )
-    logging.info("All arguments classified.")
+    logger.info("All arguments classified.")
 
 
 def process_all(
@@ -334,12 +336,12 @@ def process_skstiptionary(
     js_content = fetch_skstiptionary(url)
     references = parse_skstiptionary_references(js_content)
 
-    logging.info(f"Found {len(references)} research paper references.")
+    logger.info(f"Found {len(references)} research paper references.")
 
     for ref in references:
         key = ref["key"]
         if key in db:
-            logging.info(f"Skipping already stored reference: {key}")
+            logger.info(f"Skipping already stored reference: {key}")
         else:
             db[key] = ref
-            logging.info(f"Stored reference: {key}")
+            logger.info(f"Stored reference: {key}")

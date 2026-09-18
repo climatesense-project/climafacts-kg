@@ -8,10 +8,12 @@ import iso639
 import preserve
 from dotenv import load_dotenv
 from rdflib import OWL, RDF, RDFS, SDO, XSD, BNode, Graph, Literal, Namespace, URIRef
-from rdflib.namespace import NamespaceManager
 
 from climafactskg.builders.cimplekg import add_cards_category_link, generate_cimplekg_mappings
+from climafactskg.builders.utils import new_graph
 from climafactskg.utils import hash_string
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_text(value: str) -> str:
@@ -71,17 +73,13 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
     Raises:
         Exception: Logs any exceptions encountered during article processing.
     """
-    logging.info("Starting knowledge graph generation.")
+    logger.info("Starting knowledge graph generation.")
     ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
     # CARDS concept URIs (cards_category_id below) live in their own namespace,
     # independent of ClimaFactsKG's instance-data namespace — CARDS is a shared
     # taxonomy also used by CimpleKG, not something ClimaFactsKG owns.
     cards_ns = Namespace("https://purl.net/climatesense/cards/ns#")
-
-    g = Graph()
-    g.namespace_manager = NamespaceManager(Graph())
-    g.namespace_manager.bind("", ns)
-    g.namespace_manager.bind("cards", cards_ns)
+    g = new_graph({"": ns, "cards": cards_ns})
 
     # Iterate over all the articles in the database and create RDF triples:
     for _, arg in db:
@@ -90,10 +88,10 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
         language = iso639.to_name(lang)
 
         if ignore_urls and url in ignore_urls:
-            logging.info(f"Skipping URL (ignored): {url}")
+            logger.info(f"Skipping URL (ignored): {url}")
             continue
 
-        logging.info(f"Processing article URL: {url}")
+        logger.info(f"Processing article URL: {url}")
         try:
             claimreview_id = f"claimreview_{hash_string(url)}"
 
@@ -273,10 +271,10 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     )
                 )
 
-            logging.info(f"Successfully processed article URL: {url}")
+            logger.info(f"Successfully processed article URL: {url}")
 
         except Exception as e:
-            logging.error(f"Error processing article URL {url}: {e}")
+            logger.error(f"Error processing article URL {url}: {e}")
 
     # Citations half done (2026-09-16): sksreferenceskg.py:generate_citations_graph
     # already matches article text against sksTiptionary research-paper entries
@@ -299,7 +297,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
     # Comparable in scope to the citations feature itself — scope as its own
     # task, not a quick addition here.
 
-    logging.info("Knowledge graph generation completed.")
+    logger.info("Knowledge graph generation completed.")
     return g
 
 
@@ -331,39 +329,39 @@ def build_climafactskg(
     """
     load_dotenv()
 
-    logging.info("Starting ClimaFactsKG build process.")
+    logger.info("Starting ClimaFactsKG build process.")
 
     g = Graph()
 
     if ignore_urls is None:
         ignore_urls = ["https://skepticalscience.com/wigley-santer-2012-attribution.html"]
 
-    logging.info(f"Loading ClimaFactsKG DB from: {climafactskg_db}")
+    logger.info(f"Loading ClimaFactsKG DB from: {climafactskg_db}")
     with preserve.open(format="sqlite", filename=climafactskg_db) as db:
         g = generate_climafactskg_base(
             db,
             ignore_urls=ignore_urls,
         )
-    logging.info(f"Parsing CARDS Turtle file: {cards_ttl}")
+    logger.info(f"Parsing CARDS Turtle file: {cards_ttl}")
     cards_g = Graph()
     cards_g.parse(cards_ttl, format="ttl", encoding="utf-8")
     g += cards_g
 
-    logging.info(f"Loading CimpleKG DB from: {cimplekg_db}")
+    logger.info(f"Loading CimpleKG DB from: {cimplekg_db}")
     # add existing CimpleKG to g:
     with preserve.open(format="sqlite", filename=cimplekg_db) as db:
         cimplekg_g = generate_cimplekg_mappings(db)
         g += cimplekg_g
 
     if climatesensekg_db is not None and os.path.exists(climatesensekg_db):
-        logging.info(f"Loading ClimateSenseKG DB from: {climatesensekg_db}")
+        logger.info(f"Loading ClimateSenseKG DB from: {climatesensekg_db}")
         # Same entry shape as cimplekg_db (produced by the same collector code),
         # so the mapping function is shared as-is.
         with preserve.open(format="sqlite", filename=climatesensekg_db) as db:
             climatesensekg_g = generate_cimplekg_mappings(db)
             g += climatesensekg_g
     elif climatesensekg_db is not None:
-        logging.info(f"ClimateSenseKG DB not found at {climatesensekg_db}, skipping.")
+        logger.info(f"ClimateSenseKG DB not found at {climatesensekg_db}, skipping.")
 
-    logging.info("ClimaFactsKG build process completed.")
+    logger.info("ClimaFactsKG build process completed.")
     return g

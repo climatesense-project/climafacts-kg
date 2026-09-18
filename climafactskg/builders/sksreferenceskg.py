@@ -14,9 +14,11 @@ from urllib.parse import quote
 
 import preserve
 from rdflib import RDF, SDO, BNode, Graph, Literal, Namespace, URIRef
-from rdflib.namespace import NamespaceManager
 
+from climafactskg.builders.utils import new_graph
 from climafactskg.utils import hash_string
+
+logger = logging.getLogger(__name__)
 
 BIBO = Namespace("http://purl.org/ontology/bibo/")
 CITO = Namespace("http://purl.org/spar/cito/")
@@ -73,7 +75,7 @@ def _canonical_doi(doi_field: str) -> tuple[str, str] | None:
     """
     bare = _DOI_PREFIX_RE.sub("", doi_field.strip())
     if not re.match(r"^10\.\d{4,}/", bare):
-        logging.warning("Skipping invalid DOI field: %r", doi_field)
+        logger.warning("Skipping invalid DOI field: %r", doi_field)
         return None
     # Percent-encode characters that are illegal in URIs (e.g. < > { } | \ ^ `)
     # but preserve the slash separating the registrant from the suffix.
@@ -108,14 +110,9 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
     Returns:
         Graph: RDFLib Graph containing the generated reference triples.
     """
-    logging.info("Starting references graph generation.")
+    logger.info("Starting references graph generation.")
     ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
-
-    g = Graph()
-    g.namespace_manager = NamespaceManager(Graph())
-    g.namespace_manager.bind("", ns)
-    g.namespace_manager.bind("bibo", BIBO)
-    g.namespace_manager.bind("cito", CITO)
+    g = new_graph({"": ns, "bibo": BIBO, "cito": CITO})
 
     # SkepticalScience as the citing organization (reused across all entries)
     sks_uri = ns["organization_sks"]
@@ -234,12 +231,12 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
             # CiTO: Skeptical Science cites this article as evidence
             g.add((sks_uri, CITO.citesAsEvidence, article_uri))
 
-            logging.info(f"Processed reference: {key}")
+            logger.info(f"Processed reference: {key}")
 
         except Exception as e:
-            logging.error(f"Error processing reference '{key}': {e}")
+            logger.error(f"Error processing reference '{key}': {e}")
 
-    logging.info("References graph generation completed.")
+    logger.info("References graph generation completed.")
     return g
 
 
@@ -270,7 +267,7 @@ def generate_citations_graph(
     from climafactskg.parsers.skepticalscience import SksMatcher
 
     # Build the tiptionary-shaped dict from stored DB records — no network call needed.
-    logging.info("Building SksMatcher from references DB …")
+    logger.info("Building SksMatcher from references DB …")
     tiptionary = {
         ref["key"]: {
             "header": ref.get("header"),
@@ -280,7 +277,7 @@ def generate_citations_graph(
         for _, ref in references_db
         if ref.get("key")
     }
-    logging.info("Index covers %d reference entries.", len(tiptionary))
+    logger.info("Index covers %d reference entries.", len(tiptionary))
     matcher = SksMatcher(tiptionary)
 
     ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
@@ -316,7 +313,7 @@ def generate_citations_graph(
                 citation_count += 1
 
     article_count = sum(1 for _ in g.subjects(SDO.citation, None))
-    logging.info("Generated %d citation links across %d articles.", citation_count, article_count)
+    logger.info("Generated %d citation links across %d articles.", citation_count, article_count)
     return g
 
 

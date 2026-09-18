@@ -3,7 +3,10 @@ from typing import Optional
 
 import preserve
 from rdflib import SDO, Graph, Namespace, URIRef
-from rdflib.namespace import NamespaceManager
+
+from climafactskg.builders.utils import new_graph
+
+logger = logging.getLogger(__name__)
 
 # Both engines have their own "not related" sentinel: "0" for transformer/
 # matcher, "0_0" for LLM (see taxonomy.py — both are real taxonomy nodes
@@ -51,22 +54,19 @@ def generate_cimplekg_mappings(db: preserve.Connector) -> Graph:
     Returns:
         Graph: An RDFLib Graph containing the generated CimpleKG mappings.
     """
-    logging.info("Starting CimpleKG mapping generation.")
+    logger.info("Starting CimpleKG mapping generation.")
     # CARDS concept URIs live in their own namespace, separate from ClimaFactsKG's
     # instance-data namespace — see builders/climafactskg.py for the split rationale.
     ns = Namespace("https://purl.net/climatesense/cards/ns#")
-
-    g = Graph()
-    g.namespace_manager = NamespaceManager(Graph())
-    g.namespace_manager.bind("cards", ns)
+    g = new_graph({"cards": ns})
 
     for _, mapping in db:
         url = mapping["url"]
         try:
             if add_cards_category_link(g, ns, URIRef(url), mapping.get("cards_category")):
-                logging.info(f"Successfully processed CimpleKG URL: {url}")
+                logger.info(f"Successfully processed CimpleKG URL: {url}")
         except Exception as e:
-            logging.error(f"Error processing mapping URL {url}: {e}")
+            logger.error(f"Error processing mapping URL {url}: {e}")
 
-    logging.info("CimpleKG mappings generation completed.")
+    logger.info("CimpleKG mappings generation completed.")
     return g
