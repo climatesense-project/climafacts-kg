@@ -1,7 +1,17 @@
 """Shared helpers for builders/*.py graph construction."""
 
-from rdflib import Graph, Namespace
+import urllib.parse
+
+from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import NamespaceManager
+
+# RFC 3986 characters that are safe to leave unencoded in a URI
+_URI_SAFE = ":/?#[]@!$&'()*+,;=-._~%"
+
+
+def safe_uriref(url: str) -> URIRef:
+    """Return a URIRef for *url*, percent-encoding any characters that are illegal in an IRI."""
+    return URIRef(urllib.parse.quote(url, safe=_URI_SAFE))
 
 
 def new_graph(bindings: dict[str, Namespace]) -> Graph:

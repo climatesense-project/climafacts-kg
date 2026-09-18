@@ -15,7 +15,7 @@ from urllib.parse import quote
 import preserve
 from rdflib import RDF, SDO, BNode, Graph, Literal, Namespace, URIRef
 
-from climafactskg.builders.utils import new_graph
+from climafactskg.builders.utils import new_graph, safe_uriref
 from climafactskg.utils import hash_string
 
 logger = logging.getLogger(__name__)
@@ -165,7 +165,7 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
 
             # Link to paper / PDF / abstract
             if ref.get("url"):
-                g.add((article_uri, SDO.url, URIRef(quote(ref["url"], safe=":/?#[]@!$&'()*+,;=-._~%"))))
+                g.add((article_uri, SDO.url, safe_uriref(ref["url"])))
 
             # DOI — canonical URI via sameAs, PropertyValue identifier, and bibo:doi
             if ref.get("doi"):

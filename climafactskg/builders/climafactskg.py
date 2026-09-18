@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import urllib.parse
 from typing import Optional
 
 import iso639
@@ -10,7 +9,7 @@ from dotenv import load_dotenv
 from rdflib import OWL, RDF, RDFS, SDO, XSD, BNode, Graph, Literal, Namespace, URIRef
 
 from climafactskg.builders.cimplekg import add_cards_category_link, generate_cimplekg_mappings
-from climafactskg.builders.utils import new_graph
+from climafactskg.builders.utils import new_graph, safe_uriref
 from climafactskg.utils import hash_string
 
 logger = logging.getLogger(__name__)
@@ -23,15 +22,6 @@ def _normalize_text(value: str) -> str:
     triple-quoted Turtle literal. Normalising here keeps every text Literal on one logical line.
     """
     return " ".join(value.split())
-
-
-# RFC 3986 characters that are safe to leave unencoded in a URI
-_URI_SAFE = ":/?#[]@!$&'()*+,;=-._~%"
-
-
-def _safe_uriref(url: str) -> URIRef:
-    """Return a URIRef for *url*, percent-encoding any characters that are illegal in an IRI."""
-    return URIRef(urllib.parse.quote(url, safe=_URI_SAFE))
 
 
 _LEVEL_SUFFIX_RE = re.compile(r"-(basic|intermediate|advanced)(\.htm)$", re.IGNORECASE)
@@ -96,7 +86,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
             claimreview_id = f"claimreview_{hash_string(url)}"
 
             g.add((ns[claimreview_id], RDF.type, SDO.ClaimReview))
-            g.add((ns[claimreview_id], SDO.url, _safe_uriref(url)))
+            g.add((ns[claimreview_id], SDO.url, safe_uriref(url)))
 
             # Emit educationalLevel and link to canonical ClaimReview for level variants:
             if arg.get("level"):
@@ -267,7 +257,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                     (
                         ns[claim_id],
                         SDO.citation,
-                        _safe_uriref(arg["climate_myth_source"]["url"]),
+                        safe_uriref(arg["climate_myth_source"]["url"]),
                     )
                 )
 
