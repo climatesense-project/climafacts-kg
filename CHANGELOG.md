@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v2.1.2 (2026-09-18)
+
+### Bug Fixes
+
+- **ci**: Add missing <!-- version list --> insertion marker to CHANGELOG.md
+  ([`7c7642e`](https://github.com/climatesense-project/climafacts-kg/commit/7c7642e4f85e66aa5edacd3c90ff6c7089038676))
+
+### Continuous Integration
+
+- Add debug verbosity to semantic-release version, prior fix unconfirmed
+  ([`56c635e`](https://github.com/climatesense-project/climafacts-kg/commit/56c635ea736c611babd5f9a50cbf315ff0aed76b))
+
+
 ## Unreleased
 
 ### Continuous Integration
