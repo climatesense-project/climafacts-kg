@@ -273,11 +273,11 @@ def _validate_graph(graph_path: str, min_claim_reviews: int = 1) -> None:
     try:
         stats = count_graph_stats(graph_path)
     except Exception as e:
-        typer.echo(f"FAILED: could not parse {graph_path!r} as RDF: {e}", err=True)
+        logger.error("FAILED: could not parse %r as RDF: %s", graph_path, e)
         raise typer.Exit(code=1) from e
 
     for key, value in stats.items():
-        typer.echo(f"{key}: {value}")
+        logger.info("%s: %s", key, value)
 
     errors = []
     if stats["total_triples"] == 0:
@@ -289,10 +289,10 @@ def _validate_graph(graph_path: str, min_claim_reviews: int = 1) -> None:
 
     if errors:
         for error in errors:
-            typer.echo(f"FAILED: {error}", err=True)
+            logger.error("FAILED: %s", error)
         raise typer.Exit(code=1)
 
-    typer.echo(f"OK: {graph_path!r} is valid ({stats['total_triples']} triples).")
+    logger.info("OK: %r is valid (%s triples).", graph_path, stats["total_triples"])
 
 
 @app.command()
