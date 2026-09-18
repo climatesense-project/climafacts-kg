@@ -40,8 +40,17 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          semantic-release version
+          # Fetch tags *before* running the release: semantic-release needs
+          # full tag history to compute what's new since the last release for
+          # both the version bump and the changelog. Running this after (the
+          # previous order) meant the changelog could be computed against
+          # incomplete tag history and silently come out unchanged — which is
+          # exactly what happened: every release since ~v1.1.0 bumped
+          # pyproject.toml but never touched CHANGELOG.md.
           git fetch --tags
+          semantic-release version
+          echo "--- CHANGELOG.md diff from this release (empty means it didn't update — investigate) ---"
+          git diff --stat HEAD~1 -- CHANGELOG.md || true
           for file in ./dist/**
           do gh release upload "${{ steps.release-status.outputs.tag }}" $file
           done
