@@ -1,5 +1,27 @@
 # CHANGELOG
 
+<!-- version list -->
+
+## Unreleased
+
+### Continuous Integration
+
+- Add debug verbosity to semantic-release version, prior fix unconfirmed
+  ([`56c635e`](https://github.com/climatesense-project/climafacts-kg/commit/56c635ea736c611babd5f9a50cbf315ff0aed76b))
+
+
+## v2.1.1 (2026-09-18)
+
+### Bug Fixes
+
+- **ci**: Fetch tags before semantic-release version, not after
+  ([`587cb62`](https://github.com/climatesense-project/climafacts-kg/commit/587cb62d808023f4af6d32e7d7d3abed16d82517))
+
+### Documentation
+
+- Backfill CHANGELOG.md missing history since v1.1.0
+  ([`7c6dffa`](https://github.com/climatesense-project/climafacts-kg/commit/7c6dffa14373235f341e3a4cd6af952a7e15160f))
+
 
 ## Unreleased
 

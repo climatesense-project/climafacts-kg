@@ -40,15 +40,10 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          # Fetch tags before running the release, in case semantic-release
-          # needs full tag history for version/changelog computation.
+          # Fetch tags before running the release so semantic-release has
+          # full tag history for version/changelog computation.
           git fetch --tags
-          # -vv: the v2.1.1 release (the first after the fetch-tags reorder
-          # above) still didn't touch CHANGELOG.md, so that wasn't the actual
-          # cause. Running with debug verbosity until a real run's log shows
-          # why write_changelog_files isn't producing a diff, instead of
-          # guessing at another unproven fix.
-          semantic-release -vv version
+          semantic-release version
           echo "--- CHANGELOG.md diff from this release (empty means it didn't update — investigate) ---"
           git diff --stat HEAD~1 -- CHANGELOG.md || true
           for file in ./dist/**
