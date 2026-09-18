@@ -2,7 +2,7 @@
 
 import dataclasses
 import os
-from typing import Literal
+from typing import Literal, get_args
 
 from .prompts import (
     CARDS_LLM_DEFAULT_SYSTEM_PROMPT,
@@ -70,45 +70,10 @@ TaxonomyCode = Literal[
     "5_3",
 ]
 
-# Runtime set equivalent of TaxonomyCode for O(1) membership tests.
-# Must stay in sync with the Literal above: Literal serves static type-checkers,
-# this set serves runtime validation in CARDSOutput.normalise_category().
-_TAXONOMY_CODE_SET: set[str] = {
-    "0",
-    "0_0",
-    "1_0",
-    "1_1",
-    "1_2",
-    "1_3",
-    "1_4",
-    "1_5",
-    "1_6",
-    "1_7",
-    "1_8",
-    "2_0",
-    "2_1",
-    "2_2",
-    "2_3",
-    "2_4",
-    "2_5",
-    "3_0",
-    "3_1",
-    "3_2",
-    "3_3",
-    "3_4",
-    "3_5",
-    "3_6",
-    "4_0",
-    "4_1",
-    "4_2",
-    "4_3",
-    "4_4",
-    "4_5",
-    "5_0",
-    "5_1",
-    "5_2",
-    "5_3",
-}
+# Runtime set equivalent of TaxonomyCode for O(1) membership tests, used by
+# CARDSOutput.normalise_category(). Derived from the Literal itself via
+# get_args() rather than retyped, so the two can't drift out of sync.
+_TAXONOMY_CODE_SET: set[str] = set(get_args(TaxonomyCode))
 
 # Ordered label descriptions for the LLM codes, derived from the shared taxonomy.
 # Lazy-populated on first access to avoid a circular import with taxonomy.py.
