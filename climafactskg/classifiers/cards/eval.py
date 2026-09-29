@@ -122,18 +122,16 @@ def evaluate(classifier, dataset: Dataset, use_context: bool = True):
     contexts = [inp.context if isinstance(inp, CARDSInput) else None for inp in inputs]
     # `contexts` (the dataset's own) keys the prediction lookup below; `predict_contexts` is what the classifier sees.
     predict_contexts = contexts if use_context else [None] * len(texts)
-    if use_context and any(contexts):
-        _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
-    classifier_name = type(classifier).__name__
-    logger.info("Starting evaluation: %s on '%s' (%d cases)", classifier_name, dataset.name, len(cases))
-
     # All three CARDS engines (CARDSClassifierBase subclasses) accept `context`
     # via classify/classify_batch. Duck-typed classifiers that don't inherit it
     # (arbitrary external `classify(text) -> str` objects, per this function's
     # docstring) fall back to plain text — passing `context=` to something that
     # doesn't accept it would raise a TypeError.
     supports_context = isinstance(classifier, CARDSClassifierBase)
-
+    if use_context and supports_context and any(contexts):
+        _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
+    classifier_name = type(classifier).__name__
+    logger.info("Starting evaluation: %s on '%s' (%d cases)", classifier_name, dataset.name, len(cases))
     if hasattr(classifier, "classify_batch"):
         logger.info("Running classify_batch")
         if any(predict_contexts) and supports_context:

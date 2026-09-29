@@ -21,6 +21,7 @@ def query_sparqlendpoint(
     query,
     cache_dir: Optional[str] = None,
     cache_expiry: Optional[timedelta] = None,
+    timeout: Optional[int] = None,
 ) -> pd.DataFrame:
     """Executes a SPARQL query against a specified endpoint and returns the results as a pandas DataFrame.
 
@@ -46,6 +47,7 @@ def query_sparqlendpoint(
             Defaults to the ``CLIMAFACTSKG_SPARQL_CACHE_EXPIRY`` env var
             (seconds), or 12 hours — these endpoints get new content roughly
             daily, so that's a reasonable freshness/redundant-fetch tradeoff.
+        timeout (int, optional): Request timeout in seconds. Defaults to SPARQLWrapper's own default (no timeout).
 
     Returns:
         pandas.DataFrame: A DataFrame containing the query results, where each row corresponds to a result binding.
@@ -74,6 +76,8 @@ def query_sparqlendpoint(
                 pass  # fall through and re-fetch on a corrupt/stale cache file
 
     sparql = SPARQLWrapper(endpoint_url)
+    if timeout is not None:
+        sparql.setTimeout(timeout)
     sparql.setQuery(query)
     sparql.setReturnFormat(CSV)
 

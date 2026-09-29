@@ -422,7 +422,9 @@ def _attach_context(df: pd.DataFrame, context_path: str | None, max_context_char
     )
     df = df.merge(sidecar, on="document_id", how="left")
     df["context"] = [
-        (select_context(review, str(claim), max_chars=max_context_chars) or None) if isinstance(review, str) else None
+        (select_context(review, claim if isinstance(claim, str) else "", max_chars=max_context_chars) or None)
+        if isinstance(review, str)
+        else None
         for review, claim in zip(df["context"], df["content"], strict=True)
     ]
     logger.info("Review context attached to %d of %d cases", int(df["context"].notna().sum()), len(df))

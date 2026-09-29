@@ -3,7 +3,7 @@
 import logging
 
 import pandas as pd
-from climafactskg.classifiers.cards.datasets import climatesense_dataset_v1
+from climafactskg.classifiers.cards.datasets import _attach_context, climatesense_dataset_v1
 
 CIMPLE = "http://data.cimple.eu/claim-review/"
 
@@ -123,3 +123,14 @@ class TestLoaderContext:
         ds = climatesense_dataset_v1(path=consensus, context_path=sidecar)
 
         assert _contexts(ds)[f"{CIMPLE}a"] == "Independent analysts found the figures were wrong."
+
+
+def test_nan_claim_does_not_corrupt_the_review(tmp_path):
+    df = pd.DataFrame({"document_id": ["d1"], "content": [float("nan")]})
+    sidecar = _write_sidecar(tmp_path, [("d1", "cimplekg", "The financial analysts found the figures were wrong.")])
+
+    out = _attach_context(df, sidecar, 800)
+
+    assert (
+        out.loc[0, "context"] == "The financial analysts found the figures were wrong."
+    )  # "nan" in "financial" intact

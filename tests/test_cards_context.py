@@ -104,6 +104,31 @@ class TestSelectContext:
         )
         assert out == "False claims about carbon dioxide spread widely on social media."
 
+    def test_claim_matching_respects_word_boundaries(self):
+        review = "False claims about carbon dioxide spread widely on social media."
+        assert select_context(review, claim="x") == review  # "x" inside "dioxide" must survive
+        sun = "The sun is unrelated to sunshine hours and sunsets, analysts say in their yearly report."
+        assert "sunshine hours and sunsets" in select_context(sun, claim="sun")
+
+    def test_missing_claim_is_treated_as_empty(self):
+        review = "Some review text with several words here."
+        assert select_context(review, claim=None) == review
+
+    def test_strips_an_article_age_line_glued_to_the_content(self):
+        review = "This article is more than 7 years old Kenya is grading its new system of government after the vote."
+        out = select_context(review, claim="unrelated topic")
+        assert out == "Kenya is grading its new system of government after the vote."
+
+    def test_drops_a_french_afp_footer(self):
+        review = (
+            "Mis \u00e0 jour le 13 novembre 2019 \u00e0 18:06 - Lecture : 3 min - Par : AFP Canada Copyright AFP "
+            "2017-2025. Toute r\u00e9utilisation commerciale du contenu est sujet \u00e0 abonnement. "
+            "The claim is contradicted by satellite data from several agencies."
+        )
+        out = select_context(review, claim="unrelated topic")
+        assert "Copyright" not in out and "utilisation" not in out
+        assert "satellite data" in out
+
     def test_claim_with_regex_metacharacters_does_not_raise(self):
         claim = "A (test) [claim]? costs $5 a+b"
         review = f"WHAT WAS CLAIMED {claim} Independent analysts found the figures were wrong."
@@ -220,6 +245,18 @@ class TestFetchCimpleKGReviews:
 
         assert sleeps == [0.5, 0.5]  # 3 chunks -> 2 pauses
 
+    def test_default_query_function_sets_a_request_timeout(self, monkeypatch):
+        seen = {}
+
+        def fake_query(endpoint, query, **kwargs):
+            seen.update(kwargs)
+            return pd.DataFrame()
+
+        monkeypatch.setattr("climafactskg.classifiers.cards.context.query_sparqlendpoint", fake_query)
+        fetch_cimplekg_reviews([f"{CIMPLE}a"], sleep_fn=_no_sleep, timeout_s=7)
+
+        assert seen == {"timeout": 7}
+
     def test_ignores_blank_and_non_string_texts(self):
         def query_fn(endpoint, query):
             return pd.DataFrame({"rev": [f"{CIMPLE}a", f"{CIMPLE}b"], "text": ["   ", None]})
@@ -247,6 +284,18 @@ class TestBuildContextSidecar:
         assert by_id.loc[f"{CIMPLE}remote", "context_source"] == "cimplekg"
         assert f"{CIMPLE}missing" not in by_id.index
         assert "https://skepticalscience.com/skeptic_X.htm" not in by_id.index
+
+    def test_bare_or_nested_prefix_ids_are_not_fetched(self):
+        fetched_with = []
+
+        def fetch_fn(uris):
+            fetched_with.append(list(uris))
+            return {}
+
+        ids = [CIMPLE, f"{CIMPLE}a/b", f"{CIMPLE}ok"]
+        build_context_sidecar(ids, fetch_fn=fetch_fn)
+
+        assert fetched_with == [[f"{CIMPLE}ok"]]
 
     def test_malformed_ids_are_never_fetched(self):
         fetched_with = []

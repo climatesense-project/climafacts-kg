@@ -44,6 +44,23 @@ class TestEvaluateUseContext:
         assert clf.seen == ["ctx a"]
 
 
+class _Plain:
+    """Duck-typed classifier: not a CARDSClassifierBase, so it never receives context."""
+
+    def classify(self, text, context=None):
+        return "1_1"
+
+
+class TestClaimOnlyNote:
+    def test_not_printed_when_the_classifier_never_receives_context(self, capsys):
+        evaluate(_Plain(), _dataset("d", ["ctx a"]))
+        assert "claim text only" not in " ".join(capsys.readouterr().out.split())
+
+    def test_printed_when_context_reaches_the_classifier(self, capsys):
+        evaluate(_Recorder(), _dataset("d", ["ctx a"]))
+        assert "claim text only" in " ".join(capsys.readouterr().out.split())
+
+
 class TestBenchmarkContextModes:
     def test_runs_both_modes_when_a_dataset_has_context(self):
         clf = _Recorder()

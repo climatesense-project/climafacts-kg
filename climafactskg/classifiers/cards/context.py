@@ -11,6 +11,7 @@ import re
 import time
 import urllib.error
 from collections.abc import Callable, Iterable, Sequence
+from functools import partial
 from typing import Literal
 
 import pandas as pd
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Same endpoint as collectors/cimplekg.py; duplicated (not imported) so classifiers stay independent of collectors.
 CIMPLEKG_SPARQL_ENDPOINT = "https://data.cimple.eu/sparql"
 CIMPLEKG_REVIEW_PREFIX = "http://data.cimple.eu/claim-review/"
-_SAFE_URI_RE = re.compile(r"^[A-Za-z0-9:/._~%-]+$")
+_CIMPLEKG_REVIEW_URI_RE = re.compile(re.escape(CIMPLEKG_REVIEW_PREFIX) + r"[A-Za-z0-9._~%-]+$")
 
 _DATASET_FILES: dict[str, dict] = {
     # v1's cached consensus lives in the "cards_annotations_v2" directory and v2's in "cards_annotations_v2b" (naming
@@ -64,8 +65,12 @@ _VERDICT_RE = re.compile(
 _BOILERPLATE_BLOCK_RE = re.compile(
     r"(?:-\s*)?This article is more than\b.{0,600}?Click here to find out more\.?", re.IGNORECASE
 )
+_ARTICLE_AGE_RE = re.compile(
+    r"(?:-\s*)?This article is more than\s+\w+\s+(?:year|month|week|day)s?\s+old\.?", re.IGNORECASE
+)
 _BOILERPLATE_SENTENCE_RE = re.compile(
-    r"Copyright\s*\u00a9|\b\d+\s*min read\b|Click here to find out more|Any commercial use of this content",
+    r"Copyright\s*(?:\u00a9\s*)?(?:AFP\b)?|\b\d+\s*min read\b|Lecture\s*:\s*\d+\s*min\b|Click here to find out more"
+    r"|Any commercial use of this content|Toute r\u00e9utilisation",
     re.IGNORECASE,
 )
 # A verdict used as a headline label ("Misleading: Photo of ..."); the colon is required so ordinary text such as
@@ -86,10 +91,13 @@ def _mark_claim(text: str, claim: str) -> str:
     claim = _collapse(claim)
     if not claim:
         return text
-    return re.sub(re.escape(claim), f" {_CLAIM_MARK} ", text, flags=re.IGNORECASE)
+    # Only anchor on word boundaries where the claim's own edge is a word character.
+    start = r"(?<!\w)" if claim[0].isalnum() or claim[0] == "_" else ""
+    end = r"(?!\w)" if claim[-1].isalnum() or claim[-1] == "_" else ""
+    return re.sub(f"{start}{re.escape(claim)}{end}", f" {_CLAIM_MARK} ", text, flags=re.IGNORECASE)
 
 
-def select_context(review: str | None, claim: str, max_chars: int | None = 800, overlap: float = 0.6) -> str:
+def select_context(review: str | None, claim: str | None, max_chars: int | None = 800, overlap: float = 0.6) -> str:
     """Selects the informative lead of a fact-check review, within a character budget.
 
     Steps: collapse whitespace; mark and remove the verbatim claim; strip verdict fragments and leading labels;
@@ -99,7 +107,7 @@ def select_context(review: str | None, claim: str, max_chars: int | None = 800, 
 
     Args:
         review: Full review text (may be ``None`` or empty).
-        claim: The claim the review is about; used to drop sentences that only restate it.
+        claim: The claim the review is about (``None`` counts as empty); used to drop sentences restating it.
         max_chars: Character budget for the returned text. ``None`` disables the budget.
         overlap: A sentence with at least four words is dropped when at least this fraction of its words
             appear in *claim*.
@@ -107,11 +115,12 @@ def select_context(review: str | None, claim: str, max_chars: int | None = 800, 
     Returns:
         The selected context, or ``""`` when nothing useful survives.
     """
+    claim = claim or ""
     text = _collapse(review or "")
     if not text:
         return ""
     text = _mark_claim(text, claim)
-    text = _collapse(_BOILERPLATE_BLOCK_RE.sub(" ", _VERDICT_RE.sub(" ", text)))
+    text = _collapse(_ARTICLE_AGE_RE.sub(" ", _BOILERPLATE_BLOCK_RE.sub(" ", _VERDICT_RE.sub(" ", text))))
     for _ in range(3):  # headers can stack: "FACT CHECK: WHAT WAS CLAIMED ..."
         stripped = _VERDICT_HEADLINE_RE.sub("", _LEADING_LABEL_RE.sub("", text))
         if stripped == text:
@@ -158,7 +167,7 @@ def select_context(review: str | None, claim: str, max_chars: int | None = 800, 
 
 
 def _is_cimplekg_review_uri(document_id: str) -> bool:
-    return document_id.startswith(CIMPLEKG_REVIEW_PREFIX) and bool(_SAFE_URI_RE.match(document_id))
+    return bool(_CIMPLEKG_REVIEW_URI_RE.match(document_id))
 
 
 def load_input_reviews(csv_path: str) -> dict[str, str]:
@@ -196,7 +205,8 @@ def fetch_cimplekg_reviews(
     *,
     endpoint: str = CIMPLEKG_SPARQL_ENDPOINT,
     chunk_size: int = 20,
-    query_fn: Callable = query_sparqlendpoint,
+    query_fn: Callable | None = None,
+    timeout_s: int = 60,
     pause_s: float = 1.0,
     retries: int = 3,
     backoff_s: float = 2.0,
@@ -209,7 +219,9 @@ def fetch_cimplekg_reviews(
         endpoint: SPARQL endpoint URL.
         chunk_size: URIs per query. Kept small because the query is sent via GET and the endpoint rejects URLs of
             about 8 KB or more (HTTP 414).
-        query_fn: ``(endpoint, query) -> DataFrame`` with columns ``rev`` and ``text``; injectable for tests.
+        query_fn: ``(endpoint, query) -> DataFrame`` with columns ``rev`` and ``text``; injectable for tests. Defaults
+            to :func:`query_sparqlendpoint` with a *timeout_s* request timeout.
+        timeout_s: Request timeout in seconds for the default query function, so a hung endpoint cannot stall the build.
         pause_s: Seconds to wait between chunk queries, to stay under the endpoint's rate limit.
         retries: Extra attempts per chunk on HTTP 429/5xx, with exponential backoff (``backoff_s * 2**attempt``).
         backoff_s: Base backoff in seconds.
@@ -218,6 +230,8 @@ def fetch_cimplekg_reviews(
     Returns:
         ``uri -> review text``. URIs without a non-blank ``schema:text`` are absent. Endpoint errors propagate.
     """
+    if query_fn is None:
+        query_fn = partial(query_sparqlendpoint, timeout=timeout_s)
     unique = list(dict.fromkeys(uris))
     reviews: dict[str, str] = {}
     for start in range(0, len(unique), chunk_size):
