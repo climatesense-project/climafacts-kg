@@ -60,6 +60,20 @@ _VERDICT_RE = re.compile(
     r"\b\.?",
     re.IGNORECASE,
 )
+# Page furniture that fact-check sites glue into the review text (AFP byline/copyright block and similar).
+_BOILERPLATE_BLOCK_RE = re.compile(
+    r"(?:-\s*)?This article is more than\b.{0,600}?Click here to find out more\.?", re.IGNORECASE
+)
+_BOILERPLATE_SENTENCE_RE = re.compile(
+    r"Copyright\s*\u00a9|\b\d+\s*min read\b|Click here to find out more|Any commercial use of this content",
+    re.IGNORECASE,
+)
+# A verdict used as a headline label ("Misleading: Photo of ..."); the colon is required so ordinary text such as
+# "False claims about ..." is left alone.
+_VERDICT_HEADLINE_RE = re.compile(
+    r"^\W*(?:false|misleading|incorrect|missing context|partly false|mostly false|true|unproven|fake|satire)\s*:\s*",
+    re.IGNORECASE,
+)
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
 
@@ -97,9 +111,9 @@ def select_context(review: str | None, claim: str, max_chars: int | None = 800, 
     if not text:
         return ""
     text = _mark_claim(text, claim)
-    text = _collapse(_VERDICT_RE.sub(" ", text))
+    text = _collapse(_BOILERPLATE_BLOCK_RE.sub(" ", _VERDICT_RE.sub(" ", text)))
     for _ in range(3):  # headers can stack: "FACT CHECK: WHAT WAS CLAIMED ..."
-        stripped = _LEADING_LABEL_RE.sub("", text)
+        stripped = _VERDICT_HEADLINE_RE.sub("", _LEADING_LABEL_RE.sub("", text))
         if stripped == text:
             break
         text = stripped
@@ -115,6 +129,8 @@ def select_context(review: str | None, claim: str, max_chars: int | None = 800, 
             sentence = _LEADING_LABEL_RE.sub("", sentence).lstrip(_LEAD_PUNCT)
             if len(_WORD_RE.findall(sentence.lower())) < 4:
                 continue
+        if _BOILERPLATE_SENTENCE_RE.search(sentence):
+            continue
         words = _WORD_RE.findall(sentence.lower())
         if len(words) < 3:
             continue

@@ -76,6 +76,34 @@ class TestSelectContext:
         review = "Alpha   beta\tgamma delta.\n\nEpsilon zeta eta theta."
         assert select_context(review, claim="q") == "Alpha beta gamma delta. Epsilon zeta eta theta."
 
+    def test_drops_afp_byline_and_copyright_boilerplate(self):
+        review = (
+            "Biden\u2019s climate plan does not target US meat consumption - This article is more than four years old. "
+            "- Published on April 27, 2021 at 23:15 - Updated on April 29, 2021 at 22:09 - 3 min read "
+            "- By Louis BAUDOIN-LAARMAN, AFP USA Copyright \u00a9 AFP 2017-2025. Any commercial use of this content "
+            "requires a subscription. Click here to find out more. "
+            "\u201cJoe Biden\u2019s climate plan includes cutting emissions across the whole economy.\u201d"
+        )
+        out = select_context(review, claim="Biden wants to ban hamburgers")
+        for junk in ("Copyright", "min read", "Published on", "commercial use", "Click here", "more than four years"):
+            assert junk not in out
+        assert "climate plan includes cutting emissions across the whole economy" in out
+
+    def test_strips_a_leading_verdict_label_headline(self):
+        review = (
+            "Misleading: Photo of litter-filled street shows the aftermath of a march, not a protest against climate "
+            "policy. The march ended several hours earlier."
+        )
+        out = select_context(review, claim="x")
+        assert not out.startswith("Misleading")
+        assert out.startswith("Photo of litter-filled street")
+
+    def test_does_not_strip_an_ordinary_leading_word_without_a_label_colon(self):
+        out = select_context(
+            "False claims about carbon dioxide spread widely on social media.", claim="unrelated topic"
+        )
+        assert out == "False claims about carbon dioxide spread widely on social media."
+
     def test_claim_with_regex_metacharacters_does_not_raise(self):
         claim = "A (test) [claim]? costs $5 a+b"
         review = f"WHAT WAS CLAIMED {claim} Independent analysts found the figures were wrong."
