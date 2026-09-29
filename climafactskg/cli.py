@@ -308,6 +308,23 @@ def validate(
     _validate_graph(graph_path, min_claim_reviews)
 
 
+@app.command(name="eval-context")
+def eval_context(
+    version: str = typer.Argument(..., help="ClimateSense annotation round: 'v1' or 'v2'."),
+    force: bool = typer.Option(False, "--force", help="Rebuild even if the sidecar already exists."),
+):
+    """Build the review-context sidecar for an evaluation dataset (needs its cached consensus CSV)."""
+    from climafactskg.classifiers.cards.context import DEFAULT_CONTEXT_PATHS, build_climatesense_context
+
+    if version not in DEFAULT_CONTEXT_PATHS:
+        logger.error(
+            "Unknown annotation round %r; choose one of: %s", version, ", ".join(sorted(DEFAULT_CONTEXT_PATHS))
+        )
+        raise typer.Exit(code=2)
+    sidecar = build_climatesense_context(version, force=force)  # type: ignore[arg-type]
+    logger.info("Review context for %d documents at %s", len(sidecar), DEFAULT_CONTEXT_PATHS[version])
+
+
 @app.command()
 def classify(
     text: str = typer.Argument(..., help="Text to classify using CARDS."),
