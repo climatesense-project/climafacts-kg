@@ -92,6 +92,9 @@ rather than `datasets.py`, to keep `datasets.py` from growing and to avoid an im
   duck-typed sequential path). Default keeps today's behavior (context used if present and supported).
 - `benchmark_configs(..., context_modes=("none", "with"))`: each config runs once per mode that makes sense (`"with"`
   is skipped for datasets with no context), and the result table gains a `context` column. `print_benchmark` shows it.
+- Each benchmark row also reports `n_with_context` (cases that actually carried context), so a mostly context-free
+  dataset cannot be mistaken for a real with-context comparison. The prompt optimizer always loads the datasets with
+  `context_path=None` (claim-only training).
 - Every context benchmark output carries a note: "gold labels were annotated from claim text only".
 
 ### 4. Data, docs, non-goals
