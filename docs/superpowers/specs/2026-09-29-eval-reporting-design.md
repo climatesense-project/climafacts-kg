@@ -121,3 +121,7 @@ are made, and any plotting dependency.
 - The report is built with plain Python strings, not jinja2 (only a transitive dependency).
 - Found while implementing: rich crops a too-wide compact table silently, so score columns get minimum widths, the
   Error column shows only when something failed, and padding collapses; tied best bars share one value label.
+- Found in the branch review: the run suffix uses the full run id (a truncated timestamp collided for runs minutes apart);
+  the compact table prints failures as lines under the table because an Error column cannot fit 80 columns; evaluations
+  with `n_cases == 0` show dashes; `load_run` reads text as text (empty claims, labels like `None`/`NA`); the changed-cases
+  table names the dataset and is capped per (config, dataset).

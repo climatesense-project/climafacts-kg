@@ -152,11 +152,13 @@ def bar_chart_svg(
 def _combine(runs: Sequence[BenchmarkRun]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Concatenates runs; with several runs the config label gets a run suffix so identical labels never collide."""
     summaries, cases = [], []
-    for run in runs:
+    ids = [str(run.meta.get("run_id", "run")) for run in runs]
+    if len(set(ids)) < len(ids):  # missing or repeated ids: fall back to the position so labels stay distinct
+        ids = [f"{run_id}#{i + 1}" for i, run_id in enumerate(ids)]
+    for run, run_id in zip(runs, ids, strict=True):
         summary, run_cases = run.summary.copy(), run.cases.copy()
-        run_id = str(run.meta.get("run_id", "run"))
         if len(runs) > 1:
-            suffix = f" ({run_id[:12]})"
+            suffix = f" ({run_id})"
             summary["config"] = summary["config"].astype(str) + suffix
             run_cases["config"] = run_cases["config"].astype(str) + suffix
         summary["run"], run_cases["run"] = run_id, run_id
@@ -191,7 +193,7 @@ def _comparison(summary: pd.DataFrame) -> str:
     headers += [("Exact", True), ("hF1", True), ("D1 macro", True), ("D2 macro", True), ("Note", False)]
     rows = []
     for _, r in summary.iterrows():
-        failed = bool(str(r.get("error", "")).strip())
+        failed = bool(str(r.get("error", "")).strip()) or int(r["n_cases"]) == 0  # nothing evaluated: show dashes
         cells = [
             _td(str(r["config"])),
             _td(str(r["dataset"])),
@@ -207,12 +209,13 @@ def _comparison(summary: pd.DataFrame) -> str:
         for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
             value = r.get(metric)
             is_best = not failed and (str(r["dataset"]), metric) in best and value == best[(str(r["dataset"]), metric)]
-            text = _esc(_fmt(value))
+            text = "—" if failed else _esc(_fmt(value))
             lo, hi = _CI_COLUMNS.get(metric, (None, None))
             if lo and lo in r and not failed and not pd.isna(r[lo]) and not pd.isna(r[hi]):
                 text += f' <span class="ci">[{_fmt(r[lo], 2)}–{_fmt(r[hi], 2)}]</span>'
             cells.append(_td(text, num=True, best=is_best, raw=True))
-        cells.append(_td(f"failed: {r['error']}" if failed else "", wrap=True))
+        error = str(r.get("error", "")).strip()
+        cells.append(_td(f"failed: {error}" if error else ("no cases evaluated" if failed else ""), wrap=True))
         rows.append(cells)
     return _table(headers, rows)
 
@@ -288,6 +291,7 @@ def _context_sections(cases: pd.DataFrame) -> str:
         change_rows = [
             [
                 _td(str(r["config"])),
+                _td(str(r["dataset"])),
                 _td(str(r["change"])),
                 _td(_shorten(r["text"], 160), wrap=True),
                 _td(str(r["gold"])),
@@ -300,6 +304,7 @@ def _context_sections(cases: pd.DataFrame) -> str:
             _table(
                 [
                     ("Config", False),
+                    ("Dataset", False),
                     ("Change", False),
                     ("Claim", False),
                     ("Gold", False),

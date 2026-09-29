@@ -241,3 +241,24 @@ class TestPrintContextEffect:
         print_context_effect(pd.DataFrame(columns=list(CASE_COLUMNS)))
 
         assert "no cases" in buffer.getvalue().lower()
+
+
+class TestFailedAndEmptyRows:
+    def test_failed_rows_print_their_error_under_the_compact_table(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        df = _long_summary()
+        df.loc[0, ["exact_match", "exact_lo", "exact_hi", "h_f1", "h_f1_lo", "h_f1_hi"]] = float("nan")
+        df.loc[0, "error"] = "RuntimeError: something exploded in the classifier"
+        print_benchmark(df)
+        lines = buffer.getvalue().splitlines()
+
+        assert any("something exploded" in line for line in lines)
+        assert max(len(line) for line in lines) <= 80
+
+    def test_evaluations_with_no_cases_print_dashes_not_zeros(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        df = _long_summary()
+        df.loc[0, ["n_cases", "exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"]] = [0, 0.0, 0.0, 0.0, 0.0]
+        print_benchmark(df)
+
+        assert "0.000" not in buffer.getvalue()

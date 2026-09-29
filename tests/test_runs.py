@@ -162,3 +162,35 @@ class TestContextEffect:
 
     def test_changed_cases_respects_the_limit(self):
         assert len(changed_cases(self._cases(), limit=1)) == 1
+
+
+class TestRoundTripEdgeStrings:
+    def test_empty_text_and_na_like_labels_survive(self, tmp_path):
+        run = _run([_case(config="None", dataset="NA", case_id="a", text="")])
+        run.summary = pd.DataFrame(
+            [{"config": "None", "dataset": "NA", "context": "none", "n_cases": 1, "exact_match": 0.5, "h_f1": 0.5}]
+        )
+
+        loaded = load_run(save_run(run, tmp_path))
+
+        assert loaded.cases.loc[0, "text"] == ""
+        assert loaded.cases.loc[0, "config"] == "None" and loaded.cases.loc[0, "dataset"] == "NA"
+        assert loaded.summary.loc[0, "config"] == "None" and loaded.summary.loc[0, "dataset"] == "NA"
+
+    def test_missing_scores_stay_missing(self, tmp_path):
+        run = _run([_case(case_id="a", exact=float("nan"))])
+        loaded = load_run(save_run(run, tmp_path))
+        assert np.isnan(loaded.cases.loc[0, "exact"])
+
+
+class TestChangedCasesCap:
+    def test_limit_applies_per_config_and_dataset(self):
+        rows = []
+        for dataset in ("d1", "d2"):
+            for i in range(3):
+                rows.append(_case(dataset=dataset, context="none", case_id=f"c{i}", exact=0.0))
+                rows.append(_case(dataset=dataset, context="with", case_id=f"c{i}", exact=1.0))
+        changed = changed_cases(pd.DataFrame(rows, columns=CASE_COLUMNS), limit=2)
+
+        assert len(changed) == 4
+        assert changed.groupby("dataset").size().tolist() == [2, 2]

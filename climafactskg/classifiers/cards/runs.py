@@ -101,17 +101,20 @@ def load_run(path: str | Path) -> BenchmarkRun:
         if not (directory / name).is_file():
             raise ValueError(f"{directory}: missing {name}; not a saved benchmark run")
     meta = json.loads((directory / "run.json").read_text(encoding="utf-8"))
-    cases = pd.read_csv(
-        directory / "cases.csv",
-        dtype={"case_id": str, "text": str, "gold": str, "pred": str, "gold_d1": str, "pred_d1": str},
-        keep_default_na=False,
-        na_values=[""],
-    )
+    # Everything is read as text so empty claims and labels such as "None"/"NA" stay strings; scores become numbers.
+    cases = pd.read_csv(directory / "cases.csv", dtype=str, keep_default_na=False)
     missing = [c for c in CASE_COLUMNS if c not in cases.columns]
     if missing:
         raise ValueError(f"{directory}/cases.csv: missing columns {missing}")
-    cases["has_context"] = cases["has_context"].astype(bool)
-    summary = pd.read_csv(directory / "summary.csv")
+    for column in ("exact", "hf1"):
+        cases[column] = pd.to_numeric(cases[column], errors="coerce")
+    cases["has_context"] = cases["has_context"].map(lambda value: str(value) == "True").astype(bool)
+    summary = pd.read_csv(
+        directory / "summary.csv",
+        dtype={"config": str, "dataset": str, "context": str},
+        keep_default_na=False,
+        na_values=[""],
+    )
     missing = [c for c in _SUMMARY_REQUIRED if c not in summary.columns]
     if missing:
         raise ValueError(f"{directory}/summary.csv: missing columns {missing}")
@@ -154,13 +157,17 @@ def context_effect(cases: pd.DataFrame) -> pd.DataFrame:
 
 
 def changed_cases(cases: pd.DataFrame, limit: int = 20) -> pd.DataFrame:
-    """Cases whose exact-match outcome flipped with context (``change`` is ``fixed`` or ``broken``)."""
+    """Cases whose exact-match outcome flipped with context (``change`` is ``fixed`` or ``broken``).
+
+    At most *limit* rows per (config, dataset), so one busy config cannot crowd out the others.
+    """
     paired = _paired(cases)
     changed = paired[paired["fixed"] | paired["broken"]].copy()
     if changed.empty:
         return pd.DataFrame(columns=list(_CHANGED_COLUMNS))
     changed["change"] = np.where(changed["fixed"], "fixed", "broken")
-    return changed[list(_CHANGED_COLUMNS)].head(limit).reset_index(drop=True)
+    changed = changed.groupby(["config", "dataset"], sort=False).head(limit)
+    return changed[list(_CHANGED_COLUMNS)].reset_index(drop=True)
 
 
 def _git_commit() -> str | None:

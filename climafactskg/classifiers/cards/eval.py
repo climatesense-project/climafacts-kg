@@ -438,8 +438,9 @@ _COMPACT_COLUMNS = (
     "h_f1",
     "d1_macro_f1",
     "d2_macro_f1",
-    "error",
 )
+# Metric columns that show a dash when nothing was evaluated (n_cases == 0), never a made-up 0.000.
+_METRIC_COLUMNS = ("exact_match", "h_f1", "d1_macro_f1", "d1_weighted_f1", "d2_macro_f1", "d2_weighted_f1")
 
 
 def _score_cell(row: pd.Series, col: str) -> str:
@@ -487,12 +488,12 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
         collapse_padding=not wide,
         pad_edge=wide,
     )
-    # The compact view drops the Error column unless something actually failed, so the scores keep their room.
-    show_error = wide or ("error" in df.columns and df["error"].fillna("").astype(str).str.strip().ne("").any())
+    # The compact view has no Error column (it cannot fit 80 columns next to the scores); failures are printed as
+    # one line each under the table instead.
     present = [
         (col, hdr, style, just, mw, nw)
         for col, hdr, style, just, mw, nw in col_spec
-        if col in df.columns and (wide or col in _COMPACT_COLUMNS) and (col != "error" or show_error)
+        if col in df.columns and (wide or col in _COMPACT_COLUMNS)
     ]
     for col, hdr, style, just, mw, nw in present:
         justify_val = cast(Literal["left", "right", "center", "full", "default"], just)
@@ -508,8 +509,11 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
 
     for _, row in df.iterrows():
         cells = []
+        no_cases = "n_cases" in df.columns and row["n_cases"] == 0
         for col, _, _, _, _, _ in present:
-            if col in ("exact_match", "h_f1"):
+            if no_cases and col in _METRIC_COLUMNS:
+                cells.append("—")
+            elif col in ("exact_match", "h_f1"):
                 cells.append(_score_cell(row, col))
             elif isinstance(row[col], float):
                 cells.append("—" if pd.isna(row[col]) else f"{row[col]:.3f}")
@@ -518,6 +522,15 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
         table.add_row(*cells)
 
     _console.print(table)
+    if not wide and "error" in df.columns:
+        for _, row in df.iterrows():
+            error = "" if pd.isna(row["error"]) else str(row["error"]).strip()
+            if error:
+                label = (
+                    f"{row['config']}/{row['dataset']}/{row['context']}" if "context" in df.columns else row["config"]
+                )
+                label = label if len(label) <= 30 else label[:29] + "…"  # keep room for the reason at 80 columns
+                _console.print(f"[red]failed[/red] {label}: {error}", overflow="ellipsis", no_wrap=True, crop=True)
     if "context" in df.columns and (df["context"] == "with").any():
         _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
 

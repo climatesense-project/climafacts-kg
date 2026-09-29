@@ -148,7 +148,7 @@ class TestRenderHtml:
         html = render_html([_run("20260101T000000Z-aaaaaa"), _run("20260202T000000Z-bbbbbb")], tmp_path / "r.html")
         text = html.read_text(encoding="utf-8")
 
-        assert "gpt (20260101T000)" in text and "gpt (20260202T000)" in text
+        assert "gpt (20260101T000000Z-aaaaaa)" in text and "gpt (20260202T000000Z-bbbbbb)" in text
 
     def test_creates_parent_directories_and_leaves_no_temp_file(self, tmp_path):
         out = render_html([_run()], tmp_path / "nested" / "dir" / "report.html")
@@ -159,3 +159,43 @@ class TestRenderHtml:
     def test_requires_at_least_one_run(self, tmp_path):
         with pytest.raises(ValueError):
             render_html([], tmp_path / "r.html")
+
+
+class TestReviewFixes:
+    def test_runs_minutes_apart_do_not_collide(self, tmp_path):
+        from climafactskg.classifiers.cards.report import _combine
+        from climafactskg.classifiers.cards.runs import context_effect
+
+        first, second = _run("20260929T121503Z-aaaaaa"), _run("20260929T121803Z-bbbbbb")
+        summary, cases = _combine([first, second])
+
+        assert len(set(summary["config"])) == 2
+        effect = context_effect(cases)
+        assert sorted(effect["n_paired"]) == [2, 2]  # each run pairs only its own two cases
+        html = render_html([first, second], tmp_path / "r.html").read_text(encoding="utf-8")
+        assert "20260929T121503Z-aaaaaa" in html and "20260929T121803Z-bbbbbb" in html
+
+    def test_identical_run_ids_still_get_distinct_labels(self):
+        from climafactskg.classifiers.cards.report import _combine
+
+        summary, _ = _combine([_run("same-id"), _run("same-id")])
+
+        assert len(set(summary["config"])) == 2
+
+    def test_evaluations_with_no_cases_show_dashes_not_zeros(self, tmp_path):
+        row = _summary_row(config="empty", dataset="nothing", n=0)
+        row.update({"n_cases": 0, "exact_match": 0.0, "h_f1": 0.0, "d1_macro_f1": 0.0, "d2_macro_f1": 0.0})
+        run = BenchmarkRun(
+            meta={"run_id": "r1", "datasets": [], "configs": []},
+            summary=pd.DataFrame([row]),
+            cases=pd.DataFrame(columns=list(CASE_COLUMNS)),
+        )
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "0.000" not in html
+
+    def test_changed_cases_table_names_the_dataset(self, tmp_path):
+        html = render_html([_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        section = html[html.index("Cases changed by context") :]
+        assert "<th>Dataset</th>" in section.split("</table>")[0]
