@@ -198,7 +198,8 @@ def benchmark_configs(
             ``"with"`` also passes each case's review context and is skipped for datasets that have none.
 
     Returns:
-        DataFrame with columns ``config``, ``dataset``, ``context``, ``n_cases``,
+        DataFrame with columns ``config``, ``dataset``, ``context``, ``n_with_context`` (cases that actually
+            carried context in that run), ``n_cases``,
         ``exact_match``, ``h_f1``, ``macro_f1``, ``micro_f1``, ``weighted_f1``.
 
     Example::
@@ -250,6 +251,7 @@ def benchmark_configs(
                     "config": config_name,
                     "dataset": dataset_name,
                     "context": mode,
+                    "n_with_context": sum(1 for c in predict_contexts if c),
                     "provider": getattr(classifier, "_provider", "—"),
                     "model": getattr(classifier, "_model", type(classifier).__name__),
                     "prompt": _prompt_id(classifier),
@@ -333,6 +335,7 @@ def benchmark_configs(
                 "config": config_name,
                 "dataset": dataset_name,
                 "context": mode,
+                "n_with_context": sum(1 for c in predict_contexts if c),
                 "provider": getattr(classifier, "_provider", "—"),
                 "model": getattr(classifier, "_model", type(classifier).__name__),
                 "prompt": _prompt_id(classifier),
@@ -372,6 +375,7 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results") -> None:
         ("config", "Config", "bold cyan", "left", 22, True),
         ("dataset", "Dataset", "", "left", 16, True),
         ("context", "Ctx", "dim", "left", 6, True),
+        ("n_with_context", "Ctx N", "dim", "right", None, False),
         ("provider", "Provider", "dim", "left", 12, True),
         ("model", "Model", "", "left", 22, True),
         ("prompt", "Prompt", "dim italic", "left", 35, True),

@@ -53,6 +53,13 @@ class TestBenchmarkContextModes:
         assert list(df["n_cases"]) == [2, 2]
         assert clf.seen == [None, None, "ctx a", "ctx b"]
 
+    def test_reports_how_many_cases_actually_had_context(self):
+        clf = _Recorder()
+        df = benchmark_configs({"stub": clf}, {"d": _dataset("d", ["ctx a", None, "ctx c"])})
+
+        assert list(df["context"]) == ["none", "with"]
+        assert list(df["n_with_context"]) == [0, 2]  # the "with" row is only partly with context
+
     def test_skips_with_mode_for_datasets_without_context(self):
         clf = _Recorder()
         df = benchmark_configs({"stub": clf}, {"plain": _dataset("d", [None, None])})
