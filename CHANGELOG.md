@@ -2,6 +2,49 @@
 
 <!-- version list -->
 
+## v2.1.3 (2026-09-29)
+
+### Bug Fixes
+
+- Raise on mismatched lengths instead of silently truncating zip()
+  ([`b8cc20d`](https://github.com/climatesense-project/climafacts-kg/commit/b8cc20d1f634e36d18ce50cc34877521e44af0f3))
+
+- **builders**: Stop half-built ClaimReview nodes leaking into the graph
+  ([`54f4f7b`](https://github.com/climatesense-project/climafacts-kg/commit/54f4f7b06cc938ccba7192c068bf3caeed21d9c4))
+
+- **builders**: Strip presigned-URL credentials when emitting URLs
+  ([`22bd8f1`](https://github.com/climatesense-project/climafacts-kg/commit/22bd8f1f7c9ad98ae650e2bd8e65eecd4a2e41b0))
+
+- **data**: Rebuild graph without half-built ClaimReview and credential URL
+  ([`a4fa54c`](https://github.com/climatesense-project/climafacts-kg/commit/a4fa54cb1b9ef0880a3d2c9f0c339ef6ae8a5ca8))
+
+### Build System
+
+- Bump python-semantic-release to v10
+  ([`914a664`](https://github.com/climatesense-project/climafacts-kg/commit/914a66485c53dad335aa5c31e948b4e6cdaea6c3))
+
+- Migrate from poetry to uv
+  ([`dab0919`](https://github.com/climatesense-project/climafacts-kg/commit/dab0919f6979ec0da8873270894e0a983347faa1))
+
+### Chores
+
+- Add uv-lock pre-commit hook
+  ([`aab5874`](https://github.com/climatesense-project/climafacts-kg/commit/aab587409580bd004dd11c3231f24a8bde55b6f1))
+
+### Continuous Integration
+
+- Harden release workflow and install tooling via uv
+  ([`e90fd64`](https://github.com/climatesense-project/climafacts-kg/commit/e90fd641beee95265fad60cfc589fdc5a77c9f6d))
+
+- Set semantic-release changelog mode to update explicitly
+  ([`44945ae`](https://github.com/climatesense-project/climafacts-kg/commit/44945ae6978d4215cec0c580f2c75e731687eda3))
+
+### Refactoring
+
+- Make zip() strictness explicit and drop the B905 ignore
+  ([`182b27c`](https://github.com/climatesense-project/climafacts-kg/commit/182b27ce37f18277ad9aae902fc494c6399ef8b6))
+
+
 ## v2.1.2 (2026-09-18)
 
 ### Bug Fixes
