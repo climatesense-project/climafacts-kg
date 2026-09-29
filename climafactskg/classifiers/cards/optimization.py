@@ -213,7 +213,10 @@ def build_mixed_trainval(mix: Mapping[str, tuple[int, int]]) -> tuple[Dataset, D
             continue
         if name not in factories:
             raise ValueError(f"Unknown dataset '{name}'. Choose from: {sorted(factories)}")
-        cases = factories[name]().cases
+        # The optimizer trains claim-only: review context added to the eval datasets by a sidecar must not
+        # silently change what the prompt is tuned on.
+        kwargs = {"context_path": None} if name.startswith("cs_") else {}
+        cases = factories[name](**kwargs).cases
         train_slice = cases[:train_n]
         val_slice = cases[train_n : train_n + val_n]
         logger.info(
