@@ -44,6 +44,7 @@ from typing import Literal
 import pandas as pd
 from pydantic_evals import Case, Dataset
 
+from .context import DEFAULT_CONTEXT_PATHS, select_context
 from .evaluators import (
     _MAX_CLASSIFIER_DEPTH,
     CARDSHierarchicalMatch,
@@ -401,6 +402,33 @@ def _download_annotations_df(
     return pd.DataFrame(records)
 
 
+def _attach_context(df: pd.DataFrame, context_path: str | None, max_context_chars: int | None) -> pd.DataFrame:
+    """Left-joins the review-context sidecar onto *df* as a ``context`` column, selecting text per case.
+
+    A missing sidecar is not an error: it logs a warning and leaves every context ``None``. ``context_path=None``
+    disables context silently. Documents without a usable review get ``None``.
+    """
+    df = df.drop(columns=["context"], errors="ignore")
+    if context_path is None:
+        return df.assign(context=None)
+    if not os.path.exists(context_path):
+        logger.warning("Review-context sidecar not found at %s; loading without context", context_path)
+        return df.assign(context=None)
+
+    sidecar = (
+        pd.read_csv(context_path)[["document_id", "context"]]
+        .dropna(subset=["context"])
+        .drop_duplicates(subset=["document_id"])
+    )
+    df = df.merge(sidecar, on="document_id", how="left")
+    df["context"] = [
+        (select_context(review, str(claim), max_chars=max_context_chars) or None) if isinstance(review, str) else None
+        for review, claim in zip(df["context"], df["content"], strict=True)
+    ]
+    logger.info("Review context attached to %d of %d cases", int(df["context"].notna().sum()), len(df))
+    return df
+
+
 def _load_climatesense_dataset(
     path: str | None,
     limit: int | None,
@@ -410,6 +438,8 @@ def _load_climatesense_dataset(
     min_annotators: int,
     completed_status: str,
     dataset_name: str,
+    context_path: str | None = None,
+    max_context_chars: int | None = 800,
 ) -> Dataset:
     """Shared implementation for :func:`climatesense_dataset_v1` and :func:`climatesense_dataset_v2`.
 
@@ -434,6 +464,8 @@ def _load_climatesense_dataset(
         min_annotators: Minimum annotators required per group.
         completed_status: ``Status`` column value that marks a finished annotation.
         dataset_name: Human-readable name attached to the returned :class:`Dataset`.
+        context_path: Path to the review-context sidecar CSV (see :mod:`.context`), or ``None`` for no context.
+        max_context_chars: Character budget per case for the selected review context (``None`` = unlimited).
     """
     if path is not None and os.path.exists(path):
         logger.info("Loading annotations dataset from cached CSV: %s", path)
@@ -453,6 +485,7 @@ def _load_climatesense_dataset(
     df = df.drop_duplicates(subset=["document_id"]).reset_index(drop=True)
     if limit is not None:
         df = df.head(limit)
+    df = _attach_context(df, context_path, max_context_chars)
     limit_note = f" (limited to {limit})" if limit is not None else ""
     logger.info("Loaded %s: %d cases%s", dataset_name, len(df), limit_note)
 
@@ -487,6 +520,8 @@ def climatesense_dataset_v1(
     annotation_groups_sheet_url: str = "https://docs.google.com/spreadsheets/d/1lFn7kVaZE2AKbBRjrhIPxSCMHwjholZV8CQfrek25u0",
     annotation_folder_id: str = "1SGcdG3AxVqSsOT6ofCiMQcZcTIBOW0kh",
     min_annotators: int = 3,
+    context_path: str | None = DEFAULT_CONTEXT_PATHS["v1"],
+    max_context_chars: int | None = 800,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 1.
 
@@ -515,6 +550,9 @@ def climatesense_dataset_v1(
         annotation_groups_sheet_url: URL of the master annotation-groups spreadsheet.
         annotation_folder_id: Google Drive folder ID containing annotation subfolders.
         min_annotators: Minimum annotators required per group to include it.
+        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v1")``); a missing file only
+            logs a warning. ``None`` disables context.
+        max_context_chars: Character budget per case for the selected review context.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -525,6 +563,8 @@ def climatesense_dataset_v1(
         min_annotators=min_annotators,
         completed_status="Finished",
         dataset_name="ClimateSense Annotations v1",
+        context_path=context_path,
+        max_context_chars=max_context_chars,
     )
 
 
@@ -535,6 +575,8 @@ def climatesense_dataset_v2(
     annotation_groups_sheet_url: str = "https://docs.google.com/spreadsheets/d/1TPnG0cAxe4eh_nSV0xQJ7r9dmQoJtq4tqdFpjftZ8rw",
     annotation_folder_id: str = "1GQz59v_-ufwX1WgWgJUHQAWu7NUjxOdg",
     min_annotators: int = 2,
+    context_path: str | None = DEFAULT_CONTEXT_PATHS["v2"],
+    max_context_chars: int | None = 800,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 2.
 
@@ -551,6 +593,9 @@ def climatesense_dataset_v2(
         annotation_groups_sheet_url: URL of the master annotation-groups spreadsheet.
         annotation_folder_id: Google Drive folder ID containing annotation subfolders.
         min_annotators: Minimum annotators required per group to include it.
+        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v2")``); a missing file only
+            logs a warning. ``None`` disables context.
+        max_context_chars: Character budget per case for the selected review context.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -561,4 +606,6 @@ def climatesense_dataset_v2(
         min_annotators=min_annotators,
         completed_status="done",
         dataset_name="ClimateSense Annotations v2",
+        context_path=context_path,
+        max_context_chars=max_context_chars,
     )
