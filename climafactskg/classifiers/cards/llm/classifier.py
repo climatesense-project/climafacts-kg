@@ -584,11 +584,11 @@ class CARDSLLMClassifier(CARDSClassifierBase):
                 def _compute_pre(pending: list[str]) -> list[str]:
                     return [self._preclassifier.classify(t) for t in pending]
 
-                def _advance_on_hit(_text: str, _label: str) -> None:
-                    progress.advance(task_id)
-
+                # No on_hit advance here: the gate only routes a text, it doesn't resolve it. Each text
+                # advances the bar exactly once, when resolved — below if unrelated, otherwise by the
+                # output cache hit / LLM call.
                 pre_labels = self._preclassifier_cache.get_or_compute(
-                    texts, key_fn=lambda t: t, compute_fn=_compute_pre, on_hit=_advance_on_hit
+                    texts, key_fn=lambda t: t, compute_fn=_compute_pre
                 )
                 for i, label in enumerate(pre_labels):
                     if label == "unrelated":
