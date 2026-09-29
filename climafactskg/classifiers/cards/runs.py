@@ -122,7 +122,7 @@ def load_run(path: str | Path) -> BenchmarkRun:
 
 def _paired(cases: pd.DataFrame) -> pd.DataFrame:
     """Rows with the exact score without and with context for the same (config, dataset, case) that has context."""
-    covered = cases[cases["has_context"]]
+    covered = cases[cases["has_context"].astype(bool)]
     key = ["config", "dataset", "case_id"]
     none = covered[covered["context"] == "none"][[*key, "exact", "pred", "text", "gold"]]
     with_ = covered[covered["context"] == "with"][[*key, "exact", "pred"]]

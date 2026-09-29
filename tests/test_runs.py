@@ -150,6 +150,12 @@ class TestContextEffect:
         assert eff.empty
         assert "delta" in eff.columns
 
+    def test_empty_case_frame_gives_empty_results_without_raising(self):
+        empty = pd.DataFrame(columns=list(CASE_COLUMNS))
+
+        assert context_effect(empty).empty
+        assert changed_cases(empty).empty
+
     def test_changed_cases_lists_fixed_and_broken(self):
         changed = changed_cases(self._cases())
         assert sorted(zip(changed["case_id"], changed["change"], strict=True)) == [("c1", "fixed"), ("c2", "broken")]

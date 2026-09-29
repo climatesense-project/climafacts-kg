@@ -1,12 +1,22 @@
 """Tests for evaluating with and without review context (stub classifier, no models, no network)."""
 
+import io
 import logging
 
 import pandas as pd
+from climafactskg.classifiers.cards import eval as eval_module
 from climafactskg.classifiers.cards.base import CARDSClassifierBase
-from climafactskg.classifiers.cards.eval import CARDSInput, benchmark_configs, evaluate, print_benchmark
+from climafactskg.classifiers.cards.eval import (
+    CARDSInput,
+    benchmark_configs,
+    evaluate,
+    print_benchmark,
+    print_context_effect,
+)
 from climafactskg.classifiers.cards.evaluators import CARDSHierarchicalMatch, CARDSOneOfMatch
+from climafactskg.classifiers.cards.runs import CASE_COLUMNS
 from pydantic_evals import Case, Dataset
+from rich.console import Console
 
 
 class _Recorder(CARDSClassifierBase):
@@ -126,3 +136,106 @@ class TestPrintBenchmark:
         df = pd.DataFrame([{"config": "c", "dataset": "d", "context": "none", "n_cases": 2, "exact_match": 1.0}])
         print_benchmark(df)
         assert "claim text only" not in " ".join(capsys.readouterr().out.split())
+
+
+def _capture(monkeypatch, width=80):
+    buffer = io.StringIO()
+    monkeypatch.setattr(eval_module, "_console", Console(width=width, file=buffer, color_system=None))
+    return buffer
+
+
+def _long_summary():
+    return pd.DataFrame(
+        [
+            {
+                "config": "a-very-long-configuration-label-that-overflows",
+                "dataset": "a-very-long-dataset-label",
+                "context": "with",
+                "n_with_context": 143,
+                "n_cases": 143,
+                "provider": "openrouter",
+                "model": "openai/gpt-4o-mini",
+                "prompt": "# CARDS TAXONOMY REASONING system prompt",
+                "exact_match": 0.378,
+                "exact_lo": 0.30,
+                "exact_hi": 0.46,
+                "h_f1": 0.6084,
+                "h_f1_lo": 0.55,
+                "h_f1_hi": 0.66,
+                "d1_macro_f1": 0.6848,
+                "d1_weighted_f1": 0.7,
+                "d2_macro_f1": 0.3031,
+                "d2_weighted_f1": 0.35,
+                "error": "",
+            }
+        ]
+    )
+
+
+class TestCompactPrintBenchmark:
+    def test_compact_output_fits_80_columns_and_shows_intervals(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        print_benchmark(_long_summary())
+        lines = buffer.getvalue().splitlines()
+
+        assert max(len(line) for line in lines) <= 80
+        text = "\\n".join(lines)
+        assert "0.378±0.08" in text
+        assert "D2 Mac" in text and "0.303" in text  # the last column must not be cropped away
+        assert "Provider" not in text and "Prompt" not in text
+
+    def test_wide_shows_every_column(self, monkeypatch):
+        buffer = _capture(monkeypatch, width=250)
+        print_benchmark(_long_summary(), wide=True)
+        text = buffer.getvalue()
+
+        assert "Provider" in text and "Prompt" in text and "D1 Wt" in text
+
+    def test_rows_without_interval_columns_still_print_plain_values(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        df = _long_summary().drop(columns=["exact_lo", "exact_hi", "h_f1_lo", "h_f1_hi"])
+        print_benchmark(df)
+
+        assert "0.378" in buffer.getvalue() and "±" not in buffer.getvalue()
+
+    def test_missing_scores_print_a_dash_not_nan(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        df = _long_summary()
+        df.loc[0, ["exact_match", "exact_lo", "exact_hi"]] = float("nan")
+        print_benchmark(df)
+
+        assert "nan" not in buffer.getvalue().lower()
+
+
+class TestPrintContextEffect:
+    def test_prints_the_paired_effect(self, monkeypatch):
+        buffer = _capture(monkeypatch, width=100)
+        rows = []
+        for cid, none_exact, with_exact in (("c1", 0.0, 1.0), ("c2", 1.0, 1.0)):
+            for mode, exact in (("none", none_exact), ("with", with_exact)):
+                rows.append(
+                    {
+                        "config": "m",
+                        "dataset": "d",
+                        "context": mode,
+                        "case_id": cid,
+                        "text": "t",
+                        "gold": "1_1",
+                        "pred": "1_1",
+                        "exact": exact,
+                        "hf1": exact,
+                        "has_context": True,
+                        "gold_d1": "1",
+                        "pred_d1": "1",
+                    }
+                )
+        print_context_effect(pd.DataFrame(rows, columns=list(CASE_COLUMNS)))
+
+        text = buffer.getvalue()
+        assert "fixed" in text.lower() and "+0.500" in text
+
+    def test_prints_a_note_when_nothing_is_paired(self, monkeypatch):
+        buffer = _capture(monkeypatch, width=100)
+        print_context_effect(pd.DataFrame(columns=list(CASE_COLUMNS)))
+
+        assert "no cases" in buffer.getvalue().lower()

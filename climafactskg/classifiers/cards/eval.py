@@ -51,6 +51,7 @@ from typing import Any, Literal, cast
 
 import pandas as pd
 from pydantic_evals import Dataset
+from rich import box
 from rich.console import Console
 from rich.rule import Rule
 from rich.table import Table
@@ -81,7 +82,7 @@ from .evaluators import (  # noqa: F401
     ancestors_of,
     project_to_depth,
 )
-from .runs import CASE_COLUMNS, BenchmarkRun, bootstrap_ci, collect_meta, save_run
+from .runs import CASE_COLUMNS, BenchmarkRun, bootstrap_ci, collect_meta, context_effect, save_run
 
 logger = logging.getLogger(__name__)
 
@@ -425,19 +426,46 @@ def benchmark_configs(
     return df
 
 
-def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results") -> None:
+# Score columns must never be squeezed (a truncated "0.…" is useless); the text columns give way instead.
+_MIN_WIDTHS = {"exact_match": 10, "h_f1": 10, "d1_macro_f1": 6, "d2_macro_f1": 6, "n_cases": 3, "n_with_context": 3}
+_COMPACT_COLUMNS = (
+    "config",
+    "dataset",
+    "context",
+    "n_with_context",
+    "n_cases",
+    "exact_match",
+    "h_f1",
+    "d1_macro_f1",
+    "d2_macro_f1",
+    "error",
+)
+
+
+def _score_cell(row: pd.Series, col: str) -> str:
+    """A score as ``0.378±0.08`` (value ± half-width of its interval), ``0.378`` without one, or ``—``."""
+    value = row[col]
+    if pd.isna(value):
+        return "—"
+    lo, hi = row.get(f"{col.replace('exact_match', 'exact')}_lo"), row.get(f"{col.replace('exact_match', 'exact')}_hi")
+    if lo is None or hi is None or pd.isna(lo) or pd.isna(hi):
+        return f"{value:.3f}"
+    return f"{value:.3f}±{(hi - lo) / 2:.2f}"
+
+
+def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bool = False) -> None:
     """Render a benchmark DataFrame as a rich table.
 
-    Designed for DataFrames returned by :func:`benchmark_configs`.  Columns
-    absent from *df* are silently skipped, so the function works with any
-    subset of the enriched frame.
+    The default compact view keeps the columns that matter for comparing runs and fits 80 columns; scores show their
+    95% bootstrap interval as ``value±half-width`` when the frame has interval columns. ``wide=True`` shows every
+    column (provider, model, prompt, weighted F1). Columns absent from *df* are silently skipped.
     """
     # (key, header, style, justify, max_width, no_wrap)
     # macro_f1/micro_f1/weighted_f1 are omitted — d2_* carry the same values.
     col_spec: list[tuple[str, str, str, str, int | None, bool]] = [
-        ("config", "Config", "bold cyan", "left", 22, True),
-        ("dataset", "Dataset", "", "left", 16, True),
-        ("context", "Ctx", "dim", "left", 6, True),
+        ("config", "Config", "bold cyan", "left", 22 if wide else 10, True),
+        ("dataset", "Dataset", "", "left", 16 if wide else 8, True),
+        ("context", "Ctx", "dim", "left", 4, True),
         ("n_with_context", "Ctx N", "dim", "right", None, False),
         ("provider", "Provider", "dim", "left", 12, True),
         ("model", "Model", "", "left", 22, True),
@@ -449,28 +477,83 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results") -> None:
         ("d1_weighted_f1", "D1 Wt", "yellow", "right", None, False),
         ("d2_macro_f1", "D2 Mac", "magenta", "right", None, False),
         ("d2_weighted_f1", "D2 Wt", "magenta", "right", None, False),
-        ("error", "Error", "bold red", "left", 30, True),
+        ("error", "Error", "bold red", "left", 30 if wide else 12, True),
     ]
 
-    table = Table(title=title, show_lines=True)
-    present = [(col, hdr, style, just, mw, nw) for col, hdr, style, just, mw, nw in col_spec if col in df.columns]
-    for _, hdr, style, just, mw, nw in present:
+    table = Table(
+        title=title,
+        show_lines=wide,
+        box=box.SQUARE if wide else box.SIMPLE,
+        collapse_padding=not wide,
+        pad_edge=wide,
+    )
+    # The compact view drops the Error column unless something actually failed, so the scores keep their room.
+    show_error = wide or ("error" in df.columns and df["error"].fillna("").astype(str).str.strip().ne("").any())
+    present = [
+        (col, hdr, style, just, mw, nw)
+        for col, hdr, style, just, mw, nw in col_spec
+        if col in df.columns and (wide or col in _COMPACT_COLUMNS) and (col != "error" or show_error)
+    ]
+    for col, hdr, style, just, mw, nw in present:
         justify_val = cast(Literal["left", "right", "center", "full", "default"], just)
-        table.add_column(hdr, style=style or None, justify=justify_val, max_width=mw, no_wrap=nw, overflow="ellipsis")
+        table.add_column(
+            hdr,
+            style=style or None,
+            justify=justify_val,
+            max_width=mw,
+            min_width=_MIN_WIDTHS.get(col),
+            no_wrap=nw,
+            overflow="ellipsis",
+        )
 
     for _, row in df.iterrows():
         cells = []
         for col, _, _, _, _, _ in present:
-            val = row[col]
-            if isinstance(val, float):
-                cells.append(f"{val:.4f}")
+            if col in ("exact_match", "h_f1"):
+                cells.append(_score_cell(row, col))
+            elif isinstance(row[col], float):
+                cells.append("—" if pd.isna(row[col]) else f"{row[col]:.3f}")
             else:
-                cells.append(str(val))
+                cells.append(str(row[col]))
         table.add_row(*cells)
 
     _console.print(table)
     if "context" in df.columns and (df["context"] == "with").any():
         _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
+
+
+def print_context_effect(cases: pd.DataFrame) -> None:
+    """Print the paired none-vs-with context effect per (config, dataset) from a saved run's case rows."""
+    effect = context_effect(cases)
+    if effect.empty:
+        _console.print("[dim]No cases carry context in both runs, so there is nothing to compare.[/dim]")
+        return
+    table = Table(title="Effect of context (same cases, exact match)", box=box.SIMPLE)
+    for header, justify in (
+        ("Config", "left"),
+        ("Dataset", "left"),
+        ("Paired", "right"),
+        ("None", "right"),
+        ("With", "right"),
+        ("Δ", "right"),
+        ("Fixed", "right"),
+        ("Broken", "right"),
+        ("Same", "right"),
+    ):
+        table.add_column(header, justify=cast(Literal["left", "right"], justify), no_wrap=True, overflow="ellipsis")
+    for _, row in effect.iterrows():
+        table.add_row(
+            str(row["config"]),
+            str(row["dataset"]),
+            str(int(row["n_paired"])),
+            f"{row['exact_none']:.3f}",
+            f"{row['exact_with']:.3f}",
+            f"{row['delta']:+.3f}",
+            str(int(row["fixed"])),
+            str(int(row["broken"])),
+            str(int(row["unchanged"])),
+        )
+    _console.print(table)
 
 
 if __name__ == "__main__":
