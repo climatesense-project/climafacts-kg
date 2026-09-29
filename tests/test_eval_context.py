@@ -209,14 +209,14 @@ class TestCompactPrintBenchmark:
 
 class TestPrintContextEffect:
     def test_prints_the_paired_effect(self, monkeypatch):
-        buffer = _capture(monkeypatch, width=100)
+        buffer = _capture(monkeypatch, width=80)
         rows = []
         for cid, none_exact, with_exact in (("c1", 0.0, 1.0), ("c2", 1.0, 1.0)):
             for mode, exact in (("none", none_exact), ("with", with_exact)):
                 rows.append(
                     {
-                        "config": "m",
-                        "dataset": "d",
+                        "config": "openai/gpt-4o-mini",
+                        "dataset": "climatesense-v2",
                         "context": mode,
                         "case_id": cid,
                         "text": "t",
@@ -232,10 +232,12 @@ class TestPrintContextEffect:
         print_context_effect(pd.DataFrame(rows, columns=list(CASE_COLUMNS)))
 
         text = buffer.getvalue()
-        assert "fixed" in text.lower() and "+0.500" in text
+        assert "Fixed" in text and "Broken" in text and "Same" in text  # no header truncated at 80 columns
+        assert "+0.500" in text and "0.500" in text and "1.000" in text
+        assert max(len(line) for line in text.splitlines()) <= 80
 
     def test_prints_a_note_when_nothing_is_paired(self, monkeypatch):
-        buffer = _capture(monkeypatch, width=100)
+        buffer = _capture(monkeypatch, width=80)
         print_context_effect(pd.DataFrame(columns=list(CASE_COLUMNS)))
 
         assert "no cases" in buffer.getvalue().lower()

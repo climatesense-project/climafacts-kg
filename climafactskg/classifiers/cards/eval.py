@@ -528,19 +528,29 @@ def print_context_effect(cases: pd.DataFrame) -> None:
     if effect.empty:
         _console.print("[dim]No cases carry context in both runs, so there is nothing to compare.[/dim]")
         return
-    table = Table(title="Effect of context (same cases, exact match)", box=box.SIMPLE)
-    for header, justify in (
-        ("Config", "left"),
-        ("Dataset", "left"),
-        ("Paired", "right"),
-        ("None", "right"),
-        ("With", "right"),
-        ("Δ", "right"),
-        ("Fixed", "right"),
-        ("Broken", "right"),
-        ("Same", "right"),
+    table = Table(
+        title="Effect of context (same cases, exact match)", box=box.SIMPLE, collapse_padding=True, pad_edge=False
+    )
+    # (header, justify, max_width, min_width): the numbers keep their room, the label columns give way.
+    for header, justify, max_width, min_width in (
+        ("Config", "left", 14, None),
+        ("Dataset", "left", 10, None),
+        ("Paired", "right", None, 6),
+        ("None", "right", None, 5),
+        ("With", "right", None, 5),
+        ("Δ", "right", None, 6),
+        ("Fixed", "right", None, 5),
+        ("Broken", "right", None, 6),
+        ("Same", "right", None, 4),
     ):
-        table.add_column(header, justify=cast(Literal["left", "right"], justify), no_wrap=True, overflow="ellipsis")
+        table.add_column(
+            header,
+            justify=cast(Literal["left", "right"], justify),
+            max_width=max_width,
+            min_width=min_width,
+            no_wrap=True,
+            overflow="ellipsis",
+        )
     for _, row in effect.iterrows():
         table.add_row(
             str(row["config"]),

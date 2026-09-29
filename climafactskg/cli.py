@@ -325,6 +325,28 @@ def eval_context(
     logger.info("Review context for %d documents at %s", len(sidecar), DEFAULT_CONTEXT_PATHS[version])
 
 
+@app.command(name="eval-report")
+def eval_report(
+    run_dirs: Annotated[
+        list[str], typer.Argument(help="One or more saved benchmark run directories (data/eval_runs/...).")
+    ],
+    out: Annotated[
+        Optional[str], typer.Option("--out", help="Report path. Defaults to <first run dir>/report.html.")
+    ] = None,
+):
+    """Render saved benchmark runs as one self-contained HTML report (tables and inline SVG charts)."""
+    from climafactskg.classifiers.cards.report import render_html
+    from climafactskg.classifiers.cards.runs import load_run
+
+    try:
+        runs = [load_run(path) for path in run_dirs]
+    except ValueError as exc:
+        logger.error("%s", exc)
+        raise typer.Exit(code=1) from exc
+    target = out or f"{run_dirs[0].rstrip('/')}/report.html"
+    logger.info("Wrote %s", render_html(runs, target))
+
+
 @app.command()
 def classify(
     text: str = typer.Argument(..., help="Text to classify using CARDS."),

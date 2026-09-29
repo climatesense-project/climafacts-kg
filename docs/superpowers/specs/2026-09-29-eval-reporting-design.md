@@ -111,3 +111,13 @@ One real render at the end from the cached v2 predictions (no paid calls).
 
 Markdown export, per-class charts, confusion heatmaps, an interactive dashboard, new metrics, changing how predictions
 are made, and any plotting dependency.
+
+## Deviations while planning
+
+- `benchmark_configs` keeps its loop in place and captures per-case rows there instead of extracting a `_run_combo`
+  helper: same result, much smaller diff to code that has tests.
+- The compact terminal table shows `0.378±0.08` (value and half-width of the interval) instead of
+  `0.378 [0.30-0.46]` so it fits 80 columns; the HTML report shows the full interval.
+- The report is built with plain Python strings, not jinja2 (only a transitive dependency).
+- Found while implementing: rich crops a too-wide compact table silently, so score columns get minimum widths, the
+  Error column shows only when something failed, and padding collapses; tied best bars share one value label.
