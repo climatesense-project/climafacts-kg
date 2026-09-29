@@ -80,7 +80,17 @@ branch = "main"
 upload_to_PyPI = false
 upload_to_release = true
 build_command = "uv lock && git add uv.lock && uv build"
+commit_parser = "conventional"
+tag_format = "v{version}"
 commit_author = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+
+# UPDATE splices new releases in at the insertion flag and leaves existing (backfilled) history
+# alone. v9 defaulted to INIT (full regeneration from git history), v10 defaults to UPDATE;
+# be explicit so a version change can never silently rewrite CHANGELOG.md.
+[tool.semantic_release.changelog]
+mode = "update"
+changelog_file = "CHANGELOG.md"
+insertion_flag = "<!-- version list -->"
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = [
