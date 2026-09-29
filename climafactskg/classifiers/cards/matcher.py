@@ -195,6 +195,6 @@ class CARDSMatcher(CARDSClassifierBase):
             return list(
                 executor.map(
                     lambda pair: self.classify(pair[0], context=pair[1], min_threshold=min_threshold),
-                    zip(texts, effective_contexts, strict=False),
+                    zip(texts, effective_contexts, strict=True),
                 )
             )

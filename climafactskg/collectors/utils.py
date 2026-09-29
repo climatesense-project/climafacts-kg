@@ -129,7 +129,7 @@ def batch_classify_cards_category(
 
     failed = 0
     for url, entry, category in track(
-        zip(pending_urls, pending_entries, categories, strict=False),
+        zip(pending_urls, pending_entries, categories, strict=True),
         total=len(pending_urls),
         description=save_description,
     ):

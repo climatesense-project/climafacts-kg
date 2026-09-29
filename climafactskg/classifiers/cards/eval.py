@@ -139,7 +139,7 @@ def evaluate(classifier, dataset: Dataset):
         use_context = any(contexts) and supports_context
         preds = [
             classifier.classify(t, context=ctx) if use_context else classifier.classify(t)
-            for t, ctx in track(zip(texts, contexts, strict=False), description="Classifying...", total=len(texts))
+            for t, ctx in track(zip(texts, contexts, strict=True), description="Classifying...", total=len(texts))
         ]
 
     logger.info("Predictions complete — running pydantic-evals scoring")
@@ -222,7 +222,7 @@ def benchmark_configs(
                 use_context = any(contexts) and supports_context
                 preds = [
                     classifier.classify(t, context=ctx) if use_context else classifier.classify(t)
-                    for t, ctx in zip(texts, contexts, strict=False)
+                    for t, ctx in zip(texts, contexts, strict=True)
                 ]
         except Exception as exc:
             logger.warning("Failed '%s' on '%s': %s", config_name, dataset_name, exc)

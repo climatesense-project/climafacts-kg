@@ -207,7 +207,7 @@ class CARDSClassifier(CARDSClassifierBase):
 
         effective_contexts = contexts if contexts is not None else [None] * len(texts)
         texts = [
-            (f"{t}\n\n{c}" if c else t).strip()[: self.max_len] for t, c in zip(texts, effective_contexts, strict=False)
+            (f"{t}\n\n{c}" if c else t).strip()[: self.max_len] for t, c in zip(texts, effective_contexts, strict=True)
         ]
 
         def _compute(pending: list[str]) -> list[str]:

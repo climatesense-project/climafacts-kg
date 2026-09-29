@@ -68,5 +68,9 @@ class TestCARDSMatcherClassifyBatch:
         texts = ["", "irrelevant filler text"]
         contexts = ["Ice isn't melting, glaciers are actually growing", None]
         result = matcher.classify_batch(texts, contexts=contexts)
-        expected = [matcher.classify(t, context=c) for t, c in zip(texts, contexts, strict=False)]
+        expected = [matcher.classify(t, context=c) for t, c in zip(texts, contexts, strict=True)]
         assert result == expected
+
+    def test_batch_rejects_mismatched_context_length(self, matcher):
+        with pytest.raises(ValueError):
+            matcher.classify_batch(["one", "two"], contexts=["only one context"])

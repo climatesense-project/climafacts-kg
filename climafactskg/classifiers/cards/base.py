@@ -59,4 +59,4 @@ class CARDSClassifierBase(ABC):
             failure modes, e.g. the LLM classifier, ever produce ``None``).
         """
         effective_contexts = contexts if contexts is not None else [None] * len(texts)
-        return [self.classify(text, context=ctx) for text, ctx in zip(texts, effective_contexts, strict=False)]
+        return [self.classify(text, context=ctx) for text, ctx in zip(texts, effective_contexts, strict=True)]

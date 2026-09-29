@@ -428,6 +428,7 @@ def parse_misinformer_article(url: str, html: Optional[str] = None) -> dict:
         for i, j in zip(
             soup.select("#centerColumn > table > tr .footnote > td:nth-child(1)"),
             soup.select("#centerColumn > table > tr .footnote > td:nth-child(2) > a"),
+            # The two selectors are scraped independently; a page may not pair up, so don't raise.
             strict=False,
         ):
             argument_url = None
@@ -463,6 +464,7 @@ def parse_misinformer_article(url: str, html: Optional[str] = None) -> dict:
         for i, j in zip(
             soup.select("#centerColumn > table > tr.footnote > td:nth-child(1)"),
             soup.select("#centerColumn > table > tr > td:nth-child(2) > a"),
+            # The two selectors are scraped independently; a page may not pair up, so don't raise.
             strict=False,
         ):
             argument_url = None
