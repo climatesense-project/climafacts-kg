@@ -83,6 +83,9 @@ Consensus CSVs stay untouched. A separate, refreshable sidecar holds the context
   cached consensus CSV for the ids; v2 also uses the local input CSV, v1 uses CimpleKG only).
 - `nslp_dataset` unchanged.
 
+Deviation from the first draft: `build_climatesense_context` lives in `context.py` (with the path constants it needs)
+rather than `datasets.py`, to keep `datasets.py` from growing and to avoid an import cycle.
+
 ### 3. `eval.py`
 
 - `evaluate(classifier, dataset, use_context: bool = True)`: when `False`, ignore every case's context (also for the
