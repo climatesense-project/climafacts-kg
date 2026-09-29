@@ -206,7 +206,9 @@ class CARDSClassifier(CARDSClassifierBase):
         from rich.progress import track
 
         effective_contexts = contexts if contexts is not None else [None] * len(texts)
-        texts = [(f"{t}\n\n{c}" if c else t).strip()[: self.max_len] for t, c in zip(texts, effective_contexts)]
+        texts = [
+            (f"{t}\n\n{c}" if c else t).strip()[: self.max_len] for t, c in zip(texts, effective_contexts, strict=False)
+        ]
 
         def _compute(pending: list[str]) -> list[str]:
             chunks = [pending[i : i + batch_size] for i in range(0, len(pending), batch_size)]

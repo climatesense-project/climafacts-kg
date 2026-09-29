@@ -147,7 +147,7 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
                     score=s,
                     context=batch[c.inputs[0]].context,
                 )
-                for c, s in zip(report.cases, scores)
+                for c, s in zip(report.cases, scores, strict=False)
             ]
         return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
 

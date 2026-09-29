@@ -104,7 +104,7 @@ class ClassificationCache:
 
             if miss_indices:
                 computed = compute_fn([items[i] for i in miss_indices])
-                for i, value in zip(miss_indices, computed):
+                for i, value in zip(miss_indices, computed, strict=False):
                     results[i] = value
                     if should_cache(value):
                         db[keys[i]] = {"key": key_fn(items[i]), "result": self._serialize(value)}

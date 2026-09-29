@@ -458,7 +458,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
 
         return list(
             await asyncio.gather(
-                *[_tracked(self._call_llm_async(t, semaphore, ctx)) for t, ctx in zip(texts, contexts)],
+                *[_tracked(self._call_llm_async(t, semaphore, ctx)) for t, ctx in zip(texts, contexts, strict=False)],
                 return_exceptions=True,
             )
         )
@@ -622,9 +622,11 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             )
 
         failures: list[tuple[int, Exception]] = [
-            (orig_idx, output) for orig_idx, output in zip(pending_indices, outputs) if isinstance(output, Exception)
+            (orig_idx, output)
+            for orig_idx, output in zip(pending_indices, outputs, strict=False)
+            if isinstance(output, Exception)
         ]
-        for orig_idx, output in zip(pending_indices, outputs):
+        for orig_idx, output in zip(pending_indices, outputs, strict=False):
             if not isinstance(output, Exception):
                 results[orig_idx] = self._label_from_output(output)
 

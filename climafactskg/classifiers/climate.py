@@ -103,7 +103,7 @@ class ClimateBertClassifier:
             Predicted class labels in the same order as the input.
         """
         if contexts is not None:
-            texts = [f"{t}\n\n{ctx}" if ctx else t for t, ctx in zip(texts, contexts)]
+            texts = [f"{t}\n\n{ctx}" if ctx else t for t, ctx in zip(texts, contexts, strict=False)]
         texts = [str(t).strip() for t in texts]
         inputs = self.tokenizer(
             texts,

@@ -152,8 +152,5 @@ ignore = [
     "D100", # TODO remove docstring warning.
     "D105", # TODO remove docstring warning.
     "W291",
-    # requires-python (>=3.12) now drives ruff's target version; this rule was never enforced
-    # under the old poetry metadata, which ruff does not read. Keep lint parity.
-    "B905", # zip() without strict=
 ]
 exclude = ["data/raw/*", "LICENSE", "README.md"]
