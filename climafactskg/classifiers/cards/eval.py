@@ -81,6 +81,7 @@ from .evaluators import (  # noqa: F401
     ancestors_of,
     project_to_depth,
 )
+from .runs import CASE_COLUMNS, BenchmarkRun, bootstrap_ci, collect_meta, save_run
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +183,7 @@ def benchmark_configs(
     datasets: dict[str, Dataset],
     context_modes: Sequence[Literal["none", "with"]] = ("none", "with"),
     min_context_coverage: float = 0.5,
+    save_dir: str | None = None,
 ) -> pd.DataFrame:
     """Evaluate multiple classifier configs across multiple datasets.
 
@@ -198,11 +200,15 @@ def benchmark_configs(
         min_context_coverage: A ``"with"`` run on a dataset where fewer than this fraction of cases carry context logs
             a warning: its result mostly reflects claim-only classification. Compare on the covered subset instead
             (load the dataset with ``only_with_context=True``).
+        save_dir: When set, the run (metadata, tidy per-case rows and the summary) is saved to a new timestamped
+            directory under it (see :mod:`.runs`) and its path is attached as ``df.attrs["run_dir"]``. A failed
+            save logs a warning and never loses the returned DataFrame.
 
     Returns:
         DataFrame with columns ``config``, ``dataset``, ``context``, ``n_with_context`` (cases that actually
             carried context in that run), ``n_cases``,
-        ``exact_match``, ``h_f1``, ``macro_f1``, ``micro_f1``, ``weighted_f1``.
+        ``exact_match``, ``h_f1``, ``macro_f1``, ``micro_f1``, ``weighted_f1`` and the 95% bootstrap intervals
+        ``exact_lo``/``exact_hi`` and ``h_f1_lo``/``h_f1_hi``.
 
     Example::
 
@@ -219,6 +225,7 @@ def benchmark_configs(
     from rich.progress import track
 
     rows = []
+    case_rows: list[dict[str, Any]] = []
     combos = [
         (cn, dn, clf, ds, mode) for cn, clf in configs.items() for dn, ds in datasets.items() for mode in context_modes
     ]
@@ -276,6 +283,10 @@ def benchmark_configs(
                     "macro_f1": float("nan"),
                     "micro_f1": float("nan"),
                     "weighted_f1": float("nan"),
+                    "exact_lo": float("nan"),
+                    "exact_hi": float("nan"),
+                    "h_f1_lo": float("nan"),
+                    "h_f1_hi": float("nan"),
                     "error": str(exc),
                 }
             )
@@ -303,7 +314,8 @@ def benchmark_configs(
             one_of_score = case.scores.get("CARDSOneOfMatch")
             if one_of_score is not None:
                 exact_scores.append(one_of_score.value)
-            if (h := case.scores.get("CARDSHierarchicalMatch")) is not None:
+            h = case.scores.get("CARDSHierarchicalMatch")
+            if h is not None:
                 hier_scores.append(h.value)
 
             if one_of_score is not None and one_of_score.value == 1.0:
@@ -313,6 +325,22 @@ def benchmark_configs(
                 charged = max(expected, key=lambda e: _hierarchical_f1(a_pred, ancestors_of(e)))
                 y_true.append(charged)
             y_pred.append(predicted)
+            case_rows.append(
+                {
+                    "config": config_name,
+                    "dataset": dataset_name,
+                    "context": mode,
+                    "case_id": case.name,
+                    "text": case.inputs.text if isinstance(case.inputs, CARDSInput) else str(case.inputs),
+                    "gold": ";".join(expected),
+                    "pred": predicted,
+                    "exact": one_of_score.value if one_of_score is not None else float("nan"),
+                    "hf1": h.value if h is not None else float("nan"),
+                    "has_context": isinstance(case.inputs, CARDSInput) and bool(case.inputs.context),
+                    "gold_d1": project_to_depth(y_true[-1], 1),
+                    "pred_d1": project_to_depth(predicted, 1),
+                }
+            )
 
         f1_by_strategy: dict[str, float] = {}
         d1_f1_by_strategy: dict[str, float] = {}
@@ -360,6 +388,10 @@ def benchmark_configs(
                 "macro_f1": round(f1_by_strategy.get("macro", 0.0), 4),
                 "micro_f1": round(f1_by_strategy.get("micro", 0.0), 4),
                 "weighted_f1": round(f1_by_strategy.get("weighted", 0.0), 4),
+                "exact_lo": (ci_exact := bootstrap_ci(exact_scores))[0],
+                "exact_hi": ci_exact[1],
+                "h_f1_lo": (ci_hier := bootstrap_ci(hier_scores))[0],
+                "h_f1_hi": ci_hier[1],
                 "error": "",
             }
         )
@@ -370,7 +402,27 @@ def benchmark_configs(
             rows[-1]["macro_f1"],
         )
 
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    if save_dir is not None:
+        try:
+            configs_meta = [
+                {
+                    "label": name,
+                    "provider": str(getattr(clf, "_provider", "")),
+                    "model": str(getattr(clf, "_model", type(clf).__name__)),
+                    "prompt": _prompt_id(clf),
+                }
+                for name, clf in configs.items()
+            ]
+            run = BenchmarkRun(
+                meta=collect_meta(datasets, context_modes, min_context_coverage, configs_meta),
+                summary=df,
+                cases=pd.DataFrame(case_rows, columns=list(CASE_COLUMNS)),
+            )
+            df.attrs["run_dir"] = str(save_run(run, save_dir))
+        except OSError as exc:
+            logger.warning("Could not save benchmark run to %s: %s", save_dir, exc)
+    return df
 
 
 def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results") -> None:
