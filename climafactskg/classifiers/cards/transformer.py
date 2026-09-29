@@ -13,7 +13,7 @@ except ImportError as e:
     raise ImportError(
         "The transformer CARDS classifier requires the 'transformer' extra. "
         "Install it with: pip install 'climafactskg[transformer]' "
-        "(or: poetry install --extras transformer)."
+        "(or: uv sync --extra transformer)."
     ) from e
 
 MAX_LEN = 256

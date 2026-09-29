@@ -123,10 +123,10 @@ pip install "climafactskg[eval]"         # CARDS eval/optimization pipeline (GEP
 pip install "climafactskg[all]"          # everything
 ```
 
-With Poetry, from a checkout of this repository:
+With [uv](https://docs.astral.sh/uv/), from a checkout of this repository:
 
 ```bash
-poetry install --extras "matcher transformer eval"   # or: --all-extras
+uv sync --extra matcher --extra transformer --extra eval   # or: --all-extras
 ```
 
 ### ⌨️ Command Line Interface (CLI)

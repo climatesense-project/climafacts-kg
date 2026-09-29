@@ -1,16 +1,12 @@
-[tool.poetry]
+[project]
 name = "climafactskg"
 version = "2.1.2"
 description = "ClimaFactsKG is a knowledge graph designed to combat pervasive climate misinformation by linking common climate myths with scientific corrections. ClimaFactsKG is integrated with CimpleKG."
-authors = ["Grégoire Burel <423662+evhart@users.noreply.github.com>"]
 readme = "README.md"
-include = [
-    { path = "README.md", format = "sdist" },
-    { path = "pyproject.toml", format = "sdist" },
-    { path = "LICENSE", format = "sdist" },
-]
-homepage = "https://github.com/climatesense-project/climafacts-kg"
-repository = "https://github.com/climatesense-project/climafacts-kg"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.14"
+authors = [{ name = "Grégoire Burel", email = "423662+evhart@users.noreply.github.com" }]
+keywords = ["nlp", "misinformation", "knowledge graph", "climate change"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -20,74 +16,70 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
     "Operating System :: OS Independent",
 ]
-keywords = ["nlp", "misinformation", "knowledge graph", "climate change"]
-
-[tool.poetry.dependencies]
-python = ">=3.12,<3.14"
-usingversion = "^0.1.2"
-pandas = "^2.2.3"
-beautifulsoup4 = "^4.13.4"
-langcodes = "^3.5.0"
-python-dotenv = "^1.1.0"
-rdflib = "^7.1.4"
-rdflib-endpoint = "^0.5.3"
-uvicorn = ">=0.34.2"
-sparqlwrapper = "^2.0.0"
-langdetect = "^1.0.9"
-iso639 = "^0.1.4"
-typer = "^0.16.0"
-preserve = "^1.2.1"
-pyarrow = "^24.0.0"
-# LLM classifier is the pipeline's default classifier (see cards_classifier_name
-# default in collectors/utils.py) — kept core, not an extra.
-pydantic-ai = "^1.78.0"
-openai = "^2.30.0"
-
-# --- optional: classifiers/matcher.py (rule-based, spaCy) ---
-spacy = { version = "^3.8.7", optional = true }
-en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl", optional = true }
-en-core-web-md = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl", optional = true }
-
-# --- optional: classifiers/transformer.py (HuggingFace, pulls torch) ---
-sentence-transformers = { version = "^5.0.0", optional = true }
-
-# --- optional: classifiers/cards/{eval,optimization,datasets}.py (research/eval pipeline) ---
-pydantic-evals = { version = "^1.106.0", optional = true }
-gepa = { version = ">=0.1.1", optional = true }
-gspread = { version = "^6.0.0", optional = true }
-google-api-python-client = { version = "^2.0.0", optional = true }
-
-[tool.poetry.extras]
-matcher = ["spacy", "en-core-web-sm", "en-core-web-md"]
-transformer = ["sentence-transformers"]
-eval = ["pydantic-evals", "gepa", "gspread", "google-api-python-client"]
-all = [
-    "spacy",
-    "en-core-web-sm",
-    "en-core-web-md",
-    "sentence-transformers",
-    "pydantic-evals",
-    "gepa",
-    "gspread",
-    "google-api-python-client",
+dependencies = [
+    "usingversion>=0.1.2,<0.2.0",
+    "pandas>=2.2.3,<3.0.0",
+    "beautifulsoup4>=4.13.4,<5.0.0",
+    "langcodes>=3.5.0,<4.0.0",
+    "python-dotenv>=1.1.0,<2.0.0",
+    "rdflib>=7.1.4,<8.0.0",
+    "rdflib-endpoint>=0.5.3,<0.6.0",
+    "uvicorn>=0.34.2",
+    "sparqlwrapper>=2.0.0,<3.0.0",
+    "langdetect>=1.0.9,<2.0.0",
+    "iso639>=0.1.4,<0.2.0",
+    "typer>=0.16.0,<0.17.0",
+    "preserve>=1.2.1,<2.0.0",
+    "pyarrow>=24.0.0,<25.0.0",
+    # LLM classifier is the pipeline's default classifier (see cards_classifier_name
+    # default in collectors/utils.py) — kept core, not an extra.
+    "pydantic-ai>=1.78.0,<2.0.0",
+    "openai>=2.30.0,<3.0.0",
 ]
 
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.11.2"
-pre-commit = "^4.2.0"
-python-semantic-release = "^9.12.0"
-jupyter = "^1.1.1"
-pytest = "^8.3.0"
+[project.urls]
+Homepage = "https://github.com/climatesense-project/climafacts-kg"
+Repository = "https://github.com/climatesense-project/climafacts-kg"
+
+[project.scripts]
+climafactskg = "climafactskg.cli:app"
+
+[project.optional-dependencies]
+# classifiers/matcher.py (rule-based, spaCy)
+matcher = [
+    "spacy>=3.8.7,<4.0.0",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "en-core-web-md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
+]
+# classifiers/transformer.py (HuggingFace, pulls torch)
+transformer = ["sentence-transformers>=5.0.0,<6.0.0"]
+# classifiers/cards/{eval,optimization,datasets}.py (research/eval pipeline)
+eval = [
+    "pydantic-evals>=1.106.0,<2.0.0",
+    "gepa>=0.1.1",
+    "gspread>=6.0.0,<7.0.0",
+    "google-api-python-client>=2.0.0,<3.0.0",
+]
+all = ["climafactskg[matcher,transformer,eval]"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.2,<0.12.0",
+    "pre-commit>=4.2.0,<5.0.0",
+    "python-semantic-release>=9.12.0,<10.0.0",
+    "jupyter>=1.1.1,<2.0.0",
+    "pytest>=8.3.0,<9.0.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.semantic_release]
-version_toml = ["pyproject.toml:tool.poetry.version"]
+version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 upload_to_PyPI = false
 upload_to_release = true
-build_command = "pip install poetry && poetry build"
+build_command = "uv lock && git add uv.lock && uv build"
 commit_author = "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
 
 [tool.semantic_release.commit_parser_options]
@@ -106,13 +98,16 @@ allowed_tags = [
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf"]
 
-[tool.poetry.scripts]
-climafactskg = "climafactskg.cli:app"
-
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "climafactskg"
+module-root = ""
+source-include = ["README.md", "pyproject.toml", "LICENSE"]
+source-exclude = ["**/.DS_Store"]
+wheel-exclude = ["**/.DS_Store"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -145,5 +140,8 @@ ignore = [
     "D100", # TODO remove docstring warning.
     "D105", # TODO remove docstring warning.
     "W291",
+    # requires-python (>=3.12) now drives ruff's target version; this rule was never enforced
+    # under the old poetry metadata, which ruff does not read. Keep lint parity.
+    "B905", # zip() without strict=
 ]
 exclude = ["data/raw/*", "LICENSE", "README.md"]

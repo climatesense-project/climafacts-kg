@@ -9,11 +9,11 @@ ClimaFactsKG builds an RDF knowledge graph linking climate-denial myths to scien
 ## Commands
 
 ```bash
-# Install (Poetry-managed; core install is lightweight, ML/eval deps are extras)
-poetry install                                    # core: collect/build/serve/process --classifier llm
-poetry install --extras transformer               # + process's default classifier (transformer, no API cost)
-poetry install --extras "matcher transformer eval"  # + spaCy matcher, HF transformer classifier, eval/optimization pipeline
-poetry install --all-extras
+# Install (uv-managed; core install is lightweight, ML/eval deps are extras). Prefix commands below with `uv run` or activate .venv
+uv sync                                           # core (+ dev group): collect/build/serve/process --classifier llm
+uv sync --extra transformer                       # + process's default classifier (transformer, no API cost)
+uv sync --extra matcher --extra transformer --extra eval  # + spaCy matcher, HF transformer classifier, eval/optimization pipeline
+uv sync --all-extras
 
 # Lint / format
 ruff check .
