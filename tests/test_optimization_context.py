@@ -26,5 +26,5 @@ def test_mixed_trainval_loads_climatesense_datasets_without_context(monkeypatch)
     build_mixed_trainval({"cs_v1": (1, 0), "cs_v2": (1, 0)})
 
     for name in ("cs_v1", "cs_v2"):
-        assert "context_path" in seen[name], f"{name} was loaded with its default context sidecar"
-        assert seen[name]["context_path"] is None
+        assert seen[name].get("with_context") is False, f"{name} must be loaded explicitly claim-only"
+        assert seen[name].get("context_path") is None

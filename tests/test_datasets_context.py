@@ -3,6 +3,7 @@
 import logging
 
 import pandas as pd
+from climafactskg.classifiers.cards import datasets
 from climafactskg.classifiers.cards.datasets import _attach_context, climatesense_dataset_v1
 
 CIMPLE = "http://data.cimple.eu/claim-review/"
@@ -134,3 +135,35 @@ def test_nan_claim_does_not_corrupt_the_review(tmp_path):
     assert (
         out.loc[0, "context"] == "The financial analysts found the figures were wrong."
     )  # "nan" in "financial" intact
+
+
+class TestContextIsOptIn:
+    def test_plain_factory_call_stays_claim_only_even_when_a_sidecar_exists(self, tmp_path, monkeypatch):
+        consensus = _write_consensus(tmp_path, [(f"{CIMPLE}a", "Claim a.")])
+        sidecar = _write_sidecar(tmp_path, [(f"{CIMPLE}a", "cimplekg", "An independent finding about this claim.")])
+        monkeypatch.setitem(datasets.DEFAULT_CONTEXT_PATHS, "v1", sidecar)
+
+        assert _contexts(climatesense_dataset_v1(path=consensus)) == {f"{CIMPLE}a": None}
+
+    def test_with_context_uses_the_default_sidecar(self, tmp_path, monkeypatch):
+        consensus = _write_consensus(tmp_path, [(f"{CIMPLE}a", "Claim a.")])
+        sidecar = _write_sidecar(tmp_path, [(f"{CIMPLE}a", "cimplekg", "An independent finding about this claim.")])
+        monkeypatch.setitem(datasets.DEFAULT_CONTEXT_PATHS, "v1", sidecar)
+
+        ds = climatesense_dataset_v1(path=consensus, with_context=True)
+
+        assert _contexts(ds) == {f"{CIMPLE}a": "An independent finding about this claim."}
+
+    def test_an_explicit_context_path_also_opts_in_and_wins_over_the_default(self, tmp_path, monkeypatch):
+        consensus = _write_consensus(tmp_path, [(f"{CIMPLE}a", "Claim a.")])
+        default_sidecar = _write_sidecar(tmp_path, [(f"{CIMPLE}a", "cimplekg", "The default sidecar finding is here.")])
+        monkeypatch.setitem(datasets.DEFAULT_CONTEXT_PATHS, "v1", default_sidecar)
+        other = tmp_path / "other.csv"
+        pd.DataFrame(
+            [(f"{CIMPLE}a", "cimplekg", "The explicit sidecar finding is here.")],
+            columns=["document_id", "context_source", "context"],
+        ).to_csv(other, index=False)
+
+        ds = climatesense_dataset_v1(path=consensus, context_path=str(other), with_context=True)
+
+        assert _contexts(ds) == {f"{CIMPLE}a": "The explicit sidecar finding is here."}

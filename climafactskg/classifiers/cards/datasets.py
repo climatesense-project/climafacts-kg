@@ -402,6 +402,13 @@ def _download_annotations_df(
     return pd.DataFrame(records)
 
 
+def _resolve_context_path(version: str, context_path: str | None, with_context: bool) -> str | None:
+    """Review context is opt-in: an explicit *context_path*, or ``with_context=True`` for the default sidecar."""
+    if context_path is not None:
+        return context_path
+    return DEFAULT_CONTEXT_PATHS[version] if with_context else None
+
+
 def _attach_context(df: pd.DataFrame, context_path: str | None, max_context_chars: int | None) -> pd.DataFrame:
     """Left-joins the review-context sidecar onto *df* as a ``context`` column, selecting text per case.
 
@@ -522,8 +529,9 @@ def climatesense_dataset_v1(
     annotation_groups_sheet_url: str = "https://docs.google.com/spreadsheets/d/1lFn7kVaZE2AKbBRjrhIPxSCMHwjholZV8CQfrek25u0",
     annotation_folder_id: str = "1SGcdG3AxVqSsOT6ofCiMQcZcTIBOW0kh",
     min_annotators: int = 3,
-    context_path: str | None = DEFAULT_CONTEXT_PATHS["v1"],
+    context_path: str | None = None,
     max_context_chars: int | None = 800,
+    with_context: bool = False,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 1.
 
@@ -552,9 +560,11 @@ def climatesense_dataset_v1(
         annotation_groups_sheet_url: URL of the master annotation-groups spreadsheet.
         annotation_folder_id: Google Drive folder ID containing annotation subfolders.
         min_annotators: Minimum annotators required per group to include it.
-        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v1")``); a missing file only
-            logs a warning. ``None`` disables context.
+        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v1")``). Passing it opts in
+            to review context; a missing file only logs a warning. Default ``None``: claim-only, as before.
         max_context_chars: Character budget per case for the selected review context.
+        with_context: Opt in to review context using the default sidecar for this dataset
+            (:data:`.context.DEFAULT_CONTEXT_PATHS`). Ignored when *context_path* is given.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -565,7 +575,7 @@ def climatesense_dataset_v1(
         min_annotators=min_annotators,
         completed_status="Finished",
         dataset_name="ClimateSense Annotations v1",
-        context_path=context_path,
+        context_path=_resolve_context_path("v1", context_path, with_context),
         max_context_chars=max_context_chars,
     )
 
@@ -577,8 +587,9 @@ def climatesense_dataset_v2(
     annotation_groups_sheet_url: str = "https://docs.google.com/spreadsheets/d/1TPnG0cAxe4eh_nSV0xQJ7r9dmQoJtq4tqdFpjftZ8rw",
     annotation_folder_id: str = "1GQz59v_-ufwX1WgWgJUHQAWu7NUjxOdg",
     min_annotators: int = 2,
-    context_path: str | None = DEFAULT_CONTEXT_PATHS["v2"],
+    context_path: str | None = None,
     max_context_chars: int | None = 800,
+    with_context: bool = False,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 2.
 
@@ -595,9 +606,11 @@ def climatesense_dataset_v2(
         annotation_groups_sheet_url: URL of the master annotation-groups spreadsheet.
         annotation_folder_id: Google Drive folder ID containing annotation subfolders.
         min_annotators: Minimum annotators required per group to include it.
-        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v2")``); a missing file only
-            logs a warning. ``None`` disables context.
+        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v2")``). Passing it opts in
+            to review context; a missing file only logs a warning. Default ``None``: claim-only, as before.
         max_context_chars: Character budget per case for the selected review context.
+        with_context: Opt in to review context using the default sidecar for this dataset
+            (:data:`.context.DEFAULT_CONTEXT_PATHS`). Ignored when *context_path* is given.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -608,6 +621,6 @@ def climatesense_dataset_v2(
         min_annotators=min_annotators,
         completed_status="done",
         dataset_name="ClimateSense Annotations v2",
-        context_path=context_path,
+        context_path=_resolve_context_path("v2", context_path, with_context),
         max_context_chars=max_context_chars,
     )

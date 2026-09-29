@@ -78,7 +78,9 @@ Consensus CSVs stay untouched. A separate, refreshable sidecar holds the context
 - If `context_path` exists, read it and left-join onto the consensus `df` by `document_id` as a `context` column, then
   run `select_context` (which needs the claim text, hence the join before case construction). The existing `row["context"]` hook builds `CARDSInput(text, context)`. A missing sidecar is not an error:
   log a warning, leave context `None` (the fast path stays offline).
-- `climatesense_dataset_v1/v2` default `context_path` to `cards_annotations_context.csv` beside their consensus CSV.
+- Context is **opt-in** so existing behavior is unchanged: `climatesense_dataset_v1/v2(with_context=True)` uses
+  `cards_annotations_context.csv` beside the consensus CSV, and an explicit `context_path` also opts in. A plain call
+  loads claim-only datasets exactly as before.
 - New `build_climatesense_context(version, *, force=False)` builds and writes the sidecar for a dataset (reads the
   cached consensus CSV for the ids; v2 also uses the local input CSV, v1 uses CimpleKG only).
 - `nslp_dataset` unchanged.
@@ -94,7 +96,7 @@ rather than `datasets.py`, to keep `datasets.py` from growing and to avoid an im
   is skipped for datasets with no context), and the result table gains a `context` column. `print_benchmark` shows it.
 - Each benchmark row also reports `n_with_context` (cases that actually carried context), so a mostly context-free
   dataset cannot be mistaken for a real with-context comparison. The prompt optimizer always loads the datasets with
-  `context_path=None` (claim-only training).
+  `with_context=False` (claim-only training).
 - Every context benchmark output carries a note: "gold labels were annotated from claim text only".
 
 ### 4. Data, docs, non-goals
