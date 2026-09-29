@@ -201,7 +201,7 @@ _CREDENTIAL_QUERY_PARAMS = frozenset(
 )
 
 
-def _strip_credential_query_params(url: str) -> str:
+def strip_credential_query_params(url: str) -> str:
     """Strips known cloud-storage presigned-URL credential parameters from *url*.
 
     Even though a presigned URL's signature is time-limited, the access key id
@@ -210,9 +210,10 @@ def _strip_credential_query_params(url: str) -> str:
     parsed = urlsplit(url)
     if not parsed.query:
         return url
-    kept = [
-        (k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k.lower() not in _CREDENTIAL_QUERY_PARAMS
-    ]
+    pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    kept = [(k, v) for k, v in pairs if k.lower() not in _CREDENTIAL_QUERY_PARAMS]
+    if len(kept) == len(pairs):
+        return url  # nothing to strip: keep the original query encoding untouched
     return urlunsplit(parsed._replace(query=urlencode(kept)))
 
 
@@ -278,7 +279,7 @@ def parse_apa_citation_html(definition_html: str) -> dict:
     for a in soup.find_all("a", href=True):
         href = str(a["href"])
         if "doi.org" not in href and href.startswith(("http://", "https://")):
-            out["url"] = _strip_credential_query_params(href)
+            out["url"] = strip_credential_query_params(href)
             break
 
     # DOI: prefer anchor whose href *starts* with a doi.org domain, then fall

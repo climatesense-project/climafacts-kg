@@ -5,13 +5,19 @@ import urllib.parse
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import NamespaceManager
 
+from climafactskg.utils import strip_credential_query_params
+
 # RFC 3986 characters that are safe to leave unencoded in a URI
 _URI_SAFE = ":/?#[]@!$&'()*+,;=-._~%"
 
 
 def safe_uriref(url: str) -> URIRef:
-    """Return a URIRef for *url*, percent-encoding any characters that are illegal in an IRI."""
-    return URIRef(urllib.parse.quote(url, safe=_URI_SAFE))
+    """Return a URIRef for *url*, percent-encoding any characters that are illegal in an IRI.
+
+    Presigned-URL credentials (e.g. ``X-Amz-*``) are stripped first, so a URL stored before
+    the parser learned to strip them can never reach the published graph.
+    """
+    return URIRef(urllib.parse.quote(strip_credential_query_params(url), safe=_URI_SAFE))
 
 
 def new_graph(bindings: dict[str, Namespace]) -> Graph:

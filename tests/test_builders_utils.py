@@ -1,6 +1,6 @@
 """Tests for builders/utils.py's shared new_graph helper."""
 
-from climafactskg.builders.utils import new_graph
+from climafactskg.builders.utils import new_graph, safe_uriref
 from rdflib import Namespace
 
 NS = Namespace("http://example.org/ns#")
@@ -22,3 +22,19 @@ class TestNewGraph:
     def test_graph_starts_empty(self):
         g = new_graph({"ex": NS})
         assert len(g) == 0
+
+
+class TestSafeUriref:
+    def test_strips_presigned_credentials(self):
+        url = (
+            "https://s3.amazonaws.com/bucket/paper.pdf?response-content-disposition=inline"
+            "&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIAEXAMPLE%2F20200406%2Fus-east-1%2Fs3%2Faws4_request"
+            "&X-Amz-Security-Token=secret&X-Amz-Signature=abc123"
+        )
+        result = str(safe_uriref(url))
+        assert result.startswith("https://s3.amazonaws.com/bucket/paper.pdf?response-content-disposition=inline")
+        assert "X-Amz" not in result and "secret" not in result
+
+    def test_leaves_ordinary_urls_untouched(self):
+        url = "https://example.org/a%20b?q=1,2&tag=x:y"
+        assert str(safe_uriref(url)) == url
