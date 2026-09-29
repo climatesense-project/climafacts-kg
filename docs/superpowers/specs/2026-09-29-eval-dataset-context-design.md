@@ -94,6 +94,10 @@ rather than `datasets.py`, to keep `datasets.py` from growing and to avoid an im
   duck-typed sequential path). Default keeps today's behavior (context used if present and supported).
 - `benchmark_configs(..., context_modes=("none", "with"))`: each config runs once per mode that makes sense (`"with"`
   is skipped for datasets with no context), and the result table gains a `context` column. `print_benchmark` shows it.
+- Datasets where only some cases carry context are valid (the LLM engine picks the plain or context-aware prompt per
+  item). To compare with/without on the same cases, `only_with_context=True` on the loaders keeps just the covered
+  cases (applied before `limit`), and `benchmark_configs` warns when a `"with"` run covers less than
+  `min_context_coverage` (0.5) of a dataset.
 - Each benchmark row also reports `n_with_context` (cases that actually carried context), so a mostly context-free
   dataset cannot be mistaken for a real with-context comparison. The prompt optimizer always loads the datasets with
   `with_context=False` (claim-only training).

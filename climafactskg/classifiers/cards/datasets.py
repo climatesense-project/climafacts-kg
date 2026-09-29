@@ -449,6 +449,7 @@ def _load_climatesense_dataset(
     dataset_name: str,
     context_path: str | None = None,
     max_context_chars: int | None = 800,
+    only_with_context: bool = False,
 ) -> Dataset:
     """Shared implementation for :func:`climatesense_dataset_v1` and :func:`climatesense_dataset_v2`.
 
@@ -475,7 +476,12 @@ def _load_climatesense_dataset(
         dataset_name: Human-readable name attached to the returned :class:`Dataset`.
         context_path: Path to the review-context sidecar CSV (see :mod:`.context`), or ``None`` for no context.
         max_context_chars: Character budget per case for the selected review context (``None`` = unlimited).
+        only_with_context: Keep only cases that have review context (applied before *limit*), for a paired
+            with/without-context comparison on the same cases. Requires *context_path*.
     """
+    if only_with_context and context_path is None:
+        raise ValueError("only_with_context requires context to be enabled (with_context=True or context_path)")
+
     if path is not None and os.path.exists(path):
         logger.info("Loading annotations dataset from cached CSV: %s", path)
         df = pd.read_csv(path).dropna(subset=["document_id", "content", "cards_code"])
@@ -492,9 +498,13 @@ def _load_climatesense_dataset(
     if climate_only:
         df = df[df["cards_code"] != "0_0"]
     df = df.drop_duplicates(subset=["document_id"]).reset_index(drop=True)
+    df = _attach_context(df, context_path, max_context_chars)
+    if only_with_context:
+        df = df[df["context"].notna()].reset_index(drop=True)
+        if df.empty:
+            raise ValueError(f"only_with_context: no case of {dataset_name} has review context in {context_path}")
     if limit is not None:
         df = df.head(limit)
-    df = _attach_context(df, context_path, max_context_chars)
     limit_note = f" (limited to {limit})" if limit is not None else ""
     logger.info("Loaded %s: %d cases%s", dataset_name, len(df), limit_note)
 
@@ -532,6 +542,7 @@ def climatesense_dataset_v1(
     context_path: str | None = None,
     max_context_chars: int | None = 800,
     with_context: bool = False,
+    only_with_context: bool = False,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 1.
 
@@ -565,6 +576,8 @@ def climatesense_dataset_v1(
         max_context_chars: Character budget per case for the selected review context.
         with_context: Opt in to review context using the default sidecar for this dataset
             (:data:`.context.DEFAULT_CONTEXT_PATHS`). Ignored when *context_path* is given.
+        only_with_context: Keep only cases that have review context (applied before *limit*), so the
+            with/without-context comparison runs on the same cases. Requires context to be enabled.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -577,6 +590,7 @@ def climatesense_dataset_v1(
         dataset_name="ClimateSense Annotations v1",
         context_path=_resolve_context_path("v1", context_path, with_context),
         max_context_chars=max_context_chars,
+        only_with_context=only_with_context,
     )
 
 
@@ -590,6 +604,7 @@ def climatesense_dataset_v2(
     context_path: str | None = None,
     max_context_chars: int | None = 800,
     with_context: bool = False,
+    only_with_context: bool = False,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 2.
 
@@ -611,6 +626,8 @@ def climatesense_dataset_v2(
         max_context_chars: Character budget per case for the selected review context.
         with_context: Opt in to review context using the default sidecar for this dataset
             (:data:`.context.DEFAULT_CONTEXT_PATHS`). Ignored when *context_path* is given.
+        only_with_context: Keep only cases that have review context (applied before *limit*), so the
+            with/without-context comparison runs on the same cases. Requires context to be enabled.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -623,4 +640,5 @@ def climatesense_dataset_v2(
         dataset_name="ClimateSense Annotations v2",
         context_path=_resolve_context_path("v2", context_path, with_context),
         max_context_chars=max_context_chars,
+        only_with_context=only_with_context,
     )

@@ -3,6 +3,7 @@
 import logging
 
 import pandas as pd
+import pytest
 from climafactskg.classifiers.cards import datasets
 from climafactskg.classifiers.cards.datasets import _attach_context, climatesense_dataset_v1
 
@@ -167,3 +168,45 @@ class TestContextIsOptIn:
         ds = climatesense_dataset_v1(path=consensus, context_path=str(other), with_context=True)
 
         assert _contexts(ds) == {f"{CIMPLE}a": "The explicit sidecar finding is here."}
+
+
+class TestOnlyWithContext:
+    def _setup(self, tmp_path):
+        consensus = _write_consensus(
+            tmp_path, [(f"{CIMPLE}a", "Claim a."), (f"{CIMPLE}b", "Claim b."), (f"{CIMPLE}c", "Claim c.")]
+        )
+        sidecar = _write_sidecar(
+            tmp_path,
+            [
+                (f"{CIMPLE}b", "cimplekg", "An independent finding about claim b."),
+                (f"{CIMPLE}c", "cimplekg", "An independent finding about claim c."),
+            ],
+        )
+        return consensus, sidecar
+
+    def test_keeps_only_cases_that_have_context(self, tmp_path):
+        consensus, sidecar = self._setup(tmp_path)
+
+        ds = climatesense_dataset_v1(path=consensus, context_path=sidecar, only_with_context=True)
+
+        assert sorted(_contexts(ds)) == [f"{CIMPLE}b", f"{CIMPLE}c"]
+
+    def test_limit_applies_after_the_context_filter(self, tmp_path):
+        consensus, sidecar = self._setup(tmp_path)
+
+        ds = climatesense_dataset_v1(path=consensus, context_path=sidecar, only_with_context=True, limit=1)
+
+        assert list(_contexts(ds)) == [f"{CIMPLE}b"]  # the first case overall has no context and is not counted
+
+    def test_default_keeps_every_case(self, tmp_path):
+        consensus, sidecar = self._setup(tmp_path)
+
+        ds = climatesense_dataset_v1(path=consensus, context_path=sidecar)
+
+        assert len(ds.cases) == 3
+
+    def test_requires_context_to_be_enabled(self, tmp_path):
+        consensus, _ = self._setup(tmp_path)
+
+        with pytest.raises(ValueError, match="only_with_context"):
+            climatesense_dataset_v1(path=consensus, only_with_context=True)

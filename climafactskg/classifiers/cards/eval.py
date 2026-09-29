@@ -181,6 +181,7 @@ def benchmark_configs(
     configs: dict[str, Any],
     datasets: dict[str, Dataset],
     context_modes: Sequence[Literal["none", "with"]] = ("none", "with"),
+    min_context_coverage: float = 0.5,
 ) -> pd.DataFrame:
     """Evaluate multiple classifier configs across multiple datasets.
 
@@ -194,6 +195,9 @@ def benchmark_configs(
         datasets: Mapping of dataset label → pydantic-evals :class:`Dataset`.
         context_modes: Which context modes to run per (config, dataset). ``"none"`` classifies the claim text alone;
             ``"with"`` also passes each case's review context and is skipped for datasets that have none.
+        min_context_coverage: A ``"with"`` run on a dataset where fewer than this fraction of cases carry context logs
+            a warning: its result mostly reflects claim-only classification. Compare on the covered subset instead
+            (load the dataset with ``only_with_context=True``).
 
     Returns:
         DataFrame with columns ``config``, ``dataset``, ``context``, ``n_with_context`` (cases that actually
@@ -228,6 +232,15 @@ def benchmark_configs(
             logger.info("Skipping context mode 'with' for '%s': dataset has no context", dataset_name)
             continue
         predict_contexts = contexts if mode == "with" else [None] * len(texts)
+        n_context = sum(1 for c in contexts if c)
+        if mode == "with" and n_context / len(contexts) < min_context_coverage:
+            logger.warning(
+                "Context mode 'with' on '%s': only %d of %d cases carry context, so the result mostly reflects "
+                "claim-only classification; compare on the covered subset with only_with_context=True",
+                dataset_name,
+                n_context,
+                len(contexts),
+            )
 
         supports_context = isinstance(classifier, CARDSClassifierBase)
         try:

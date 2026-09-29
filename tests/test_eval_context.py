@@ -1,5 +1,7 @@
 """Tests for evaluating with and without review context (stub classifier, no models, no network)."""
 
+import logging
+
 import pandas as pd
 from climafactskg.classifiers.cards.base import CARDSClassifierBase
 from climafactskg.classifiers.cards.eval import CARDSInput, benchmark_configs, evaluate, print_benchmark
@@ -89,6 +91,29 @@ class TestBenchmarkContextModes:
 
         assert list(df["context"]) == ["with"]
         assert clf.seen == ["ctx"]
+
+
+class TestCoverageWarning:
+    def test_warns_when_few_cases_carry_context(self, caplog):
+        clf = _Recorder()
+        with caplog.at_level(logging.WARNING):
+            benchmark_configs({"stub": clf}, {"sparse": _dataset("d", ["ctx", None, None])})
+
+        assert any("only_with_context" in r.message and "1 of 3" in r.message for r in caplog.records)
+
+    def test_no_warning_when_coverage_is_high(self, caplog):
+        clf = _Recorder()
+        with caplog.at_level(logging.WARNING):
+            benchmark_configs({"stub": clf}, {"full": _dataset("d", ["a", "b", "c"])})
+
+        assert not [r for r in caplog.records if "only_with_context" in r.message]
+
+    def test_threshold_is_configurable(self, caplog):
+        clf = _Recorder()
+        with caplog.at_level(logging.WARNING):
+            benchmark_configs({"stub": clf}, {"sparse": _dataset("d", ["ctx", None, None])}, min_context_coverage=0.2)
+
+        assert not [r for r in caplog.records if "only_with_context" in r.message]
 
 
 class TestPrintBenchmark:
