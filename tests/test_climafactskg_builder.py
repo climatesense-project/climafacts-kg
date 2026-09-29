@@ -7,7 +7,7 @@ sentinel) — see builders/cimplekg.py's equivalent, correct check for compariso
 
 import preserve
 from climafactskg.builders.climafactskg import generate_climafactskg_base
-from rdflib import SDO, Namespace
+from rdflib import RDF, SDO, Namespace
 
 CARDS_NS = Namespace("https://purl.net/climatesense/cards/ns#")
 
@@ -51,3 +51,27 @@ class TestCardsCategoryExclusion:
     def test_missing_category_adds_no_about_link(self, tmp_path):
         g = _build_graph(tmp_path, _make_entry("http://example.org/d", cards_category=None))
         assert not list(g.triples((None, SDO.about, None)))
+
+
+def _claim_review_urls(graph) -> set[str]:
+    return {str(graph.value(s, SDO.url)) for s in graph.subjects(RDF.type, SDO.ClaimReview)}
+
+
+class TestArticleFailureHandling:
+    def test_failing_article_leaves_no_partial_claimreview(self):
+        # what_the_science_says=None makes the builder raise part-way through the article.
+        broken = _make_entry("https://example.org/broken.htm") | {"what_the_science_says": None}
+        good = _make_entry("https://example.org/good.htm")
+
+        g = generate_climafactskg_base([("k1", broken), ("k2", good)])
+
+        assert _claim_review_urls(g) == {"https://example.org/good.htm"}
+        assert not any("broken" in str(term) for triple in g for term in triple)
+
+    def test_ignore_urls_match_regardless_of_scheme(self):
+        # The SkS DB stores wigley-santer as http://; the default ignore list uses https://.
+        entry = _make_entry("http://example.org/skipped.htm")
+
+        g = generate_climafactskg_base([("k", entry)], ignore_urls=["https://example.org/skipped.htm"])
+
+        assert _claim_review_urls(g) == set()
