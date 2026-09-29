@@ -560,6 +560,10 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             TimeRemainingColumn,
         )
 
+        # Items are addressed by index below, so unlike the zip()-based engines a length mismatch
+        # would not raise on its own (a longer *contexts* was silently ignored).
+        if contexts is not None and len(contexts) != len(texts):
+            raise ValueError(f"contexts has {len(contexts)} items but texts has {len(texts)}")
         effective_contexts: list[str | None] = contexts if contexts is not None else [None] * len(texts)
         results: list[Optional[str]] = [None] * len(texts)
         pending_indices: list[int] = []
