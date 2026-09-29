@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v2.1.4 (2026-09-29)
+
+### Bug Fixes
+
+- **llm**: Count each text once in the classification progress bar
+  ([`b5cab1e`](https://github.com/climatesense-project/climafacts-kg/commit/b5cab1e7dae4f52f8f1ad6c402628319279c0a30))
+
+- **llm**: Reject a contexts list whose length differs from texts
+  ([`cf69186`](https://github.com/climatesense-project/climafacts-kg/commit/cf69186377bbd6dd767f0ff42efdc120166d57d5))
+
+### Chores
+
+- Default TOKENIZERS_PARALLELISM to false
+  ([`42b4080`](https://github.com/climatesense-project/climafacts-kg/commit/42b408045c2b991952be7aae6ef0298af0ea0f67))
+
+### Documentation
+
+- Update CLAUDE.md for uv, releases, builders and tests
+  ([`e700abf`](https://github.com/climatesense-project/climafacts-kg/commit/e700abf9b87c2ece43e0df64ad71ae41fec5cbb4))
+
+
 ## v2.1.3 (2026-09-29)
 
 ### Bug Fixes
