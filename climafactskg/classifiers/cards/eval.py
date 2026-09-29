@@ -46,6 +46,7 @@ benchmark_configs
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Any, Literal, cast
 
 import pandas as pd
@@ -93,7 +94,7 @@ def _prompt_id(classifier, max_chars: int = 60) -> str:
     return first_line[:max_chars] + ("…" if len(first_line) > max_chars else "")
 
 
-def evaluate(classifier, dataset: Dataset):
+def evaluate(classifier, dataset: Dataset, use_context: bool = True):
     """Evaluate a CARDS classifier against a pydantic-evals Dataset.
 
     Predictions are collected via :meth:`classify_batch` (when available) or
@@ -107,6 +108,9 @@ def evaluate(classifier, dataset: Dataset):
     Args:
         classifier: Classifier instance with ``classify`` / ``classify_batch``.
         dataset: A pydantic-evals :class:`Dataset`, e.g. from :func:`nslp_dataset`.
+        use_context: When ``False``, ignore every case's ``context`` and classify the claim text alone (the gold
+            labels are claim-only annotations, so this is the like-for-like run). Defaults to ``True``: contexts
+            are used when present and the classifier supports them.
 
     Returns:
         The pydantic-evals :class:`EvaluationReport` (per-case scores for all
@@ -116,6 +120,10 @@ def evaluate(classifier, dataset: Dataset):
     inputs = [case.inputs for case in cases]
     texts = [inp.text if isinstance(inp, CARDSInput) else inp for inp in inputs]
     contexts = [inp.context if isinstance(inp, CARDSInput) else None for inp in inputs]
+    # `contexts` (the dataset's own) keys the prediction lookup below; `predict_contexts` is what the classifier sees.
+    predict_contexts = contexts if use_context else [None] * len(texts)
+    if use_context and any(contexts):
+        _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
     classifier_name = type(classifier).__name__
     logger.info("Starting evaluation: %s on '%s' (%d cases)", classifier_name, dataset.name, len(cases))
 
@@ -128,18 +136,20 @@ def evaluate(classifier, dataset: Dataset):
 
     if hasattr(classifier, "classify_batch"):
         logger.info("Running classify_batch")
-        if any(contexts) and supports_context:
-            preds = classifier.classify_batch(texts, contexts=contexts)
+        if any(predict_contexts) and supports_context:
+            preds = classifier.classify_batch(texts, contexts=predict_contexts)
         else:
             preds = classifier.classify_batch(texts)
     else:
         from rich.progress import track
 
         logger.info("Running sequential classify")
-        use_context = any(contexts) and supports_context
+        pass_context = any(predict_contexts) and supports_context
         preds = [
-            classifier.classify(t, context=ctx) if use_context else classifier.classify(t)
-            for t, ctx in track(zip(texts, contexts, strict=True), description="Classifying...", total=len(texts))
+            classifier.classify(t, context=ctx) if pass_context else classifier.classify(t)
+            for t, ctx in track(
+                zip(texts, predict_contexts, strict=True), description="Classifying...", total=len(texts)
+            )
         ]
 
     logger.info("Predictions complete — running pydantic-evals scoring")
@@ -172,6 +182,7 @@ def evaluate(classifier, dataset: Dataset):
 def benchmark_configs(
     configs: dict[str, Any],
     datasets: dict[str, Dataset],
+    context_modes: Sequence[Literal["none", "with"]] = ("none", "with"),
 ) -> pd.DataFrame:
     """Evaluate multiple classifier configs across multiple datasets.
 
@@ -183,9 +194,11 @@ def benchmark_configs(
         configs: Mapping of config label → classifier instance (any object with
             ``classify(text) -> str`` or ``classify_batch(texts) -> list[str]``).
         datasets: Mapping of dataset label → pydantic-evals :class:`Dataset`.
+        context_modes: Which context modes to run per (config, dataset). ``"none"`` classifies the claim text alone;
+            ``"with"`` also passes each case's review context and is skipped for datasets that have none.
 
     Returns:
-        DataFrame with columns ``config``, ``dataset``, ``n_cases``,
+        DataFrame with columns ``config``, ``dataset``, ``context``, ``n_cases``,
         ``exact_match``, ``h_f1``, ``macro_f1``, ``micro_f1``, ``weighted_f1``.
 
     Example::
@@ -203,26 +216,32 @@ def benchmark_configs(
     from rich.progress import track
 
     rows = []
-    combos = [(cn, dn, clf, ds) for cn, clf in configs.items() for dn, ds in datasets.items()]
-    for config_name, dataset_name, classifier, dataset in track(combos, description="Benchmarking..."):
-        logger.info("Benchmarking '%s' on '%s'", config_name, dataset_name)
+    combos = [
+        (cn, dn, clf, ds, mode) for cn, clf in configs.items() for dn, ds in datasets.items() for mode in context_modes
+    ]
+    for config_name, dataset_name, classifier, dataset, mode in track(combos, description="Benchmarking..."):
+        logger.info("Benchmarking '%s' on '%s' (context=%s)", config_name, dataset_name, mode)
         cases = list(dataset.cases)
         inputs = [case.inputs for case in cases]
         texts = [inp.text if isinstance(inp, CARDSInput) else inp for inp in inputs]
         contexts = [inp.context if isinstance(inp, CARDSInput) else None for inp in inputs]
+        if mode == "with" and not any(contexts):
+            logger.info("Skipping context mode 'with' for '%s': dataset has no context", dataset_name)
+            continue
+        predict_contexts = contexts if mode == "with" else [None] * len(texts)
 
         supports_context = isinstance(classifier, CARDSClassifierBase)
         try:
             if hasattr(classifier, "classify_batch"):
-                if any(contexts) and supports_context:
-                    preds = classifier.classify_batch(texts, contexts=contexts)
+                if any(predict_contexts) and supports_context:
+                    preds = classifier.classify_batch(texts, contexts=predict_contexts)
                 else:
                     preds = classifier.classify_batch(texts)
             else:
-                use_context = any(contexts) and supports_context
+                pass_context = any(predict_contexts) and supports_context
                 preds = [
-                    classifier.classify(t, context=ctx) if use_context else classifier.classify(t)
-                    for t, ctx in zip(texts, contexts, strict=True)
+                    classifier.classify(t, context=ctx) if pass_context else classifier.classify(t)
+                    for t, ctx in zip(texts, predict_contexts, strict=True)
                 ]
         except Exception as exc:
             logger.warning("Failed '%s' on '%s': %s", config_name, dataset_name, exc)
@@ -230,6 +249,7 @@ def benchmark_configs(
                 {
                     "config": config_name,
                     "dataset": dataset_name,
+                    "context": mode,
                     "provider": getattr(classifier, "_provider", "—"),
                     "model": getattr(classifier, "_model", type(classifier).__name__),
                     "prompt": _prompt_id(classifier),
@@ -312,6 +332,7 @@ def benchmark_configs(
             {
                 "config": config_name,
                 "dataset": dataset_name,
+                "context": mode,
                 "provider": getattr(classifier, "_provider", "—"),
                 "model": getattr(classifier, "_model", type(classifier).__name__),
                 "prompt": _prompt_id(classifier),
@@ -350,6 +371,7 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results") -> None:
     col_spec: list[tuple[str, str, str, str, int | None, bool]] = [
         ("config", "Config", "bold cyan", "left", 22, True),
         ("dataset", "Dataset", "", "left", 16, True),
+        ("context", "Ctx", "dim", "left", 6, True),
         ("provider", "Provider", "dim", "left", 12, True),
         ("model", "Model", "", "left", 22, True),
         ("prompt", "Prompt", "dim italic", "left", 35, True),
@@ -380,6 +402,8 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results") -> None:
         table.add_row(*cells)
 
     _console.print(table)
+    if "context" in df.columns and (df["context"] == "with").any():
+        _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
 
 
 if __name__ == "__main__":
