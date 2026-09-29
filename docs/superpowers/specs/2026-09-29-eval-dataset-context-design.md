@@ -8,6 +8,11 @@ Give the CARDS evaluation datasets the fact-check **review text** as optional `c
 and make the eval report classifier accuracy **both without and with** that context, so we can see whether context
 helps.
 
+**Constraint: no LLM anywhere in context preparation.** Selecting and cleaning context is deterministic, offline and
+free (regex sentence splitting, word-overlap, character budget). The only network access is the plain SPARQL fetch of
+review text. This keeps the with-context eval reproducible, free of a second model's biases, and cheap to re-run.
+No LLM summarization or ranking, now or as a fallback.
+
 Ratings/verdicts are deliberately **not** context: they say nothing about which CARDS narrative a claim promotes and
 could leak an "is misinformation" hint into the metrics.
 
@@ -64,7 +69,8 @@ Consensus CSVs stay untouched. A separate, refreshable sidecar holds the context
      exceeds the budget, take it cut at a word boundary with a trailing ellipsis (last resort).
   5. If nothing survives, return an empty string (the case gets `context = None`).
   `max_chars=None` disables the budget (steps 1-3 still apply). There is no paragraph rule because the source texts
-  have none. Not doing: keyword or summary-based sentence ranking (YAGNI until the simple rule is measured).
+  have none. Not doing: any LLM step, or keyword/embedding-based sentence ranking (YAGNI until the simple rule is
+  measured).
 
 ### 2. `datasets.py`
 
@@ -90,7 +96,7 @@ Consensus CSVs stay untouched. A separate, refreshable sidecar holds the context
 - Sidecar files live under `data/` next to the consensus CSVs (untracked, like them); the build step is idempotent and
   cheap to rerun.
 - `CLAUDE.md` eval section is updated to describe the sidecar and the with/without-context runs.
-- Not in scope: production collectors, changing transformer truncation, re-annotating with context, using NSLP
+- Not in scope: LLM-based summarization or sentence ranking, production collectors, changing transformer truncation, re-annotating with context, using NSLP
   abstracts, ratings/verdicts as features.
 
 ## Error handling
