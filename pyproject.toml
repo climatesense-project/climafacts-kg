@@ -66,7 +66,7 @@ all = ["climafactskg[matcher,transformer,eval]"]
 dev = [
     "ruff>=0.11.2,<0.12.0",
     "pre-commit>=4.2.0,<5.0.0",
-    "python-semantic-release>=9.12.0,<10.0.0",
+    "python-semantic-release>=10.7.0,<11.0.0",
     "jupyter>=1.1.1,<2.0.0",
     "pytest>=8.3.0,<9.0.0",
 ]
@@ -89,8 +89,10 @@ commit_author = "github-actions[bot] <41898282+github-actions[bot]@users.noreply
 # be explicit so a version change can never silently rewrite CHANGELOG.md.
 [tool.semantic_release.changelog]
 mode = "update"
-changelog_file = "CHANGELOG.md"
 insertion_flag = "<!-- version list -->"
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = [
