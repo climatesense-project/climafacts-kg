@@ -1,5 +1,8 @@
 """Tests for the deterministic review-context helpers (no network, no LLM)."""
 
+import urllib.error
+import urllib.parse
+
 import pandas as pd
 import pytest
 from climafactskg.classifiers.cards.context import (
@@ -82,6 +85,14 @@ class TestSelectContext:
 CIMPLE = "http://data.cimple.eu/claim-review/"
 
 
+def _no_sleep(_seconds):
+    pass
+
+
+def _http_error(code):
+    return urllib.error.HTTPError("http://endpoint.test", code, "error", None, None)
+
+
 class TestLoadInputReviews:
     def test_maps_id_to_review_and_skips_blank_reviews(self, tmp_path):
         path = tmp_path / "inputs.csv"
@@ -108,12 +119,78 @@ class TestFetchCimpleKGReviews:
             return pd.DataFrame(found, columns=["rev", "text"]) if found else pd.DataFrame()
 
         uris = [f"{CIMPLE}a", f"{CIMPLE}b", f"{CIMPLE}c", f"{CIMPLE}d", f"{CIMPLE}a"]
-        result = fetch_cimplekg_reviews(uris, chunk_size=2, query_fn=query_fn, endpoint="http://endpoint.test")
+        result = fetch_cimplekg_reviews(
+            uris, chunk_size=2, query_fn=query_fn, endpoint="http://endpoint.test", sleep_fn=_no_sleep
+        )
 
         assert result == {f"{CIMPLE}a": f"text for {CIMPLE}a", f"{CIMPLE}c": f"text for {CIMPLE}c"}
         assert len(calls) == 2  # 4 unique uris / chunk_size 2
         assert all(endpoint == "http://endpoint.test" for endpoint, _ in calls)
         assert f"<{CIMPLE}a>" in calls[0][1] and f"<{CIMPLE}b>" in calls[0][1]
+
+    def test_default_chunking_keeps_each_query_url_safe(self):
+        # query_sparqlendpoint sends queries via GET; the live endpoint answers 414 for URLs around 12 KB.
+        queries = []
+
+        def query_fn(endpoint, query):
+            queries.append(query)
+            return pd.DataFrame()
+
+        uris = [f"{CIMPLE}{i:064x}" for i in range(500)]
+        fetch_cimplekg_reviews(uris, query_fn=query_fn, sleep_fn=_no_sleep)
+
+        assert len(queries) > 1
+        assert max(len(urllib.parse.quote(q)) for q in queries) < 4000
+
+    def test_retries_rate_limits_with_backoff_then_succeeds(self):
+        attempts, sleeps = [], []
+
+        def query_fn(endpoint, query):
+            attempts.append(1)
+            if len(attempts) < 3:
+                raise _http_error(429)
+            return pd.DataFrame({"rev": [f"{CIMPLE}a"], "text": ["Review a."]})
+
+        result = fetch_cimplekg_reviews([f"{CIMPLE}a"], query_fn=query_fn, sleep_fn=sleeps.append, backoff_s=1.0)
+
+        assert result == {f"{CIMPLE}a": "Review a."}
+        assert len(attempts) == 3
+        assert sleeps == [1.0, 2.0]  # exponential backoff between the two failed attempts
+
+    def test_gives_up_after_the_retry_limit(self):
+        attempts = []
+
+        def query_fn(endpoint, query):
+            attempts.append(1)
+            raise _http_error(429)
+
+        with pytest.raises(urllib.error.HTTPError):
+            fetch_cimplekg_reviews([f"{CIMPLE}a"], query_fn=query_fn, sleep_fn=_no_sleep, retries=2)
+
+        assert len(attempts) == 3  # first try plus two retries
+
+    def test_does_not_retry_client_errors(self):
+        attempts = []
+
+        def query_fn(endpoint, query):
+            attempts.append(1)
+            raise _http_error(400)
+
+        with pytest.raises(urllib.error.HTTPError):
+            fetch_cimplekg_reviews([f"{CIMPLE}a"], query_fn=query_fn, sleep_fn=_no_sleep)
+
+        assert len(attempts) == 1
+
+    def test_pauses_between_chunks_but_not_before_the_first(self):
+        sleeps = []
+
+        def query_fn(endpoint, query):
+            return pd.DataFrame()
+
+        uris = [f"{CIMPLE}{i}" for i in range(5)]
+        fetch_cimplekg_reviews(uris, chunk_size=2, query_fn=query_fn, sleep_fn=sleeps.append, pause_s=0.5)
+
+        assert sleeps == [0.5, 0.5]  # 3 chunks -> 2 pauses
 
     def test_ignores_blank_and_non_string_texts(self):
         def query_fn(endpoint, query):

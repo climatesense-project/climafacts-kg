@@ -8,6 +8,8 @@ text.
 import logging
 import os
 import re
+import time
+import urllib.error
 from collections.abc import Callable, Iterable, Sequence
 from typing import Literal
 
@@ -151,20 +153,51 @@ def load_input_reviews(csv_path: str) -> dict[str, str]:
     }
 
 
+_RETRYABLE_HTTP_CODES = frozenset({429, 502, 503, 504})
+
+
+def _query_with_retry(
+    query_fn: Callable,
+    endpoint: str,
+    query: str,
+    retries: int,
+    backoff_s: float,
+    sleep_fn: Callable[[float], None],
+):
+    """Runs ``query_fn(endpoint, query)``, retrying rate-limit and transient server errors with backoff."""
+    for attempt in range(retries + 1):
+        try:
+            return query_fn(endpoint, query)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in _RETRYABLE_HTTP_CODES or attempt == retries:
+                raise
+            logger.warning("CimpleKG returned HTTP %s; retrying (%d/%d)", exc.code, attempt + 1, retries)
+            sleep_fn(backoff_s * 2**attempt)
+
+
 def fetch_cimplekg_reviews(
     uris: Iterable[str],
     *,
     endpoint: str = CIMPLEKG_SPARQL_ENDPOINT,
-    chunk_size: int = 100,
+    chunk_size: int = 20,
     query_fn: Callable = query_sparqlendpoint,
+    pause_s: float = 1.0,
+    retries: int = 3,
+    backoff_s: float = 2.0,
+    sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, str]:
     """Fetches ``schema:text`` (the review text) for CimpleKG ClaimReview URIs, chunked into ``VALUES`` queries.
 
     Args:
         uris: ClaimReview URIs. Duplicates are collapsed.
         endpoint: SPARQL endpoint URL.
-        chunk_size: URIs per query.
+        chunk_size: URIs per query. Kept small because the query is sent via GET and the endpoint rejects URLs of
+            about 8 KB or more (HTTP 414).
         query_fn: ``(endpoint, query) -> DataFrame`` with columns ``rev`` and ``text``; injectable for tests.
+        pause_s: Seconds to wait between chunk queries, to stay under the endpoint's rate limit.
+        retries: Extra attempts per chunk on HTTP 429/5xx, with exponential backoff (``backoff_s * 2**attempt``).
+        backoff_s: Base backoff in seconds.
+        sleep_fn: Sleep function; injectable for tests.
 
     Returns:
         ``uri -> review text``. URIs without a non-blank ``schema:text`` are absent. Endpoint errors propagate.
@@ -172,12 +205,14 @@ def fetch_cimplekg_reviews(
     unique = list(dict.fromkeys(uris))
     reviews: dict[str, str] = {}
     for start in range(0, len(unique), chunk_size):
+        if start:
+            sleep_fn(pause_s)
         values = " ".join(f"<{uri}>" for uri in unique[start : start + chunk_size])
         query = (
             "PREFIX schema: <http://schema.org/> "
             f"SELECT ?rev ?text WHERE {{ VALUES ?rev {{ {values} }} ?rev schema:text ?text }}"
         )
-        df = query_fn(endpoint, query)
+        df = _query_with_retry(query_fn, endpoint, query, retries, backoff_s, sleep_fn)
         if df is None or df.empty:
             continue
         for rev, text in zip(df["rev"], df["text"], strict=True):
