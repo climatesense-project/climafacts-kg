@@ -1,0 +1,56 @@
+# Example config for `climafactskg eval run eval.example.toml`.
+# Preview first: `climafactskg eval run eval.example.toml --dry-run`.
+
+[run]
+save_dir = "data/eval_runs"          # each run gets its own timestamped directory
+context_modes = ["none", "with"]     # claim only, and claim + review context (paired comparison in the report)
+min_context_coverage = 0.5           # warn when "with" runs on a dataset where fewer cases have context
+
+# Applied to every LLM classifier below; a classifier's own settings win, and `options` merge key by key.
+[defaults]
+provider = "openrouter"
+preset = "xplainnlp-nslp"
+cache_path = "data/eval_cache.db"
+concurrency = 8
+[defaults.options]
+temperature = 0.0
+top_p = "none"                       # TOML has no null: "none" switches a preset's value off
+max_tokens = "none"
+
+[[classifiers]]
+label = "gpt-4o-mini | xplainnlp"
+model = "openai/gpt-4o-mini"
+
+[[classifiers]]
+label = "llama-3.1-8b | xplainnlp"
+model = "meta-llama/llama-3.1-8b-instruct"
+concurrency = 2
+
+[[classifiers]]
+label = "local | xplainnlp"          # local providers (ollama, lmstudio) are not counted as paid
+provider = "ollama"
+model = "llama3.1:8b"
+
+[[classifiers]]
+label = "transformer"                # free, needs the `transformer` extra
+engine = "transformer"
+
+[[classifiers]]
+label = "matcher"                    # free, needs the `matcher` extra
+engine = "matcher"
+
+[[datasets]]
+name = "nslp"
+limit = 200                          # quick smoke-test size; drop for the full split
+
+# Datasets with review context are opt-in. `with_context` loads it; cases without any keep their claim only.
+[[datasets]]
+name = "climatesense_v2"
+with_context = true
+
+# The same dataset again, restricted to cases that have context (a fair like-for-like context comparison).
+[[datasets]]
+name = "climatesense_v2"
+label = "climatesense_v2 (context only)"
+with_context = true
+only_with_context = true

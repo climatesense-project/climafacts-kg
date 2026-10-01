@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 from typing import Optional
@@ -23,6 +24,31 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(add_completion=False)
+eval_app = typer.Typer(
+    help="Benchmark and report on the CARDS classifiers (needs the `eval` extra).", no_args_is_help=True
+)
+app.add_typer(eval_app, name="eval")
+
+# Top-level modules the optional `eval` extra provides; importing one without it means the extra is missing.
+_EVAL_EXTRA_MODULES = ("pydantic_evals", "gepa", "gspread", "google")
+
+
+def _needs_eval_extra(func):
+    """Turns a missing `eval` extra into a one-line install hint instead of a traceback."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except ModuleNotFoundError as exc:
+            if (exc.name or "").split(".")[0] not in _EVAL_EXTRA_MODULES:
+                raise
+            logger.error(
+                'Missing %r. Install the eval extra: pip install "climafactskg[eval]" (uv sync --extra eval)', exc.name
+            )
+            raise typer.Exit(code=1) from exc
+
+    return wrapper
 
 
 def _version_callback(value: bool):
@@ -308,7 +334,9 @@ def validate(
     _validate_graph(graph_path, min_claim_reviews)
 
 
-@app.command(name="eval-context")
+@app.command(name="eval-context", hidden=True)  # kept for scripts written against 2.2.0
+@eval_app.command(name="context")
+@_needs_eval_extra
 def eval_context(
     version: str = typer.Argument(..., help="ClimateSense annotation round: 'v1' or 'v2'."),
     force: bool = typer.Option(False, "--force", help="Rebuild even if the sidecar already exists."),
@@ -325,7 +353,71 @@ def eval_context(
     logger.info("Review context for %d documents at %s", len(sidecar), DEFAULT_CONTEXT_PATHS[version])
 
 
-@app.command(name="eval-report")
+@eval_app.command(name="run")
+@_needs_eval_extra
+def eval_run(
+    config: Annotated[
+        str, typer.Argument(help="TOML config: classifiers, datasets and run settings (eval.example.toml).")
+    ],
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Print the plan and estimated paid calls, run nothing.")
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Do not ask before a run that calls paid LLM APIs.")] = False,
+    report: Annotated[bool, typer.Option("--report", help="Also write report.html in the run directory.")] = False,
+):
+    """Benchmark the classifiers and datasets named in a config file and save the run."""
+    from pathlib import Path
+
+    from climafactskg.classifiers.cards import eval as cards_eval
+    from climafactskg.classifiers.cards import runconfig
+
+    try:
+        spec, text = runconfig.load_run_config(config)
+    except runconfig.ConfigError as exc:
+        logger.error("%s", exc)
+        raise typer.Exit(code=1) from exc
+
+    datasets = {d.label: runconfig.build_dataset(d) for d in spec.datasets}
+    paid = [c.label for c in spec.classifiers if runconfig.is_paid(c)]
+    calls = 0
+    typer.echo(f"Classifiers: {', '.join(c.label for c in spec.classifiers)}")
+    for label, dataset in datasets.items():
+        total = len(dataset.cases)
+        with_context = sum(1 for case in dataset.cases if getattr(case.inputs, "context", None))
+        modes = [m for m in spec.run.context_modes if m == "none" or with_context]
+        calls += total * len(modes) * len(paid)
+        typer.echo(f"Dataset {label}: {total} cases, {with_context} with context; modes: {', '.join(modes)}")
+    typer.echo(f"Saving to: {spec.run.save_dir}")
+    typer.echo(f"Paid classifiers: {', '.join(paid) or 'none'}; up to {calls} paid calls (fewer when cached)")
+    if dry_run:
+        return
+    if paid and not yes and not typer.confirm("Run and spend on the paid APIs?", default=False):
+        raise typer.Exit(code=1)
+
+    configs = {c.label: runconfig.build_classifier(c) for c in spec.classifiers}
+    df = cards_eval.benchmark_configs(
+        configs,
+        datasets,
+        context_modes=spec.run.context_modes,
+        min_context_coverage=spec.run.min_context_coverage,
+        save_dir=spec.run.save_dir,
+    )
+    cards_eval.print_benchmark(df)
+    run_dir = df.attrs.get("run_dir")
+    if not run_dir:
+        logger.warning("The run was not saved, so no config copy or report was written")
+        return
+    (Path(run_dir) / "config.toml").write_text(text, encoding="utf-8")
+    if report:
+        from climafactskg.classifiers.cards.report import render_html
+        from climafactskg.classifiers.cards.runs import load_run
+
+        logger.info("Wrote %s", render_html([load_run(run_dir)], str(Path(run_dir) / "report.html")))
+
+
+@app.command(name="eval-report", hidden=True)  # kept for scripts written against 2.2.0
+@eval_app.command(name="report")
+@_needs_eval_extra
 def eval_report(
     run_dirs: Annotated[
         list[str], typer.Argument(help="One or more saved benchmark run directories (data/eval_runs/...).")

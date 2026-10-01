@@ -151,6 +151,7 @@ ClimaFactsKG has a simple CLI interface accessible via the `climafactskg` comman
 │ classify   Classify text using the CARDS taxonomy.                                                       │
 │ serve      Create a SPARQL endpoint for serving a knowledge graph.                                       │
 │ export     Export a Preserve database to a JSON file.                                                    │
+│ eval       Benchmark and report on the classifiers (`eval run`, `eval context`, `eval report`).          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -213,6 +214,30 @@ climafactskg classify "CO2 is just plant food" --context "Reviewer verdict: fals
 ### 🧩 CARDS Classifiers (Python API)
 
 The `climafactskg.classifiers.cards` module exposes three classifiers for programmatic use. All three inherit `CARDSClassifierBase` and share the same interface: `classify(text, context=None) -> str` and `classify_batch(texts, contexts=None) -> list[str]`. `context` is optional fact-check context (e.g. reviewer verdict, sources) — matcher and transformer append it to the text before classifying; the LLM classifier routes it to a dedicated context-aware prompt.
+
+#### Batch classification with context (full or partial)
+
+`classify_batch(texts, contexts)` takes one context per text, in the same order. Use `None` for the items that have no context: each item is classified with its own context if it has one and from the claim text alone otherwise, so a batch can mix both. Passing no `contexts` classifies everything without context. A `contexts` list of a different length than `texts` raises `ValueError`.
+
+```python
+from climafactskg.classifiers.cards import CARDSLLMClassifier
+
+clf = CARDSLLMClassifier.from_preset("climatesense-nslp", cache_path="/tmp/cards.db")
+
+texts = [
+    "CO2 is just plant food",
+    "Global warming stopped in 1998",
+    "The Arctic is gaining ice",
+]
+contexts = [
+    "Reviewer verdict: false. Plants also need water and nutrients, and high CO2 lowers crop nutrition.",
+    None,  # no review available: classified from the claim alone
+    "Reviewer verdict: false. Arctic sea ice extent has declined over the satellite record.",
+]
+labels = clf.classify_batch(texts, contexts=contexts, concurrency=4)
+```
+
+The same call works for the transformer and matcher classifiers, which append the context to the text instead of using a context-aware prompt. Cached results are keyed by claim *and* context, so the with- and without-context answers for one claim are cached separately.
 
 #### Transformer classifier (two-stage, default)
 
@@ -301,6 +326,57 @@ class MyCARDSLLMConfig(CARDSLLMConfig):
     provider: str = "ollama"
     model: str = "llama3.3"
 ```
+
+### 📏 Evaluation and benchmarking
+
+The `eval` extra adds a pipeline that scores the classifiers against annotated ground truth (the ClimateCheck NSLP data and the ClimateSense annotation rounds `climatesense_v1` / `climatesense_v2`). Metrics are exact match, hierarchical F1 and macro/weighted F1 at taxonomy depth 1 and 2, with 95% bootstrap intervals. A failed prediction counts as wrong and stays in the denominators.
+
+**Review context is opt-in.** ClimateSense claims can be classified with the fact-check's review text as context. Build the context sidecar once (needs the cached consensus CSV and, for CimpleKG reviews, network access), then load datasets with `with_context=True`:
+
+```bash
+climafactskg eval context v2            # writes the context sidecar; --force rebuilds it
+```
+
+Context is selected deterministically, with no LLM: it drops the claim restatement, verdict fragments and boilerplate, and stops at a sentence boundary within an 800-character budget. Not every claim has a review, so a dataset usually has *partial* context. Cases without context are still evaluated, from the claim alone. Use `only_with_context=True` to restrict a dataset to the covered cases for a like-for-like comparison. By default each classifier is benchmarked in both modes (`none` and `with`), and the report pairs them case by case: fixed/broken counts, a delta with a bootstrap interval, and an exact McNemar p-value.
+
+**Run a benchmark from a config file.** Everything that is benchmarked lives in one TOML file; see [eval.example.toml](eval.example.toml):
+
+```toml
+[run]
+save_dir = "data/eval_runs"
+context_modes = ["none", "with"]
+
+[defaults]                       # applied to every LLM classifier
+provider = "openrouter"
+preset = "xplainnlp-nslp"
+cache_path = "data/eval_cache.db"
+
+[[classifiers]]
+label = "gpt-4o-mini"
+model = "openai/gpt-4o-mini"
+
+[[classifiers]]
+label = "transformer"
+engine = "transformer"           # also: "matcher"
+
+[[datasets]]
+name = "climatesense_v2"
+with_context = true              # partial context: cases without a review are claim-only
+```
+
+```bash
+climafactskg eval run eval.toml --dry-run   # show cases per dataset and the estimated number of paid calls
+climafactskg eval run eval.toml --report    # run, save, and write report.html next to the results
+climafactskg eval run eval.toml --yes       # skip the confirmation before paid LLM calls
+```
+
+A run that calls a hosted LLM provider (anything except `ollama` / `lmstudio`) asks for confirmation first, unless `--yes` is given. The config file is validated up front, so a misspelled key or an unknown dataset option fails before anything is spent. Each run is saved to its own timestamped directory under `save_dir` (`run.json`, `cases.csv`, `summary.csv`, plus a copy of the config); runs are never overwritten. To compare runs or re-render a report later:
+
+```bash
+climafactskg eval report data/eval_runs/<run> [<other run> ...] --baseline "gpt-4o-mini"
+```
+
+The report is a single self-contained HTML file (no JavaScript or external assets) with the comparison table, charts, paired model comparison, context effect, and the cases that changed.
 
 ## ©️ Licenses
 

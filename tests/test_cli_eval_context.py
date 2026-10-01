@@ -16,7 +16,7 @@ def _sidecar(n: int) -> pd.DataFrame:
 
 def test_builds_the_sidecar_for_the_requested_round():
     with patch(BUILDER, return_value=_sidecar(2)) as build:
-        result = runner.invoke(app, ["eval-context", "v2"])
+        result = runner.invoke(app, ["eval", "context", "v2"])
 
     assert result.exit_code == 0
     build.assert_called_once_with("v2", force=False)
@@ -24,7 +24,7 @@ def test_builds_the_sidecar_for_the_requested_round():
 
 def test_force_flag_rebuilds():
     with patch(BUILDER, return_value=_sidecar(1)) as build:
-        result = runner.invoke(app, ["eval-context", "v1", "--force"])
+        result = runner.invoke(app, ["eval", "context", "v1", "--force"])
 
     assert result.exit_code == 0
     build.assert_called_once_with("v1", force=True)
@@ -32,7 +32,7 @@ def test_force_flag_rebuilds():
 
 def test_unknown_round_fails_without_building():
     with patch(BUILDER) as build:
-        result = runner.invoke(app, ["eval-context", "v3"])
+        result = runner.invoke(app, ["eval", "context", "v3"])
 
     assert result.exit_code != 0
     build.assert_not_called()

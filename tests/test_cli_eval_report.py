@@ -50,7 +50,7 @@ def _saved_run(base):
 def test_writes_the_report_next_to_the_run_by_default(tmp_path):
     run_dir = _saved_run(tmp_path)
 
-    result = runner.invoke(app, ["eval-report", str(run_dir)])
+    result = runner.invoke(app, ["eval", "report", str(run_dir)])
 
     assert result.exit_code == 0
     assert (run_dir / "report.html").is_file()
@@ -60,14 +60,14 @@ def test_out_option_sets_the_destination_and_merges_runs(tmp_path):
     first, second = _saved_run(tmp_path), _saved_run(tmp_path)
     out = tmp_path / "combined.html"
 
-    result = runner.invoke(app, ["eval-report", str(first), str(second), "--out", str(out)])
+    result = runner.invoke(app, ["eval", "report", str(first), str(second), "--out", str(out)])
 
     assert result.exit_code == 0
     assert out.is_file() and "run(s)" in out.read_text(encoding="utf-8")
 
 
 def test_a_directory_that_is_not_a_run_fails_cleanly(tmp_path):
-    result = runner.invoke(app, ["eval-report", str(tmp_path)])
+    result = runner.invoke(app, ["eval", "report", str(tmp_path)])
 
     assert result.exit_code != 0
     assert not (tmp_path / "report.html").exists()
@@ -76,7 +76,7 @@ def test_a_directory_that_is_not_a_run_fails_cleanly(tmp_path):
 def test_an_unknown_baseline_fails_cleanly(tmp_path):
     run_dir = _saved_run(tmp_path)
 
-    result = runner.invoke(app, ["eval-report", str(run_dir), "--baseline", "does-not-exist"])
+    result = runner.invoke(app, ["eval", "report", str(run_dir), "--baseline", "does-not-exist"])
 
     assert result.exit_code != 0
     assert not (run_dir / "report.html").exists()
