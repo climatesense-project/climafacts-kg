@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .runs import BenchmarkRun, changed_cases, context_effect
+from .runs import BenchmarkRun, changed_cases, compare_configs, context_effect
 
 _SERIES_LIGHT = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948")
 _SERIES_DARK = ("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767")
@@ -288,12 +288,62 @@ def _charts(summary: pd.DataFrame) -> str:
     return "".join(out)
 
 
+def _p(p) -> str:
+    """An exact p-value to three decimals, or ``<0.001``; a dash when missing."""
+    return "—" if p is None or pd.isna(p) else ("<0.001" if p < 0.001 else f"{p:.3f}")
+
+
+def _interval(lo, hi) -> str:
+    return "—" if pd.isna(lo) or pd.isna(hi) else f"[{lo:+.3f}, {hi:+.3f}]"
+
+
+def _model_comparison(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str | None) -> str:
+    """Each config against *baseline* (default: the first config) on the cases both answered, in one context mode."""
+    configs = list(dict.fromkeys(summary["config"].astype(str)))
+    if baseline is not None and baseline not in configs:
+        raise ValueError(f"unknown baseline {baseline!r}; choose one of: {', '.join(configs)}")
+    if len(configs) < 2:
+        return ""
+    baseline = baseline or configs[0]
+    modes = list(dict.fromkeys(cases["context"])) if not cases.empty else []
+    if not modes:
+        return ""
+    mode = "none" if "none" in modes else modes[0]
+    comparison = compare_configs(cases, baseline, context=mode)
+    if comparison.empty:
+        return ""
+    headers = [("Dataset", False), ("Config", False), ("Paired", True), ("Baseline", True), ("Config exact", True)]
+    headers += [("Δ", True), ("Δ 95% CI", True), ("Better", True), ("Worse", True), ("p", True)]
+    rows = [
+        [
+            _td(str(r["dataset"])),
+            _td(str(r["config"])),
+            _td(str(int(r["n_paired"])), num=True),
+            _td(_fmt(r["exact_baseline"]), num=True),
+            _td(_fmt(r["exact_config"]), num=True),
+            _td(f"{r['delta']:+.3f}", num=True),
+            _td(_interval(r["delta_lo"], r["delta_hi"]), num=True),
+            _td(str(int(r["better"])), num=True),
+            _td(str(int(r["worse"])), num=True),
+            _td(_p(r["p_value"]), num=True),
+        ]
+        for _, r in comparison.iterrows()
+    ]
+    intro = (
+        f'<p class="muted">Each config against <b>{_esc(baseline)}</b> on the cases both answered '
+        f"(context: {_esc(mode)}). Δ is exact match, config minus baseline; the interval is a 95% bootstrap over the "
+        "pairs; p is an exact two-sided McNemar test on the cases where they differ, not corrected for the number of "
+        "comparisons.</p>"
+    )
+    return "<h2>Model comparison</h2>" + intro + _table(headers, rows)
+
+
 def _context_sections(cases: pd.DataFrame) -> str:
     effect = context_effect(cases)
     if effect.empty:
         return ""
     headers = [("Config", False), ("Dataset", False), ("Paired", True), ("None", True), ("With", True), ("Δ", True)]
-    headers += [("Fixed", True), ("Broken", True), ("Same", True)]
+    headers += [("Δ 95% CI", True), ("Fixed", True), ("Broken", True), ("Same", True), ("p", True)]
     rows = [
         [
             _td(str(r["config"])),
@@ -302,16 +352,19 @@ def _context_sections(cases: pd.DataFrame) -> str:
             _td(_fmt(r["exact_none"]), num=True),
             _td(_fmt(r["exact_with"]), num=True),
             _td(f"{r['delta']:+.3f}", num=True),
+            _td(_interval(r["delta_lo"], r["delta_hi"]), num=True),
             _td(str(int(r["fixed"])), num=True),
             _td(str(int(r["broken"])), num=True),
             _td(str(int(r["unchanged"])), num=True),
+            _td(_p(r["p_value"]), num=True),
         ]
         for _, r in effect.iterrows()
     ]
     out = [
         "<h2>Context effect</h2>",
         '<p class="muted">Exact match without and with context on the same cases (only cases that carry context). '
-        "Fixed: wrong without, right with; broken: the reverse.</p>",
+        "Fixed: wrong without, right with; broken: the reverse. The interval is a 95% bootstrap over the pairs; p is "
+        "an exact two-sided McNemar test on the cases that changed (not corrected for multiple comparisons).</p>",
         _table(headers, rows),
     ]
     changed = changed_cases(cases, limit=20)
@@ -375,8 +428,12 @@ def _details(runs: Sequence[BenchmarkRun]) -> str:
     return "".join(out)
 
 
-def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path) -> Path:
-    """Renders *runs* as one self-contained HTML report at *out_path* and returns the path."""
+def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: str | None = None) -> Path:
+    """Renders *runs* as one self-contained HTML report at *out_path* and returns the path.
+
+    With two or more configs a "Model comparison" section compares each against *baseline* (default: the first
+    config; ``ValueError`` if it is not one of the configs).
+    """
     if not runs:
         raise ValueError("render_html needs at least one run")
     summary, cases = _combine(runs)
@@ -396,7 +453,7 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path) -> Path:
         f"<style>{_css()}</style></head><body><main><h1>CARDS evaluation report</h1>"
         f'<p class="muted">{len(runs)} run(s), {len(summary)} result row(s).</p>{caveat}'
         f"<h2>Comparison</h2>{_comparison(summary)}<h2>Charts</h2>{_charts(summary)}"
-        f"{_context_sections(cases)}{_details(runs)}</main></body></html>"
+        f"{_model_comparison(cases, summary, baseline)}{_context_sections(cases)}{_details(runs)}</main></body></html>"
     )
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)

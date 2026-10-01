@@ -10,8 +10,10 @@ from climafactskg.classifiers.cards.runs import (
     BenchmarkRun,
     bootstrap_ci,
     changed_cases,
+    compare_configs,
     context_effect,
     load_run,
+    mcnemar_exact,
     save_run,
 )
 
@@ -194,3 +196,113 @@ class TestChangedCasesCap:
 
         assert len(changed) == 4
         assert changed.groupby("dataset").size().tolist() == [2, 2]
+
+
+class TestMcNemarExact:
+    def test_known_values(self):
+        assert mcnemar_exact(0, 0) == 1.0
+        assert mcnemar_exact(5, 0) == pytest.approx(0.0625)  # 2 * (1/2)^5
+        assert mcnemar_exact(3, 3) == 1.0
+        assert mcnemar_exact(10, 21) == pytest.approx(mcnemar_exact(21, 10))
+
+    def test_agrees_with_scipys_exact_binomial_test(self):
+        stats = pytest.importorskip("scipy.stats")
+        for better, worse in ((10, 21), (2, 9), (0, 6), (14, 14), (40, 25)):
+            expected = stats.binomtest(min(better, worse), better + worse, 0.5).pvalue
+            assert mcnemar_exact(better, worse) == pytest.approx(expected)
+
+    def test_never_exceeds_one(self):
+        assert mcnemar_exact(1, 1) == 1.0
+
+
+def _effect_frame(fixed, broken, same_right, same_wrong):
+    rows = []
+    spec = [(0.0, 1.0)] * fixed + [(1.0, 0.0)] * broken + [(1.0, 1.0)] * same_right + [(0.0, 0.0)] * same_wrong
+    for i, (none_exact, with_exact) in enumerate(spec):
+        rows.append(_case(context="none", case_id=f"c{i}", exact=none_exact))
+        rows.append(_case(context="with", case_id=f"c{i}", exact=with_exact))
+    return pd.DataFrame(rows, columns=CASE_COLUMNS)
+
+
+class TestContextEffectSignificance:
+    def test_reports_a_paired_interval_and_an_exact_p_value(self):
+        eff = context_effect(_effect_frame(fixed=8, broken=0, same_right=4, same_wrong=0)).iloc[0]
+
+        assert (eff["n_paired"], eff["fixed"], eff["broken"]) == (12, 8, 0)
+        assert eff["p_value"] == pytest.approx(2 * 0.5**8)
+        assert eff["delta_lo"] > 0 and eff["delta_lo"] <= eff["delta"] <= eff["delta_hi"]
+
+    def test_a_balanced_change_is_not_significant(self):
+        eff = context_effect(_effect_frame(fixed=10, broken=10, same_right=5, same_wrong=5)).iloc[0]
+
+        assert eff["p_value"] == 1.0 and eff["delta"] == 0.0
+        assert eff["delta_lo"] < 0 < eff["delta_hi"]
+
+    def test_the_real_v2_shape_ten_fixed_twenty_one_broken(self):
+        eff = context_effect(_effect_frame(fixed=10, broken=21, same_right=40, same_wrong=72)).iloc[0]
+
+        assert eff["p_value"] == pytest.approx(mcnemar_exact(10, 21))
+        assert 0.05 < eff["p_value"] < 0.1  # suggestive, not significant at 0.05
+        assert eff["delta_lo"] < -0.1 and eff["delta_hi"] <= 0.01  # the interval just reaches zero
+
+    def test_empty_frame_has_the_new_columns(self):
+        eff = context_effect(pd.DataFrame(columns=list(CASE_COLUMNS)))
+        assert {"delta_lo", "delta_hi", "p_value"} <= set(eff.columns)
+
+
+def _config_rows(config, right_ids, all_ids, dataset="d", context="none"):
+    return [
+        _case(config=config, dataset=dataset, context=context, case_id=cid, exact=1.0 if cid in right_ids else 0.0)
+        for cid in all_ids
+    ]
+
+
+class TestCompareConfigs:
+    def _cases(self):
+        ids = [f"c{i}" for i in range(10)]
+        rows = _config_rows("A", ids[:5], ids)
+        rows += _config_rows("B", ids[:9], ids)  # B fixes four cases A gets wrong
+        rows += _config_rows("C", ids[:3], ids)  # C breaks two cases A gets right
+        return pd.DataFrame(rows, columns=CASE_COLUMNS)
+
+    def test_each_config_is_compared_with_the_baseline_on_the_same_cases(self):
+        out = compare_configs(self._cases(), baseline="A").set_index("config")
+
+        b, c = out.loc["B"], out.loc["C"]
+        assert (b["n_paired"], b["better"], b["worse"]) == (10, 4, 0)
+        assert b["exact_baseline"] == 0.5 and b["exact_config"] == 0.9 and b["delta"] == pytest.approx(0.4)
+        assert b["p_value"] == pytest.approx(2 * 0.5**4)
+        assert (c["better"], c["worse"]) == (0, 2) and c["delta"] == pytest.approx(-0.2)
+        assert set(out["baseline"]) == {"A"}
+
+    def test_only_cases_both_configs_answered_are_paired(self):
+        ids = [f"c{i}" for i in range(10)]
+        rows = _config_rows("A", ids[:5], ids) + _config_rows("D", ids[:4], ids[:4])
+        out = compare_configs(pd.DataFrame(rows, columns=CASE_COLUMNS), baseline="A")
+
+        assert out.iloc[0]["n_paired"] == 4
+
+    def test_datasets_are_compared_separately(self):
+        ids = [f"c{i}" for i in range(4)]
+        rows = _config_rows("A", ids[:2], ids, dataset="d1") + _config_rows("B", ids, ids, dataset="d1")
+        rows += _config_rows("A", ids, ids, dataset="d2") + _config_rows("B", ids[:2], ids, dataset="d2")
+        out = compare_configs(pd.DataFrame(rows, columns=CASE_COLUMNS), baseline="A").set_index("dataset")
+
+        assert out.loc["d1", "delta"] > 0 and out.loc["d2", "delta"] < 0
+
+    def test_the_context_mode_is_selected(self):
+        ids = [f"c{i}" for i in range(4)]
+        rows = _config_rows("A", ids[:2], ids) + _config_rows("B", ids, ids, context="with")
+        out = compare_configs(pd.DataFrame(rows, columns=CASE_COLUMNS), baseline="A", context="none")
+
+        assert out.empty  # B has no "none" rows, so nothing to pair
+
+    def test_unknown_baseline_is_a_clear_error(self):
+        with pytest.raises(ValueError, match="baseline"):
+            compare_configs(self._cases(), baseline="nope")
+
+    def test_a_lone_baseline_gives_an_empty_frame_with_columns(self):
+        ids = ["c0", "c1"]
+        out = compare_configs(pd.DataFrame(_config_rows("A", ids, ids), columns=CASE_COLUMNS), baseline="A")
+
+        assert out.empty and {"delta", "p_value", "better", "worse"} <= set(out.columns)

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import os
 import subprocess
 import uuid
@@ -32,7 +33,35 @@ CASE_COLUMNS = (
 )
 _SUMMARY_REQUIRED = ("config", "dataset", "context", "n_cases", "exact_match", "h_f1")
 _RUN_FILES = ("run.json", "cases.csv", "summary.csv")
-_EFFECT_COLUMNS = ("config", "dataset", "n_paired", "exact_none", "exact_with", "delta", "fixed", "broken", "unchanged")
+_EFFECT_COLUMNS = (
+    "config",
+    "dataset",
+    "n_paired",
+    "exact_none",
+    "exact_with",
+    "delta",
+    "delta_lo",
+    "delta_hi",
+    "fixed",
+    "broken",
+    "unchanged",
+    "p_value",
+)
+_COMPARISON_COLUMNS = (
+    "dataset",
+    "config",
+    "baseline",
+    "n_paired",
+    "exact_baseline",
+    "exact_config",
+    "delta",
+    "delta_lo",
+    "delta_hi",
+    "better",
+    "worse",
+    "unchanged",
+    "p_value",
+)
 _CHANGED_COLUMNS = ("config", "dataset", "case_id", "text", "gold", "pred_none", "pred_with", "change")
 
 
@@ -135,25 +164,98 @@ def _paired(cases: pd.DataFrame) -> pd.DataFrame:
     return paired
 
 
+def mcnemar_exact(better: int, worse: int) -> float:
+    """Exact two-sided McNemar p-value for paired outcomes.
+
+    *better* and *worse* are the discordant pairs (right only on one side / right only on the other); concordant
+    pairs carry no information. Under "no difference" each discordant pair is equally likely to go either way, so the
+    p-value is twice the binomial tail P(X <= min(better, worse)) with n = better + worse, capped at 1.
+    """
+    n = better + worse
+    if n == 0:
+        return 1.0
+    tail = sum(math.comb(n, i) for i in range(min(better, worse) + 1))
+    return min(1.0, 2 * tail / 2**n)
+
+
+def _summarize_pairs(paired: pd.DataFrame, group: list[str]) -> pd.DataFrame:
+    """Per-group paired statistics from rows with ``exact_left`` / ``exact_right`` (the exact score on each side).
+
+    ``better``: wrong on the left, right on the right; ``worse``: the reverse. ``delta`` is right minus left, with a
+    deterministic 95% bootstrap interval over the pairs and the exact McNemar p-value.
+    """
+    rows = []
+    for key, rows_of_group in paired.groupby(group, sort=False):
+        key = key if isinstance(key, tuple) else (key,)
+        left, right = rows_of_group["exact_left"], rows_of_group["exact_right"]
+        better = int(((left < 1) & (right >= 1)).sum())
+        worse = int(((left >= 1) & (right < 1)).sum())
+        delta_lo, delta_hi = bootstrap_ci((right - left).to_numpy())
+        rows.append(
+            {
+                **dict(zip(group, key, strict=True)),
+                "n_paired": len(rows_of_group),
+                "exact_left": round(float(left.mean()), 4),
+                "exact_right": round(float(right.mean()), 4),
+                "delta": round(float(right.mean() - left.mean()), 4),
+                "delta_lo": round(delta_lo, 4),
+                "delta_hi": round(delta_hi, 4),
+                "better": better,
+                "worse": worse,
+                "unchanged": len(rows_of_group) - better - worse,
+                "p_value": mcnemar_exact(better, worse),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def context_effect(cases: pd.DataFrame) -> pd.DataFrame:
     """Paired effect of context per (config, dataset), on the cases that actually have context.
 
-    ``fixed``: wrong without context, right with it; ``broken``: the reverse. Empty when nothing is paired.
+    ``fixed``: wrong without context, right with it; ``broken``: the reverse. ``delta`` (with minus without) comes
+    with a 95% bootstrap interval over the pairs and the exact McNemar p-value (``p_value``). Empty when nothing is
+    paired.
     """
     paired = _paired(cases)
     if paired.empty:
         return pd.DataFrame(columns=list(_EFFECT_COLUMNS))
-    grouped = paired.groupby(["config", "dataset"], as_index=False).agg(
-        n_paired=("case_id", "size"),
-        exact_none=("exact_none", "mean"),
-        exact_with=("exact_with", "mean"),
-        fixed=("fixed", "sum"),
-        broken=("broken", "sum"),
+    summary = _summarize_pairs(
+        paired.rename(columns={"exact_none": "exact_left", "exact_with": "exact_right"}), ["config", "dataset"]
+    ).rename(columns={"exact_left": "exact_none", "exact_right": "exact_with", "better": "fixed", "worse": "broken"})
+    return summary[list(_EFFECT_COLUMNS)]
+
+
+def compare_configs(cases: pd.DataFrame, baseline: str, context: str = "none") -> pd.DataFrame:
+    """Compares every other config with *baseline* on the cases both answered, per dataset.
+
+    Pairs are matched on ``(dataset, case_id)`` within one context mode. ``better``: the config is right where the
+    baseline is wrong; ``worse``: the reverse. Each row carries ``delta`` (config minus baseline), its 95% bootstrap
+    interval and the exact McNemar ``p_value``. The p-values are not corrected for the number of comparisons.
+
+    Raises:
+        ValueError: if *baseline* has no rows in that context mode.
+    """
+    in_mode = cases[cases["context"] == context]
+    base = in_mode[in_mode["config"] == baseline]
+    if base.empty:
+        raise ValueError(f"no rows for baseline config {baseline!r} in context mode {context!r}")
+    others = in_mode[in_mode["config"] != baseline]
+    paired = (
+        base[["dataset", "case_id", "exact"]]
+        .rename(columns={"exact": "exact_left"})
+        .merge(
+            others[["config", "dataset", "case_id", "exact"]].rename(columns={"exact": "exact_right"}),
+            on=["dataset", "case_id"],
+        )
+        .dropna(subset=["exact_left", "exact_right"])
     )
-    grouped["delta"] = grouped["exact_with"] - grouped["exact_none"]
-    grouped["unchanged"] = grouped["n_paired"] - grouped["fixed"] - grouped["broken"]
-    grouped[["exact_none", "exact_with", "delta"]] = grouped[["exact_none", "exact_with", "delta"]].round(4)
-    return grouped[list(_EFFECT_COLUMNS)]
+    if paired.empty:
+        return pd.DataFrame(columns=list(_COMPARISON_COLUMNS))
+    summary = _summarize_pairs(paired, ["dataset", "config"]).rename(
+        columns={"exact_left": "exact_baseline", "exact_right": "exact_config"}
+    )
+    summary["baseline"] = baseline
+    return summary[list(_COMPARISON_COLUMNS)]
 
 
 def changed_cases(cases: pd.DataFrame, limit: int = 20) -> pd.DataFrame:

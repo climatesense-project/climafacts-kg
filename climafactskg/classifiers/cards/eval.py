@@ -541,6 +541,11 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
         _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
 
 
+def _format_p(p: float) -> str:
+    """An exact p-value to three decimals, or ``<0.001``."""
+    return "—" if pd.isna(p) else ("<0.001" if p < 0.001 else f"{p:.3f}")
+
+
 def print_context_effect(cases: pd.DataFrame) -> None:
     """Print the paired none-vs-with context effect per (config, dataset) from a saved run's case rows."""
     effect = context_effect(cases)
@@ -560,7 +565,7 @@ def print_context_effect(cases: pd.DataFrame) -> None:
         ("Δ", "right", None, 6),
         ("Fixed", "right", None, 5),
         ("Broken", "right", None, 6),
-        ("Same", "right", None, 4),
+        ("p", "right", None, 6),
     ):
         table.add_column(
             header,
@@ -580,9 +585,10 @@ def print_context_effect(cases: pd.DataFrame) -> None:
             f"{row['delta']:+.3f}",
             str(int(row["fixed"])),
             str(int(row["broken"])),
-            str(int(row["unchanged"])),
+            _format_p(row["p_value"]),
         )
     _console.print(table)
+    _console.print("[dim]p: exact two-sided McNemar test on the cases that changed.[/dim]")
 
 
 if __name__ == "__main__":

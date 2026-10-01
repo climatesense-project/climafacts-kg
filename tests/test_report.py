@@ -233,3 +233,48 @@ class TestReliabilityColumns:
 
         assert table.count("—") >= 4  # failed / not related / unambiguous / baseline are dashes, not made-up values
         assert "nan" not in html.lower()
+
+
+def _two_config_run():
+    ids = [f"c{i}" for i in range(10)]
+    cases = []
+    for config, right in (("A", ids[:5]), ("B", ids[:9])):
+        for cid in ids:
+            cases.append(_case(config, "none", cid, 1.0 if cid in right else 0.0))
+    summary = [_summary_row(config="A", context="none", exact=0.5), _summary_row(config="B", context="none", exact=0.9)]
+    run = _run(with_context=False)
+    run.summary = pd.DataFrame(summary)
+    run.cases = pd.DataFrame(cases, columns=list(CASE_COLUMNS))
+    return run
+
+
+class TestSignificanceInReport:
+    def test_context_effect_table_has_an_interval_and_a_p_value(self, tmp_path):
+        html = render_html([_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+        section = html[html.index("<h2>Context effect</h2>") :]
+
+        assert '<th class="num">\u0394 95% CI</th>' in section and '<th class="num">p</th>' in section
+        assert "McNemar" in section
+
+    def test_two_configs_get_a_model_comparison_against_the_first(self, tmp_path):
+        html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+        section = html[html.index("<h2>Model comparison</h2>") :]
+
+        assert "<b>A</b>" in section  # the baseline defaults to the first config
+        assert "0.125" in section  # 4 better, 0 worse -> exact p = 2 * (1/2)^4
+        assert "+0.400" in section and "not corrected" in section
+
+    def test_a_single_config_has_no_model_comparison(self, tmp_path):
+        html = render_html([_run(with_context=False)], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "Model comparison" not in html
+
+    def test_the_baseline_can_be_chosen(self, tmp_path):
+        html = render_html([_two_config_run()], tmp_path / "r.html", baseline="B").read_text(encoding="utf-8")
+        section = html[html.index("<h2>Model comparison</h2>") :]
+
+        assert "<b>B</b>" in section and "-0.400" in section
+
+    def test_an_unknown_baseline_is_a_clear_error(self, tmp_path):
+        with pytest.raises(ValueError, match="baseline"):
+            render_html([_two_config_run()], tmp_path / "r.html", baseline="nope")

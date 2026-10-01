@@ -71,3 +71,12 @@ def test_a_directory_that_is_not_a_run_fails_cleanly(tmp_path):
 
     assert result.exit_code != 0
     assert not (tmp_path / "report.html").exists()
+
+
+def test_an_unknown_baseline_fails_cleanly(tmp_path):
+    run_dir = _saved_run(tmp_path)
+
+    result = runner.invoke(app, ["eval-report", str(run_dir), "--baseline", "does-not-exist"])
+
+    assert result.exit_code != 0
+    assert not (run_dir / "report.html").exists()

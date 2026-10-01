@@ -333,6 +333,10 @@ def eval_report(
     out: Annotated[
         Optional[str], typer.Option("--out", help="Report path. Defaults to <first run dir>/report.html.")
     ] = None,
+    baseline: Annotated[
+        Optional[str],
+        typer.Option("--baseline", help="Config to compare the others against (default: the first config)."),
+    ] = None,
 ):
     """Render saved benchmark runs as one self-contained HTML report (tables and inline SVG charts)."""
     from climafactskg.classifiers.cards.report import render_html
@@ -344,7 +348,11 @@ def eval_report(
         logger.error("%s", exc)
         raise typer.Exit(code=1) from exc
     target = out or f"{run_dirs[0].rstrip('/')}/report.html"
-    logger.info("Wrote %s", render_html(runs, target))
+    try:
+        logger.info("Wrote %s", render_html(runs, target, baseline=baseline))
+    except ValueError as exc:
+        logger.error("%s", exc)
+        raise typer.Exit(code=1) from exc
 
 
 @app.command()

@@ -2,6 +2,7 @@
 
 import io
 import logging
+import re
 
 import pandas as pd
 from climafactskg.classifiers.cards import eval as eval_module
@@ -236,7 +237,8 @@ class TestPrintContextEffect:
         print_context_effect(pd.DataFrame(rows, columns=list(CASE_COLUMNS)))
 
         text = buffer.getvalue()
-        assert "Fixed" in text and "Broken" in text and "Same" in text  # no header truncated at 80 columns
+        assert "Fixed" in text and "Broken" in text  # no header truncated at 80 columns
+        assert re.search(r"\bp\b", text) and "1.000" in text  # fixed 1, broken 0 -> exact McNemar p = 1
         assert "+0.500" in text and "0.500" in text and "1.000" in text
         assert max(len(line) for line in text.splitlines()) <= 80
 
