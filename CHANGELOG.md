@@ -2,6 +2,113 @@
 
 <!-- version list -->
 
+## v2.2.0 (2026-10-01)
+
+### Bug Fixes
+
+- **eval**: Benchmark on the shared scoring and report reliability columns
+  ([`e4d49f7`](https://github.com/climatesense-project/climafacts-kg/commit/e4d49f7a762dce42017f08845309d664363c1674))
+
+- **eval**: Close the remaining review-context edge cases
+  ([`817ac6d`](https://github.com/climatesense-project/climafacts-kg/commit/817ac6db0a1e9acd0ac5a23e15404a291de151b7))
+
+- **eval**: Drop page boilerplate and verdict headlines from review context
+  ([`7166cc8`](https://github.com/climatesense-project/climafacts-kg/commit/7166cc8f3d5547fcea7522fbb4c9d36d2c78095c))
+
+- **eval**: Fold depth-3 labels, keep counts integral and harden scoring edge cases
+  ([`cfff819`](https://github.com/climatesense-project/climafacts-kg/commit/cfff8198e03bae7d3e156e5721d8d6a1cfee329e))
+
+- **eval**: Keep CimpleKG review fetches under the URL and rate limits
+  ([`43835b1`](https://github.com/climatesense-project/climafacts-kg/commit/43835b1af003e1cd1d7dc0f0cfcdc1579c644dc7))
+
+- **eval**: Keep multi-run reports distinct and failures visible
+  ([`ca0c995`](https://github.com/climatesense-project/climafacts-kg/commit/ca0c995fbec5ea653e5379dbd97e6efc4fddde8e))
+
+- **eval**: Keep the prompt optimizer training claim-only
+  ([`fe47945`](https://github.com/climatesense-project/climafacts-kg/commit/fe4794588478f4d86a14bab9804fddf06c54a313))
+
+- **eval**: Report how many cases carried context in each benchmark row
+  ([`04b9a21`](https://github.com/climatesense-project/climafacts-kg/commit/04b9a213600aa2ce0d369c8d0ab7e108a83822d2))
+
+- **eval**: Score failed predictions as wrong and unify the not-related code
+  ([`a71a6df`](https://github.com/climatesense-project/climafacts-kg/commit/a71a6df30e363a6089d5d7971410ba48012b858b))
+
+### Continuous Integration
+
+- Download Pages assets with authenticated gh release download
+  ([`31ccd71`](https://github.com/climatesense-project/climafacts-kg/commit/31ccd712290d33e55060fe870d7c557d7f0e005f))
+
+### Documentation
+
+- Design for review context in the CARDS eval datasets
+  ([`b7adf4c`](https://github.com/climatesense-project/climafacts-kg/commit/b7adf4c077ea6eb817dcde81480e6f6bcc8259ce))
+
+- Design for saved, comparable and visual eval reporting
+  ([`d61027f`](https://github.com/climatesense-project/climafacts-kg/commit/d61027fe00e51aa7943acc614a85892e38f19171))
+
+- Document review context for the eval datasets
+  ([`b7a59d2`](https://github.com/climatesense-project/climafacts-kg/commit/b7a59d2d00a731d0ffaf6216d6b0fa06a8673638))
+
+- Implementation plan for review context in the CARDS eval datasets
+  ([`6db06a4`](https://github.com/climatesense-project/climafacts-kg/commit/6db06a43ab8782deeeba4723d3f886278a56d9b8))
+
+- Implementation plan for saved, comparable and visual eval reporting
+  ([`e6912aa`](https://github.com/climatesense-project/climafacts-kg/commit/e6912aa6314593980ca994d88089595464fe643d))
+
+- Make review-context selection sentence-based in the eval design
+  ([`d9daa10`](https://github.com/climatesense-project/climafacts-kg/commit/d9daa1009713fd7f89e15d7132526ac76584b1ab))
+
+- Require deterministic, LLM-free context preparation in the eval design
+  ([`f338518`](https://github.com/climatesense-project/climafacts-kg/commit/f3385180818c4620af9328b012d56bdc00284a4f))
+
+- Update review-context notes after the branch review
+  ([`2998147`](https://github.com/climatesense-project/climafacts-kg/commit/299814713e56dca994e9924de62ba6dce89945c9))
+
+- Update test count
+  ([`01e8f00`](https://github.com/climatesense-project/climafacts-kg/commit/01e8f00fd19b5956ad3e53e3d604711c92345f3e))
+
+### Features
+
+- **cli**: Add eval-context command to build the review-context sidecar
+  ([`2f0345e`](https://github.com/climatesense-project/climafacts-kg/commit/2f0345e3d52fdbf2c93768eddd8c36d3883cd42e))
+
+- **cli**: Add eval-report and document saved runs
+  ([`b5639cc`](https://github.com/climatesense-project/climafacts-kg/commit/b5639ccf8da0d6d8c53eff372988c565a7d1c859))
+
+- **eval**: Add a self-contained HTML report with inline SVG charts
+  ([`29f6deb`](https://github.com/climatesense-project/climafacts-kg/commit/29f6deb32ccd99ed6ed0b26baf3ec82098639d21))
+
+- **eval**: Add deterministic sentence-based review context selection
+  ([`c8a965f`](https://github.com/climatesense-project/climafacts-kg/commit/c8a965f2d55983de9eaafea6484ef8d44d1f3d6b))
+
+- **eval**: Add saved benchmark runs with bootstrap intervals and paired context analysis
+  ([`49b6c8d`](https://github.com/climatesense-project/climafacts-kg/commit/49b6c8d7e4e3ec0e4ba9b731e6ad25489b52f377))
+
+- **eval**: Attach selected review context to the ClimateSense datasets
+  ([`e80531e`](https://github.com/climatesense-project/climafacts-kg/commit/e80531e2b8fd51bc13da072920fa981b146ab4fb))
+
+- **eval**: Build a review-context sidecar from local inputs and CimpleKG
+  ([`11d3fc1`](https://github.com/climatesense-project/climafacts-kg/commit/11d3fc197fbab027c236e6807baaa2044e4b5a96))
+
+- **eval**: Compact benchmark table with intervals and a context-effect view
+  ([`9d78b30`](https://github.com/climatesense-project/climafacts-kg/commit/9d78b3084049b5b8ea80686507797eab69137b82))
+
+- **eval**: Compare context on the covered subset and warn on sparse coverage
+  ([`fc2083c`](https://github.com/climatesense-project/climafacts-kg/commit/fc2083c7670f27700223531878d5bbed1ff1c5e1))
+
+- **eval**: Evaluate with and without review context
+  ([`24f3cf4`](https://github.com/climatesense-project/climafacts-kg/commit/24f3cf4c066512fca72fdd94ebb93b19fdb2189a))
+
+- **eval**: Make review context opt-in for the ClimateSense datasets
+  ([`c3d88b6`](https://github.com/climatesense-project/climafacts-kg/commit/c3d88b6ed0977fdcd198d6fa8afc795d59879822))
+
+- **eval**: Save benchmark runs with per-case rows and bootstrap intervals
+  ([`e39fd11`](https://github.com/climatesense-project/climafacts-kg/commit/e39fd1142c24df1a2f9480f942fe939d23ef20bd))
+
+- **eval**: Show failures, baseline and reliability columns in the terminal and report
+  ([`b7824d5`](https://github.com/climatesense-project/climafacts-kg/commit/b7824d558b4aad8c6ca24bc39e0cc042c58ad6c9))
+
+
 ## v2.1.4 (2026-09-29)
 
 ### Bug Fixes
