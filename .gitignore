@@ -206,3 +206,6 @@ data/optimised_prompt.txt
 
 # macOS
 .DS_Store
+
+# saved evaluation runs
+data/eval_runs/

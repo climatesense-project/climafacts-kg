@@ -26,6 +26,26 @@ class TestQuerySparqlendpoint:
         assert df.empty
 
     @patch("climafactskg.utils.SPARQLWrapper")
+    def test_timeout_is_passed_to_the_wrapper(self, mock_wrapper_cls, tmp_path):
+        mock_wrapper = MagicMock()
+        mock_wrapper.query.return_value.response = io.BytesIO(b"a,b\n1,2\n")
+        mock_wrapper_cls.return_value = mock_wrapper
+
+        query_sparqlendpoint("https://example.org/sparql", "SELECT 1", cache_dir=str(tmp_path), timeout=5)
+
+        mock_wrapper.setTimeout.assert_called_once_with(5)
+
+    @patch("climafactskg.utils.SPARQLWrapper")
+    def test_no_timeout_leaves_the_wrapper_default(self, mock_wrapper_cls, tmp_path):
+        mock_wrapper = MagicMock()
+        mock_wrapper.query.return_value.response = io.BytesIO(b"a,b\n1,2\n")
+        mock_wrapper_cls.return_value = mock_wrapper
+
+        query_sparqlendpoint("https://example.org/sparql", "SELECT 2", cache_dir=str(tmp_path))
+
+        mock_wrapper.setTimeout.assert_not_called()
+
+    @patch("climafactskg.utils.SPARQLWrapper")
     def test_malformed_non_empty_response_returns_empty_dataframe(self, mock_wrapper_cls, tmp_path):
         # Inconsistent field counts across lines -> pandas.errors.ParserError, not EmptyDataError.
         mock_wrapper = MagicMock()

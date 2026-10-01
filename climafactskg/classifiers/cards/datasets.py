@@ -44,6 +44,7 @@ from typing import Literal
 import pandas as pd
 from pydantic_evals import Case, Dataset
 
+from .context import DEFAULT_CONTEXT_PATHS, select_context
 from .evaluators import (
     _MAX_CLASSIFIER_DEPTH,
     CARDSHierarchicalMatch,
@@ -401,6 +402,42 @@ def _download_annotations_df(
     return pd.DataFrame(records)
 
 
+def _resolve_context_path(version: str, context_path: str | None, with_context: bool) -> str | None:
+    """Review context is opt-in: an explicit *context_path*, or ``with_context=True`` for the default sidecar."""
+    if context_path is not None:
+        return context_path
+    return DEFAULT_CONTEXT_PATHS[version] if with_context else None
+
+
+def _attach_context(df: pd.DataFrame, context_path: str | None, max_context_chars: int | None) -> pd.DataFrame:
+    """Left-joins the review-context sidecar onto *df* as a ``context`` column, selecting text per case.
+
+    A missing sidecar is not an error: it logs a warning and leaves every context ``None``. ``context_path=None``
+    disables context silently. Documents without a usable review get ``None``.
+    """
+    df = df.drop(columns=["context"], errors="ignore")
+    if context_path is None:
+        return df.assign(context=None)
+    if not os.path.exists(context_path):
+        logger.warning("Review-context sidecar not found at %s; loading without context", context_path)
+        return df.assign(context=None)
+
+    sidecar = (
+        pd.read_csv(context_path)[["document_id", "context"]]
+        .dropna(subset=["context"])
+        .drop_duplicates(subset=["document_id"])
+    )
+    df = df.merge(sidecar, on="document_id", how="left")
+    df["context"] = [
+        (select_context(review, claim if isinstance(claim, str) else "", max_chars=max_context_chars) or None)
+        if isinstance(review, str)
+        else None
+        for review, claim in zip(df["context"], df["content"], strict=True)
+    ]
+    logger.info("Review context attached to %d of %d cases", int(df["context"].notna().sum()), len(df))
+    return df
+
+
 def _load_climatesense_dataset(
     path: str | None,
     limit: int | None,
@@ -410,6 +447,9 @@ def _load_climatesense_dataset(
     min_annotators: int,
     completed_status: str,
     dataset_name: str,
+    context_path: str | None = None,
+    max_context_chars: int | None = 800,
+    only_with_context: bool = False,
 ) -> Dataset:
     """Shared implementation for :func:`climatesense_dataset_v1` and :func:`climatesense_dataset_v2`.
 
@@ -434,7 +474,14 @@ def _load_climatesense_dataset(
         min_annotators: Minimum annotators required per group.
         completed_status: ``Status`` column value that marks a finished annotation.
         dataset_name: Human-readable name attached to the returned :class:`Dataset`.
+        context_path: Path to the review-context sidecar CSV (see :mod:`.context`), or ``None`` for no context.
+        max_context_chars: Character budget per case for the selected review context (``None`` = unlimited).
+        only_with_context: Keep only cases that have review context (applied before *limit*), for a paired
+            with/without-context comparison on the same cases. Requires *context_path*.
     """
+    if only_with_context and context_path is None:
+        raise ValueError("only_with_context requires context to be enabled (with_context=True or context_path)")
+
     if path is not None and os.path.exists(path):
         logger.info("Loading annotations dataset from cached CSV: %s", path)
         df = pd.read_csv(path).dropna(subset=["document_id", "content", "cards_code"])
@@ -451,6 +498,11 @@ def _load_climatesense_dataset(
     if climate_only:
         df = df[df["cards_code"] != "0_0"]
     df = df.drop_duplicates(subset=["document_id"]).reset_index(drop=True)
+    df = _attach_context(df, context_path, max_context_chars)
+    if only_with_context:
+        df = df[df["context"].notna()].reset_index(drop=True)
+        if df.empty:
+            raise ValueError(f"only_with_context: no case of {dataset_name} has review context in {context_path}")
     if limit is not None:
         df = df.head(limit)
     limit_note = f" (limited to {limit})" if limit is not None else ""
@@ -487,6 +539,10 @@ def climatesense_dataset_v1(
     annotation_groups_sheet_url: str = "https://docs.google.com/spreadsheets/d/1lFn7kVaZE2AKbBRjrhIPxSCMHwjholZV8CQfrek25u0",
     annotation_folder_id: str = "1SGcdG3AxVqSsOT6ofCiMQcZcTIBOW0kh",
     min_annotators: int = 3,
+    context_path: str | None = None,
+    max_context_chars: int | None = 800,
+    with_context: bool = False,
+    only_with_context: bool = False,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 1.
 
@@ -515,6 +571,13 @@ def climatesense_dataset_v1(
         annotation_groups_sheet_url: URL of the master annotation-groups spreadsheet.
         annotation_folder_id: Google Drive folder ID containing annotation subfolders.
         min_annotators: Minimum annotators required per group to include it.
+        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v1")``). Passing it opts in
+            to review context; a missing file only logs a warning. Default ``None``: claim-only, as before.
+        max_context_chars: Character budget per case for the selected review context.
+        with_context: Opt in to review context using the default sidecar for this dataset
+            (:data:`.context.DEFAULT_CONTEXT_PATHS`). Ignored when *context_path* is given.
+        only_with_context: Keep only cases that have review context (applied before *limit*), so the
+            with/without-context comparison runs on the same cases. Requires context to be enabled.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -525,6 +588,9 @@ def climatesense_dataset_v1(
         min_annotators=min_annotators,
         completed_status="Finished",
         dataset_name="ClimateSense Annotations v1",
+        context_path=_resolve_context_path("v1", context_path, with_context),
+        max_context_chars=max_context_chars,
+        only_with_context=only_with_context,
     )
 
 
@@ -535,6 +601,10 @@ def climatesense_dataset_v2(
     annotation_groups_sheet_url: str = "https://docs.google.com/spreadsheets/d/1TPnG0cAxe4eh_nSV0xQJ7r9dmQoJtq4tqdFpjftZ8rw",
     annotation_folder_id: str = "1GQz59v_-ufwX1WgWgJUHQAWu7NUjxOdg",
     min_annotators: int = 2,
+    context_path: str | None = None,
+    max_context_chars: int | None = 800,
+    with_context: bool = False,
+    only_with_context: bool = False,
 ) -> Dataset:
     """Build a dataset from the ClimateSense annotation round 2.
 
@@ -551,6 +621,13 @@ def climatesense_dataset_v2(
         annotation_groups_sheet_url: URL of the master annotation-groups spreadsheet.
         annotation_folder_id: Google Drive folder ID containing annotation subfolders.
         min_annotators: Minimum annotators required per group to include it.
+        context_path: Review-context sidecar CSV (built by ``build_climatesense_context("v2")``). Passing it opts in
+            to review context; a missing file only logs a warning. Default ``None``: claim-only, as before.
+        max_context_chars: Character budget per case for the selected review context.
+        with_context: Opt in to review context using the default sidecar for this dataset
+            (:data:`.context.DEFAULT_CONTEXT_PATHS`). Ignored when *context_path* is given.
+        only_with_context: Keep only cases that have review context (applied before *limit*), so the
+            with/without-context comparison runs on the same cases. Requires context to be enabled.
     """
     return _load_climatesense_dataset(
         path=path,
@@ -561,4 +638,7 @@ def climatesense_dataset_v2(
         min_annotators=min_annotators,
         completed_status="done",
         dataset_name="ClimateSense Annotations v2",
+        context_path=_resolve_context_path("v2", context_path, with_context),
+        max_context_chars=max_context_chars,
+        only_with_context=only_with_context,
     )
