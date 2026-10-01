@@ -79,6 +79,13 @@ class TestCARDSOneOfMatch:
         ctx = SimpleNamespace(output="1_1", expected_output=["2_3"])
         assert self.evaluator.evaluate(ctx) == 0.0
 
+    def test_the_two_not_related_spellings_match(self):
+        assert self.evaluator.evaluate(SimpleNamespace(output="0", expected_output=["0_0"])) == 1.0
+        assert self.evaluator.evaluate(SimpleNamespace(output="0_0", expected_output=["0"])) == 1.0
+
+    def test_a_failed_prediction_scores_zero(self):
+        assert self.evaluator.evaluate(SimpleNamespace(output=None, expected_output=["1_1"])) == 0.0
+
 
 class TestCARDSHierarchicalMatch:
     def setup_method(self):

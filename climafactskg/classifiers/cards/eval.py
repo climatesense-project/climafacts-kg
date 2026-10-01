@@ -162,7 +162,10 @@ def evaluate(classifier, dataset: Dataset, use_context: bool = True):
     identity = f"{model} ({provider})" if provider else model
     _console.print(Rule(f"{identity}  |  {_prompt_id(classifier)}  |  {len(cases)} cases"))
 
-    unique_labels = sorted(set(preds))
+    n_failed = sum(pred is None for pred in preds)
+    if n_failed:
+        _console.print(f"[yellow]{n_failed} of {len(preds)} predictions failed and count as wrong.[/yellow]")
+    unique_labels = sorted({pred for pred in preds if pred is not None})
     logger.info("Predicted label set (%d unique): %s", len(unique_labels), unique_labels)
     _console.print(f"Predicted labels ({len(unique_labels)} unique):", Columns(unique_labels))
 

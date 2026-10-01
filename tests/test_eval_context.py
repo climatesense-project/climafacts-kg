@@ -13,7 +13,11 @@ from climafactskg.classifiers.cards.eval import (
     print_benchmark,
     print_context_effect,
 )
-from climafactskg.classifiers.cards.evaluators import CARDSHierarchicalMatch, CARDSOneOfMatch
+from climafactskg.classifiers.cards.evaluators import (
+    CARDSHierarchicalMatch,
+    CARDSOneOfMatch,
+    HierarchicalMetricsReportEvaluator,
+)
 from climafactskg.classifiers.cards.runs import CASE_COLUMNS
 from pydantic_evals import Case, Dataset
 from rich.console import Console
@@ -262,3 +266,32 @@ class TestFailedAndEmptyRows:
         print_benchmark(df)
 
         assert "0.000" not in buffer.getvalue()
+
+
+class _Flaky(CARDSClassifierBase):
+    """Answers 1_1 for every claim except the second, which fails (None) like an LLM item that ran out of retries."""
+
+    def classify(self, text, context=None):
+        return None if text.endswith("1") else "1_1"
+
+
+class TestEvaluateWithFailedPredictions:
+    def test_evaluate_survives_failures_and_says_how_many(self, monkeypatch):
+        buffer = _capture(monkeypatch, width=100)
+
+        report = evaluate(_Flaky(), _dataset("d", [None, None, None]))
+
+        assert len(report.cases) == 3
+        assert "1 of 3 predictions failed" in " ".join(buffer.getvalue().split())
+
+    def test_report_tables_keep_failures_in_the_denominator(self, monkeypatch):
+        buffer = _capture(monkeypatch, width=100)
+        dataset = _dataset("d", [None, None, None])
+        dataset.report_evaluators.append(HierarchicalMetricsReportEvaluator())
+
+        evaluate(_Flaky(), dataset)
+
+        text = " ".join(buffer.getvalue().split())
+        assert "0.6667" in text  # 2 right out of 3, not 2 of the 2 that answered
+        assert "Failed predictions (counted as wrong)" in text and "1 of 3" in text
+        assert "Exact match (answered only)" in text and "1.0000" in text
