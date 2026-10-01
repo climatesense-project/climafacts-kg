@@ -145,6 +145,13 @@ def _charged_label(pred: str, golds: list[str]) -> str:
     return max(golds, key=lambda gold: _hierarchical_f1(a_pred, ancestors_of(gold)))
 
 
+def charged_gold(pred: str | None, golds: Any, depth: int = _MAX_CLASSIFIER_DEPTH) -> str:
+    """The gold label a prediction is charged to at *depth* (see the module docstring); ``None`` is a failure."""
+    gold = list(dict.fromkeys(project_to_depth(label, depth) for label in normalize_gold(golds)))
+    projected = FAILED if pred is None else project_to_depth(normalize_label(pred), depth)
+    return _charged_label(projected, gold)
+
+
 def _charged_arrays(
     preds: Sequence[str | None], golds: Sequence[list[str]], depth: int
 ) -> tuple[list[str], list[str], set[str]]:
@@ -267,6 +274,7 @@ __all__ = [
     "ancestors_of",
     "bootstrap_macro_f1",
     "case_scores",
+    "charged_gold",
     "compute_metrics",
     "normalize_gold",
     "normalize_label",

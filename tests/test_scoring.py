@@ -6,6 +6,7 @@ import pytest
 from climafactskg.classifiers.cards.scoring import (
     bootstrap_macro_f1,
     case_scores,
+    charged_gold,
     compute_metrics,
     normalize_gold,
     normalize_label,
@@ -125,3 +126,17 @@ class TestBootstrapMacroF1:
     def test_empty_input_gives_nan(self):
         lo, hi = bootstrap_macro_f1([], [])
         assert math.isnan(lo) and math.isnan(hi)
+
+
+class TestChargedGold:
+    def test_a_hit_is_charged_to_the_prediction(self):
+        assert charged_gold("2_1", ["3_1", "2_1"]) == "2_1"
+
+    def test_a_miss_is_charged_to_the_closest_gold_label(self):
+        assert charged_gold("2_1", ["3_1", "2_3"]) == "2_3"  # shares the 2_0 parent
+
+    def test_a_failure_is_charged_to_the_first_gold_label(self):
+        assert charged_gold(None, ["3_1", "2_3"]) == "3_1"
+
+    def test_depth_one_projects_before_charging(self):
+        assert charged_gold("2_1", ["3_1", "2_3"], depth=1) == "2_0"

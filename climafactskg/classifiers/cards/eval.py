@@ -55,7 +55,6 @@ from rich import box
 from rich.console import Console
 from rich.rule import Rule
 from rich.table import Table
-from sklearn.metrics import precision_recall_fscore_support
 
 from .base import CARDSClassifierBase
 
@@ -83,6 +82,15 @@ from .evaluators import (  # noqa: F401
     project_to_depth,
 )
 from .runs import CASE_COLUMNS, BenchmarkRun, bootstrap_ci, collect_meta, context_effect, save_run
+from .scoring import (
+    Metrics,
+    bootstrap_macro_f1,
+    case_scores,
+    charged_gold,
+    compute_metrics,
+    normalize_gold,
+    normalize_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +188,11 @@ def evaluate(classifier, dataset: Dataset, use_context: bool = True):
 
     logger.info("Evaluation complete: %s on '%s'", classifier_name, dataset.name)
     return report
+
+
+def _f1(metrics: Metrics, depth: int, strategy: str) -> float:
+    """The F1 of *strategy* at *depth*, or NaN when nothing was scored."""
+    return metrics.prf[depth][strategy][2] if depth in metrics.prf else float("nan")
 
 
 def benchmark_configs(
@@ -287,48 +300,35 @@ def benchmark_configs(
                     "macro_f1": float("nan"),
                     "micro_f1": float("nan"),
                     "weighted_f1": float("nan"),
+                    "n_failed": float("nan"),
+                    "exact_answered": float("nan"),
+                    "not_related_rate": float("nan"),
+                    "exact_unambiguous": float("nan"),
+                    "n_unambiguous": float("nan"),
+                    "baseline_exact": float("nan"),
                     "exact_lo": float("nan"),
                     "exact_hi": float("nan"),
                     "h_f1_lo": float("nan"),
                     "h_f1_hi": float("nan"),
+                    "d2_macro_f1_lo": float("nan"),
+                    "d2_macro_f1_hi": float("nan"),
                     "error": str(exc),
                 }
             )
             continue
 
-        cache = {(t, c): p for t, c, p in zip(texts, contexts, preds, strict=True)}
-        report = dataset.evaluate_sync(
-            lambda inp, _c=cache: _c[(inp.text, inp.context) if isinstance(inp, CARDSInput) else (str(inp), None)]
-        )
+        # Cases without a gold label cannot be scored. A failed prediction (None) is a wrong answer, not a missing one.
+        scored = [i for i, case in enumerate(cases) if case.expected_output is not None]
+        s_preds = [preds[i] for i in scored]
+        s_golds = [cases[i].expected_output for i in scored]
+        metrics = compute_metrics(s_preds, s_golds)
+        per_case = [case_scores(pred, gold) for pred, gold in zip(s_preds, s_golds, strict=True)]
+        exact_lo, exact_hi = bootstrap_ci([score[0] for score in per_case])
+        hier_lo, hier_hi = bootstrap_ci([score[1] for score in per_case])
+        macro_lo, macro_hi = bootstrap_macro_f1(s_preds, s_golds)
 
-        exact_scores: list[float] = []
-        hier_scores: list[float] = []
-        y_true: list[str] = []
-        y_pred: list[str] = []
-        true_classes: set[str] = set()
-
-        for case in report.cases:
-            if case.output is None or case.expected_output is None:
-                continue
-            predicted = str(case.output)
-            exp_out = case.expected_output
-            expected = [str(exp_out)] if isinstance(exp_out, str) else [str(e) for e in exp_out]
-            true_classes.update(expected)
-
-            one_of_score = case.scores.get("CARDSOneOfMatch")
-            if one_of_score is not None:
-                exact_scores.append(one_of_score.value)
-            h = case.scores.get("CARDSHierarchicalMatch")
-            if h is not None:
-                hier_scores.append(h.value)
-
-            if one_of_score is not None and one_of_score.value == 1.0:
-                y_true.append(predicted)
-            else:
-                a_pred = ancestors_of(predicted)
-                charged = max(expected, key=lambda e: _hierarchical_f1(a_pred, ancestors_of(e)))
-                y_true.append(charged)
-            y_pred.append(predicted)
+        for i, (pred, gold, (exact, hf1)) in zip(scored, zip(s_preds, s_golds, per_case, strict=True), strict=True):
+            case = cases[i]
             case_rows.append(
                 {
                     "config": config_name,
@@ -336,42 +336,15 @@ def benchmark_configs(
                     "context": mode,
                     "case_id": case.name,
                     "text": case.inputs.text if isinstance(case.inputs, CARDSInput) else str(case.inputs),
-                    "gold": ";".join(expected),
-                    "pred": predicted,
-                    "exact": one_of_score.value if one_of_score is not None else float("nan"),
-                    "hf1": h.value if h is not None else float("nan"),
+                    "gold": ";".join(normalize_gold(gold)),
+                    "pred": "" if pred is None else normalize_label(pred),
+                    "exact": exact,
+                    "hf1": hf1,
                     "has_context": isinstance(case.inputs, CARDSInput) and bool(case.inputs.context),
-                    "gold_d1": project_to_depth(y_true[-1], 1),
-                    "pred_d1": project_to_depth(predicted, 1),
+                    "gold_d1": project_to_depth(charged_gold(pred, gold, 2), 1),
+                    "pred_d1": "" if pred is None else project_to_depth(normalize_label(pred), 1),
                 }
             )
-
-        f1_by_strategy: dict[str, float] = {}
-        d1_f1_by_strategy: dict[str, float] = {}
-        if y_true and true_classes:
-            gold_labels = sorted(true_classes)
-            for strategy in ("macro", "micro", "weighted"):
-                _, _, f1, _ = precision_recall_fscore_support(
-                    y_true,
-                    y_pred,
-                    average=cast(Literal["binary", "micro", "macro", "samples", "weighted"], strategy),
-                    labels=gold_labels,
-                    zero_division=0,
-                )
-                f1_by_strategy[strategy] = float(f1)
-
-            d1_true = [project_to_depth(t, 1) for t in y_true]
-            d1_pred = [project_to_depth(p, 1) for p in y_pred]
-            d1_labels = sorted({project_to_depth(t, 1) for t in true_classes})
-            for strategy in ("macro", "weighted"):
-                _, _, f1, _ = precision_recall_fscore_support(
-                    d1_true,
-                    d1_pred,
-                    average=cast(Literal["binary", "micro", "macro", "samples", "weighted"], strategy),
-                    labels=d1_labels,
-                    zero_division=0,
-                )
-                d1_f1_by_strategy[strategy] = float(f1)
 
         rows.append(
             {
@@ -382,20 +355,28 @@ def benchmark_configs(
                 "provider": getattr(classifier, "_provider", "—"),
                 "model": getattr(classifier, "_model", type(classifier).__name__),
                 "prompt": _prompt_id(classifier),
-                "n_cases": len(y_pred),
-                "exact_match": round(sum(exact_scores) / len(exact_scores), 4) if exact_scores else 0.0,
-                "h_f1": round(sum(hier_scores) / len(hier_scores), 4) if hier_scores else 0.0,
-                "d1_macro_f1": round(d1_f1_by_strategy.get("macro", 0.0), 4),
-                "d1_weighted_f1": round(d1_f1_by_strategy.get("weighted", 0.0), 4),
-                "d2_macro_f1": round(f1_by_strategy.get("macro", 0.0), 4),
-                "d2_weighted_f1": round(f1_by_strategy.get("weighted", 0.0), 4),
-                "macro_f1": round(f1_by_strategy.get("macro", 0.0), 4),
-                "micro_f1": round(f1_by_strategy.get("micro", 0.0), 4),
-                "weighted_f1": round(f1_by_strategy.get("weighted", 0.0), 4),
-                "exact_lo": (ci_exact := bootstrap_ci(exact_scores))[0],
-                "exact_hi": ci_exact[1],
-                "h_f1_lo": (ci_hier := bootstrap_ci(hier_scores))[0],
-                "h_f1_hi": ci_hier[1],
+                "n_cases": metrics.n_cases,
+                "n_failed": metrics.n_failed,
+                "exact_match": round(metrics.exact, 4),
+                "h_f1": round(metrics.hf1, 4),
+                "d1_macro_f1": round(_f1(metrics, 1, "macro"), 4),
+                "d1_weighted_f1": round(_f1(metrics, 1, "weighted"), 4),
+                "d2_macro_f1": round(_f1(metrics, 2, "macro"), 4),
+                "d2_weighted_f1": round(_f1(metrics, 2, "weighted"), 4),
+                "macro_f1": round(_f1(metrics, 2, "macro"), 4),
+                "micro_f1": round(_f1(metrics, 2, "micro"), 4),
+                "weighted_f1": round(_f1(metrics, 2, "weighted"), 4),
+                "exact_answered": round(metrics.exact_answered, 4),
+                "not_related_rate": round(metrics.not_related_rate, 4),
+                "exact_unambiguous": round(metrics.exact_unambiguous, 4),
+                "n_unambiguous": metrics.n_unambiguous,
+                "baseline_exact": round(metrics.baseline_exact, 4),
+                "exact_lo": exact_lo,
+                "exact_hi": exact_hi,
+                "h_f1_lo": hier_lo,
+                "h_f1_hi": hier_hi,
+                "d2_macro_f1_lo": macro_lo,
+                "d2_macro_f1_hi": macro_hi,
                 "error": "",
             }
         )
