@@ -249,6 +249,31 @@ def _comparison(summary: pd.DataFrame) -> str:
     return _table(headers, rows)
 
 
+def _relatedness(summary: pd.DataFrame) -> str:
+    """The "is it climate at all?" scores; empty unless a run included not-climate documents."""
+    if "rel_f1" not in summary.columns or summary["rel_f1"].isna().all():
+        return ""
+    headers = [("Config", False), ("Dataset", False), ("Context", False), ("Not climate", True)]
+    headers += [("Precision", True), ("Recall", True), ("F1", True), ("False alarms", True)]
+    rows = [
+        [
+            _td(str(r["config"])),
+            _td(str(r["dataset"])),
+            _td(str(r["context"])),
+            _td(_count(r.get("n_not_climate")), num=True),
+            *(_td(_fmt(r.get(c)), num=True) for c in ("rel_precision", "rel_recall", "rel_f1", "rel_fpr")),
+        ]
+        for _, r in summary.iterrows()
+        if not pd.isna(r["rel_f1"])
+    ]
+    intro = (
+        '<p class="note">Whether a claim is about climate at all, scored on every document including those annotated '
+        'as not climate. "False alarms" is the share of not-climate documents called climate. The category scores '
+        "above cover the climate documents only.</p>"
+    )
+    return "<h2>Relatedness</h2>" + intro + _table(headers, rows)
+
+
 def _charts(summary: pd.DataFrame) -> str:
     usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
     if usable.empty:
@@ -452,7 +477,7 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
         '<meta name="viewport" content="width=device-width, initial-scale=1"><title>CARDS evaluation report</title>'
         f"<style>{_css()}</style></head><body><main><h1>CARDS evaluation report</h1>"
         f'<p class="muted">{len(runs)} run(s), {len(summary)} result row(s).</p>{caveat}'
-        f"<h2>Comparison</h2>{_comparison(summary)}<h2>Charts</h2>{_charts(summary)}"
+        f"<h2>Comparison</h2>{_comparison(summary)}{_relatedness(summary)}<h2>Charts</h2>{_charts(summary)}"
         f"{_model_comparison(cases, summary, baseline)}{_context_sections(cases)}{_details(runs)}</main></body></html>"
     )
     out = Path(out_path)

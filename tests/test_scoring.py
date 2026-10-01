@@ -166,3 +166,50 @@ class TestDepthThreeAndTies:
         point = compute_metrics(preds, golds).prf[2]["macro"][2]
         lo, hi = bootstrap_macro_f1(preds, golds)
         assert lo <= point <= hi
+
+
+class TestRelatedness:
+    def test_confusion_counts_use_the_not_related_spellings_interchangeably(self):
+        from climafactskg.classifiers.cards.scoring import relatedness
+
+        golds = [["1_1"], ["1_1"], ["0_0"], ["0_0"]]
+        r = relatedness(["1_1", "0_0", "0", "2_2"], golds)  # hit, miss, correct reject, false alarm
+
+        assert (r.n_related, r.n_not_related) == (2, 2)
+        assert (r.precision, r.recall, r.f1, r.fpr) == (0.5, 0.5, 0.5, 0.5)
+
+    def test_only_relatedness_counts_not_the_category(self):
+        from climafactskg.classifiers.cards.scoring import relatedness
+
+        r = relatedness(["2_2"], [["1_1"]])  # wrong category, but still "related"
+
+        assert r.recall == 1.0
+
+    def test_a_failed_prediction_is_wrong_on_either_side(self):
+        from climafactskg.classifiers.cards.scoring import relatedness
+
+        r = relatedness([None, None], [["1_1"], ["0_0"]])
+
+        assert r.recall == 0.0 and r.fpr == 1.0
+
+    def test_tied_gold_sets_that_include_not_related_are_left_out(self):
+        from climafactskg.classifiers.cards.scoring import relatedness
+
+        r = relatedness(["1_1", "1_1"], [["0_0", "1_1"], ["1_1"]])
+
+        assert (r.n_related, r.n_not_related) == (1, 0)
+
+    def test_undefined_rates_are_nan_not_zero(self):
+        import math
+
+        from climafactskg.classifiers.cards.scoring import relatedness
+
+        r = relatedness(["1_1"], [["1_1"]])  # no negatives: no false-positive rate, precision is trivially 1
+
+        assert math.isnan(r.fpr) and r.recall == 1.0
+
+    def test_pure_not_climate_gold_is_detected(self):
+        from climafactskg.classifiers.cards.scoring import is_not_climate_gold
+
+        assert is_not_climate_gold(["0"]) and is_not_climate_gold(["0_0"])
+        assert not is_not_climate_gold(["0_0", "1_1"]) and not is_not_climate_gold(["1_1"])

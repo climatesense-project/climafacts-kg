@@ -55,7 +55,8 @@ def test_micro_f1_is_plain_accuracy():
 
 
 def test_the_two_not_related_spellings_are_one_class():
-    row = _row(["0", "0_0"], [["0_0"], ["0_0"]])
+    # Gold ties that include "not related" stay in the category scores (pure not-climate gold goes to relatedness).
+    row = _row(["0", "0_0"], [["0_0", "1_1"], ["0_0", "1_1"]])
     assert row["exact_match"] == 1.0 and row["h_f1"] == 1.0
 
 
@@ -101,3 +102,30 @@ def test_a_case_without_any_gold_label_is_skipped_not_fatal():
     row = _row(["1_1", "1_1", "1_1"], [["1_1"], [], ""])
 
     assert row["n_cases"] == 1 and row["exact_match"] == 1.0
+
+
+def test_not_climate_gold_cases_are_scored_for_relatedness_not_category(tmp_path):
+    df = benchmark_configs(
+        {"x": _Fixed(["1_1", "2_2", "0", "1_1"])},
+        {"d": _dataset([["1_1"], ["1_1"], ["0_0"], ["0_0"]])},
+        save_dir=str(tmp_path),
+    )
+    row = df.iloc[0]
+
+    assert (row["n_cases"], row["n_not_climate"]) == (2, 2)  # category scores stay on the climate cases
+    assert row["exact_match"] == 0.5
+    assert abs(row["rel_precision"] - 2 / 3) < 1e-3 and row["rel_recall"] == 1.0 and row["rel_fpr"] == 0.5
+    assert len(load_run(df.attrs["run_dir"]).cases) == 2  # saved case rows are the category table
+
+
+def test_without_not_climate_gold_the_relatedness_columns_are_empty_and_nothing_else_changes():
+    row = _row(["1_1", "2_2"], [["1_1"], ["1_1"]])
+
+    assert row["n_not_climate"] == 0 and row["n_cases"] == 2 and row["exact_match"] == 0.5
+    assert np.isnan(row["rel_f1"]) and np.isnan(row["rel_recall"])
+
+
+def test_a_dataset_of_only_not_climate_cases_does_not_crash():
+    row = _row(["0", "1_1"], [["0_0"], ["0_0"]])
+
+    assert row["n_cases"] == 0 and row["n_not_climate"] == 2 and row["rel_fpr"] == 0.5

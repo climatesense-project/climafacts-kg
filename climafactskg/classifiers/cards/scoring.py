@@ -14,6 +14,10 @@ Conventions
 * Micro-F1 is computed over every label that occurs, so it equals plain accuracy (failures included). Macro and weighted
   F1 average over the classes that occur in some gold set *and* were charged or predicted at least once, so neither
   predicted-only classes nor classes that only appear as a second option in tied gold sets add zero-F1 entries.
+* Relatedness ("is this a climate claim at all?") is scored separately from the category (:func:`relatedness`), on every
+  case whose gold is not a tie that includes "not related". A failed prediction is wrong on both sides. The category
+  metrics belong to the climate cases only, so a dataset that also holds not-climate documents is split by
+  :func:`is_not_climate_gold` before :func:`compute_metrics`.
 """
 
 from collections.abc import Iterable, Sequence
@@ -235,6 +239,57 @@ def compute_metrics(preds: Sequence[str | None], golds: Sequence[Any]) -> Metric
     )
 
 
+_NOT_RELATED = "0_0"
+
+
+def is_not_climate_gold(golds: Any) -> bool:
+    """True when the gold is exactly "not climate" (a tie between "not climate" and a category is not)."""
+    return normalize_gold(golds) == [_NOT_RELATED]
+
+
+@dataclass(frozen=True)
+class Relatedness:
+    """Confusion-based scores of the "climate related" decision. NaN where a rate has an empty denominator."""
+
+    n_related: int
+    n_not_related: int
+    precision: float
+    recall: float
+    f1: float
+    fpr: float
+
+
+def _rate(numerator: int, denominator: int) -> float:
+    return numerator / denominator if denominator else float("nan")
+
+
+def relatedness(preds: Sequence[str | None], golds: Sequence[Any]) -> Relatedness:
+    """Scores the related-vs-not-related decision (positive class: "climate related").
+
+    A case is *related* when no gold label is "not related", *not related* when the gold is exactly that; tied gold sets
+    containing both are skipped. A prediction counts as "related" when it is any category, so a wrong category is still
+    a correct relatedness call. ``None`` (failed) is the wrong answer in either direction.
+    """
+    if len(preds) != len(golds):
+        raise ValueError(f"{len(preds)} predictions but {len(golds)} gold sets")
+    tp = fp = tn = fn = 0
+    for pred, gold in zip(preds, golds, strict=True):
+        labels = normalize_gold(gold)
+        if not labels or (_NOT_RELATED in labels and labels != [_NOT_RELATED]):
+            continue
+        related = _NOT_RELATED not in labels
+        said_related = None if pred is None else normalize_label(pred) != _NOT_RELATED
+        if said_related is None:
+            said_related = not related
+        if related:
+            tp, fn = (tp + 1, fn) if said_related else (tp, fn + 1)
+        else:
+            fp, tn = (fp + 1, tn) if said_related else (fp, tn + 1)
+    precision, recall = _rate(tp, tp + fp), _rate(tp, tp + fn)
+    f1 = _rate(2 * tp, 2 * tp + fp + fn)
+    return Relatedness(tp + fn, fp + tn, precision, recall, f1, _rate(fp, fp + tn))
+
+
 def bootstrap_macro_f1(
     preds: Sequence[str | None],
     golds: Sequence[Any],
@@ -276,12 +331,15 @@ def bootstrap_macro_f1(
 __all__ = [
     "FAILED",
     "Metrics",
+    "Relatedness",
     "ancestors_of",
     "bootstrap_macro_f1",
     "case_scores",
     "charged_gold",
     "compute_metrics",
+    "is_not_climate_gold",
     "normalize_gold",
     "normalize_label",
     "project_to_depth",
+    "relatedness",
 ]

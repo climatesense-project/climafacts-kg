@@ -88,8 +88,10 @@ from .scoring import (
     case_scores,
     charged_gold,
     compute_metrics,
+    is_not_climate_gold,
     normalize_gold,
     normalize_label,
+    relatedness,
 )
 
 logger = logging.getLogger(__name__)
@@ -313,6 +315,11 @@ def benchmark_configs(
                     "not_related_rate": float("nan"),
                     "exact_unambiguous": float("nan"),
                     "n_unambiguous": float("nan"),
+                    "n_not_climate": float("nan"),
+                    "rel_precision": float("nan"),
+                    "rel_recall": float("nan"),
+                    "rel_f1": float("nan"),
+                    "rel_fpr": float("nan"),
                     "baseline_exact": float("nan"),
                     "exact_lo": float("nan"),
                     "exact_hi": float("nan"),
@@ -327,6 +334,9 @@ def benchmark_configs(
 
         # Cases without a gold label cannot be scored. A failed prediction (None) is a wrong answer, not a missing one.
         scored = [i for i, case in enumerate(cases) if normalize_gold(case.expected_output)]
+        relation = relatedness([preds[i] for i in scored], [cases[i].expected_output for i in scored])
+        # The category scores belong to the climate cases; documents whose gold is "not climate" only feed relatedness.
+        scored = [i for i in scored if not is_not_climate_gold(cases[i].expected_output)]
         s_preds = [preds[i] for i in scored]
         s_golds = [cases[i].expected_output for i in scored]
         metrics = compute_metrics(s_preds, s_golds)
@@ -334,6 +344,7 @@ def benchmark_configs(
         exact_lo, exact_hi = bootstrap_ci([score[0] for score in per_case])
         hier_lo, hier_hi = bootstrap_ci([score[1] for score in per_case])
         macro_lo, macro_hi = bootstrap_macro_f1(s_preds, s_golds)
+        has_negatives = relation.n_not_related > 0
 
         for i, (pred, gold, (exact, hf1)) in zip(scored, zip(s_preds, s_golds, per_case, strict=True), strict=True):
             case = cases[i]
@@ -378,6 +389,12 @@ def benchmark_configs(
                 "not_related_rate": round(metrics.not_related_rate, 4),
                 "exact_unambiguous": round(metrics.exact_unambiguous, 4),
                 "n_unambiguous": metrics.n_unambiguous,
+                "n_not_climate": relation.n_not_related,
+                # Only meaningful when the dataset has not-climate documents (load it with climate_only=False).
+                "rel_precision": round(relation.precision, 4) if has_negatives else float("nan"),
+                "rel_recall": round(relation.recall, 4) if has_negatives else float("nan"),
+                "rel_f1": round(relation.f1, 4) if has_negatives else float("nan"),
+                "rel_fpr": round(relation.fpr, 4) if has_negatives else float("nan"),
                 "baseline_exact": round(metrics.baseline_exact, 4),
                 "exact_lo": exact_lo,
                 "exact_hi": exact_hi,
@@ -537,8 +554,29 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
                 )
                 label = label if len(label) <= 30 else label[:29] + "…"  # keep room for the reason at 80 columns
                 _console.print(f"[red]failed[/red] {label}: {error}", overflow="ellipsis", no_wrap=True, crop=True)
+    _print_relatedness(df)
     if "context" in df.columns and (df["context"] == "with").any():
         _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
+
+
+def _print_relatedness(df: pd.DataFrame) -> None:
+    """A second table with the climate-or-not scores; only printed when a dataset had not-climate documents."""
+    if "rel_f1" not in df.columns or df["rel_f1"].isna().all():
+        return
+    table = Table(title="Relatedness (climate or not)", box=box.SIMPLE, collapse_padding=True, pad_edge=False)
+    for header, justify in (("Config", "left"), ("Dataset", "left"), ("Ctx", "left"), ("Not clim.", "right")):
+        table.add_column(header, justify=cast(Literal["left", "right"], justify), no_wrap=True, max_width=14)
+    for header in ("Prec", "Recall", "F1", "False alarm"):
+        table.add_column(header, justify="right", no_wrap=True, min_width=6)
+    for _, row in df[df["rel_f1"].notna()].iterrows():
+        table.add_row(
+            str(row["config"]),
+            str(row["dataset"]),
+            str(row.get("context", "")),
+            str(int(row["n_not_climate"])),
+            *(f"{row[c]:.3f}" for c in ("rel_precision", "rel_recall", "rel_f1", "rel_fpr")),
+        )
+    _console.print(table)
 
 
 def _format_p(p: float) -> str:

@@ -370,6 +370,8 @@ climafactskg eval run eval.toml --report    # run, save, and write report.html n
 climafactskg eval run eval.toml --yes       # skip the confirmation before paid LLM calls
 ```
 
+**Relatedness (is it a climate claim at all?).** By default the ClimateSense datasets keep only documents annotated as climate-related, so the classifier's first decision (climate or not) is never tested on a real negative. Set `climate_only = false` on a dataset to include the not-climate documents (v1: 398 instead of 153, v2: 277 instead of 143). They are scored separately: the category scores (exact, hF1, F1) still cover the climate documents only, and a second "Relatedness" table (console and HTML report) gives precision, recall, F1 and the false-alarm rate (share of not-climate documents called climate) of the climate-or-not decision. A wrong category on a climate document is still a correct relatedness call, and a failed prediction counts as wrong. Gold sets that tie "not climate" with a category are left out of the relatedness score. The not-climate documents are not written to `cases.csv`, so context and model comparisons stay on the category cases. A mixed run costs more calls, so check `--dry-run` first.
+
 A run that calls a hosted LLM provider (anything except `ollama` / `lmstudio`) asks for confirmation first, unless `--yes` is given. The config file is validated up front, so a misspelled key or an unknown dataset option fails before anything is spent. Each run is saved to its own timestamped directory under `save_dir` (`run.json`, `cases.csv`, `summary.csv`, plus a copy of the config); runs are never overwritten. To compare runs or re-render a report later:
 
 ```bash

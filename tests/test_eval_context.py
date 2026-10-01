@@ -328,3 +328,17 @@ class TestCountColumnsWithErrorRows:
 
         assert "7.000" not in text and "143.000" not in text
         assert "  7  " in text.replace("|", " ")
+
+
+class TestPrintedRelatedness:
+    def test_a_relatedness_table_is_printed_only_with_not_climate_documents(self, capsys):
+        import pandas as pd
+
+        base = {"config": "c", "dataset": "d", "context": "none", "n_cases": 4, "n_not_climate": 0}
+        print_benchmark(pd.DataFrame([{**base, "rel_f1": float("nan")}]))
+        assert "Relatedness" not in capsys.readouterr().out
+
+        mixed = {**base, "n_not_climate": 5, "rel_precision": 0.8, "rel_recall": 0.9, "rel_f1": 0.85, "rel_fpr": 0.2}
+        print_benchmark(pd.DataFrame([mixed]))
+        out = capsys.readouterr().out
+        assert "Relatedness" in out and "0.850" in out and "0.200" in out

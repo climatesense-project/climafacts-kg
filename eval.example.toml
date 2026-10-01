@@ -54,3 +54,11 @@ name = "climatesense_v2"
 label = "climatesense_v2 (context only)"
 with_context = true
 only_with_context = true
+
+# Also score "is it a climate claim at all?": include the documents annotated as not climate. The category scores keep
+# covering the climate documents only; the extra documents feed the separate relatedness table (precision, recall, F1,
+# false alarms). Costs about 2.6x (v1) / 1.9x (v2) more classifications than climate-only.
+[[datasets]]
+name = "climatesense_v2"
+label = "climatesense_v2 (incl. not climate)"
+climate_only = false

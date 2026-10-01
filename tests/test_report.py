@@ -278,3 +278,19 @@ class TestSignificanceInReport:
     def test_an_unknown_baseline_is_a_clear_error(self, tmp_path):
         with pytest.raises(ValueError, match="baseline"):
             render_html([_two_config_run()], tmp_path / "r.html", baseline="nope")
+
+
+def test_relatedness_section_appears_only_when_a_run_has_not_climate_documents(tmp_path):
+    plain = render_html([_run()], tmp_path / "plain.html").read_text(encoding="utf-8")
+    row = {
+        **_summary_row(),
+        "n_not_climate": 6,
+        "rel_precision": 0.8,
+        "rel_recall": 0.9,
+        "rel_f1": 0.85,
+        "rel_fpr": 0.2,
+    }
+    mixed = render_html([_run(extra_summary=[row])], tmp_path / "mixed.html").read_text(encoding="utf-8")
+
+    assert "Relatedness" not in plain
+    assert "Relatedness" in mixed and "0.850" in mixed and "0.200" in mixed
