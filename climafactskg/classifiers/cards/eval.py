@@ -411,13 +411,22 @@ def benchmark_configs(
 
 
 # Score columns must never be squeezed (a truncated "0.…" is useless); the text columns give way instead.
-_MIN_WIDTHS = {"exact_match": 10, "h_f1": 10, "d1_macro_f1": 6, "d2_macro_f1": 6, "n_cases": 3, "n_with_context": 3}
+_MIN_WIDTHS = {
+    "exact_match": 10,
+    "h_f1": 10,
+    "d1_macro_f1": 6,
+    "d2_macro_f1": 6,
+    "n_cases": 3,
+    "n_failed": 4,
+    "n_with_context": 3,
+}
 _COMPACT_COLUMNS = (
     "config",
     "dataset",
     "context",
     "n_with_context",
     "n_cases",
+    "n_failed",
     "exact_match",
     "h_f1",
     "d1_macro_f1",
@@ -448,14 +457,15 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
     # (key, header, style, justify, max_width, no_wrap)
     # macro_f1/micro_f1/weighted_f1 are omitted — d2_* carry the same values.
     col_spec: list[tuple[str, str, str, str, int | None, bool]] = [
-        ("config", "Config", "bold cyan", "left", 22 if wide else 10, True),
-        ("dataset", "Dataset", "", "left", 16 if wide else 8, True),
+        ("config", "Config", "bold cyan", "left", 22 if wide else 8, True),
+        ("dataset", "Dataset", "", "left", 16 if wide else 6, True),
         ("context", "Ctx", "dim", "left", 4, True),
-        ("n_with_context", "Ctx N", "dim", "right", None, False),
+        ("n_with_context", "Ctx#", "dim", "right", None, False),
         ("provider", "Provider", "dim", "left", 12, True),
         ("model", "Model", "", "left", 22, True),
         ("prompt", "Prompt", "dim italic", "left", 35, True),
         ("n_cases", "N", "", "right", None, False),
+        ("n_failed", "Fail", "red", "right", None, False),
         ("exact_match", "Exact", "green", "right", None, False),
         ("h_f1", "hF1", "green", "right", None, False),
         ("d1_macro_f1", "D1 Mac", "yellow", "right", None, False),

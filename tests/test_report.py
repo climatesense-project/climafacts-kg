@@ -199,3 +199,35 @@ class TestReviewFixes:
 
         section = html[html.index("Cases changed by context") :]
         assert "<th>Dataset</th>" in section.split("</table>")[0]
+
+
+class TestReliabilityColumns:
+    def _extended_run(self):
+        run = _run()
+        run.summary["n_failed"] = [3, 0]
+        run.summary["not_related_rate"] = [0.28, 0.15]
+        run.summary["exact_unambiguous"] = [0.4156, 0.3117]
+        run.summary["n_unambiguous"] = [77, 77]
+        run.summary["baseline_exact"] = [0.1958, 0.1958]
+        run.summary["d2_macro_f1_lo"] = [0.23, 0.2]
+        run.summary["d2_macro_f1_hi"] = [0.35, 0.34]
+        return run
+
+    def test_comparison_table_shows_failures_baseline_and_the_unambiguous_subset(self, tmp_path):
+        html = render_html([self._extended_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+        table = html[html.index("<h2>Comparison</h2>") : html.index("<h2>Charts</h2>")]
+
+        for header in ("Failed", "Not related", "Unambiguous", "Baseline"):
+            assert f'<th class="num">{header}</th>' in table
+        assert "28%" in table and "0.196" in table and "0.416" in table and "n=77" in table
+        assert "3 failed" in table  # the note cell says failures are counted as wrong
+
+    def test_macro_f1_gets_its_interval_in_the_table(self, tmp_path):
+        html = render_html([self._extended_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "[0.23–0.35]" in html
+
+    def test_older_runs_without_the_new_columns_still_render(self, tmp_path):
+        html = render_html([_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "<h2>Comparison</h2>" in html

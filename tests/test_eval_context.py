@@ -295,3 +295,17 @@ class TestEvaluateWithFailedPredictions:
         assert "0.6667" in text  # 2 right out of 3, not 2 of the 2 that answered
         assert "Failed predictions (counted as wrong)" in text and "1 of 3" in text
         assert "Exact match (answered only)" in text and "1.0000" in text
+
+
+class TestFailureColumn:
+    def test_compact_table_shows_the_failed_count_within_80_columns(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        df = _long_summary()
+        df["n_failed"] = 7
+        print_benchmark(df)
+        lines = buffer.getvalue().splitlines()
+
+        assert any("Fail" in line for line in lines)
+        assert max(len(line) for line in lines) <= 80
+        text = "\n".join(lines)
+        assert "D2 Mac" in text and "0.303" in text  # adding a column must not crop the others

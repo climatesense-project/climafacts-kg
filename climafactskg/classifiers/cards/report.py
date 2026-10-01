@@ -19,7 +19,11 @@ _SERIES_LIGHT = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300
 _SERIES_DARK = ("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767")
 MAX_SERIES = len(_SERIES_LIGHT)
 _METRICS = (("exact_match", "Exact match"), ("h_f1", "Hierarchical F1"), ("d2_macro_f1", "Depth-2 macro F1"))
-_CI_COLUMNS = {"exact_match": ("exact_lo", "exact_hi"), "h_f1": ("h_f1_lo", "h_f1_hi")}
+_CI_COLUMNS = {
+    "exact_match": ("exact_lo", "exact_hi"),
+    "h_f1": ("h_f1_lo", "h_f1_hi"),
+    "d2_macro_f1": ("d2_macro_f1_lo", "d2_macro_f1_hi"),
+}
 _esc = html.escape
 
 
@@ -46,14 +50,14 @@ def _css() -> str:
 * {{ box-sizing: border-box; }}
 body {{ margin: 0; padding: 24px 16px 48px; background: var(--surface); color: var(--text);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }}
-main {{ max-width: 980px; margin: 0 auto; }}
+main {{ max-width: 1240px; margin: 0 auto; }}
 h1 {{ font-size: 1.5rem; margin: 0 0 4px; }} h2 {{ font-size: 1.15rem; margin: 32px 0 8px; }}
 p, li, td, th, dd, dt, summary {{ color: var(--text); }} .muted {{ color: var(--text2); }}
 .note {{ border-left: 3px solid var(--grid); padding: 4px 12px; color: var(--text2); margin: 12px 0; }}
-.scroll {{ overflow-x: auto; }} table {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
-th, td {{ padding: 6px 10px; border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }}
+.scroll {{ overflow-x: auto; }} table {{ border-collapse: collapse; width: 100%; font-size: 0.86rem; }}
+th, td {{ padding: 6px 8px; border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }}
 td.num, th.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
-td.wrap {{ white-space: normal; min-width: 220px; }}
+td.wrap {{ white-space: normal; min-width: 150px; }}
 td b {{ font-weight: 700; }}
 .ci {{ color: var(--text2); font-size: 0.8em; }}
 .bad {{ color: var(--text); font-weight: 600; }}
@@ -181,6 +185,11 @@ def _table(headers: Sequence[tuple[str, bool]], rows: Sequence[Sequence[str]]) -
     return f'<div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
+def _count(value) -> str:
+    """An integer count, or a dash when it is missing (older saved runs do not have every column)."""
+    return "—" if value is None or pd.isna(value) else str(int(value))
+
+
 def _comparison(summary: pd.DataFrame) -> str:
     best: dict[tuple[str, str], float] = {}
     for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
@@ -189,8 +198,9 @@ def _comparison(summary: pd.DataFrame) -> str:
                 values = group[metric].dropna()
                 if not values.empty:
                     best[(str(dataset), metric)] = float(values.max())
-    headers = [("Config", False), ("Dataset", False), ("Context", False), ("N", True), ("With ctx", True)]
-    headers += [("Exact", True), ("hF1", True), ("D1 macro", True), ("D2 macro", True), ("Note", False)]
+    headers = [("Config", False), ("Dataset", False), ("Context", False), ("N", True), ("Failed", True)]
+    headers += [("With ctx", True), ("Exact", True), ("hF1", True), ("D1 macro", True), ("D2 macro", True)]
+    headers += [("Not related", True), ("Unambiguous", True), ("Baseline", True), ("Note", False)]
     rows = []
     for _, r in summary.iterrows():
         failed = bool(str(r.get("error", "")).strip()) or int(r["n_cases"]) == 0  # nothing evaluated: show dashes
@@ -199,6 +209,7 @@ def _comparison(summary: pd.DataFrame) -> str:
             _td(str(r["dataset"])),
             _td(str(r["context"])),
             _td(str(int(r["n_cases"])), num=True),
+            _td(_count(r.get("n_failed")), num=True),
         ]
         cells.append(
             _td(
@@ -214,8 +225,26 @@ def _comparison(summary: pd.DataFrame) -> str:
             if lo and lo in r and not failed and not pd.isna(r[lo]) and not pd.isna(r[hi]):
                 text += f' <span class="ci">[{_fmt(r[lo], 2)}–{_fmt(r[hi], 2)}]</span>'
             cells.append(_td(text, num=True, best=is_best, raw=True))
+        cells.append(
+            _td("—" if failed or pd.isna(r.get("not_related_rate")) else f"{r['not_related_rate']:.0%}", num=True)
+        )
+        unambiguous = r.get("exact_unambiguous")
+        has_unambiguous = not failed and unambiguous is not None and not pd.isna(unambiguous)
+        cells.append(
+            _td(f"{_fmt(unambiguous)} (n={_count(r.get('n_unambiguous'))})" if has_unambiguous else "—", num=True)
+        )
+        cells.append(_td("—" if failed else _fmt(r.get("baseline_exact")), num=True))
         error = str(r.get("error", "")).strip()
-        cells.append(_td(f"failed: {error}" if error else ("no cases evaluated" if failed else ""), wrap=True))
+        n_failed = r.get("n_failed")
+        if error:
+            note = f"failed: {error}"
+        elif failed:
+            note = "no cases evaluated"
+        elif n_failed is not None and not pd.isna(n_failed) and int(n_failed) > 0:
+            note = f"{int(n_failed)} failed, counted as wrong"
+        else:
+            note = ""
+        cells.append(_td(note, wrap=True))
         rows.append(cells)
     return _table(headers, rows)
 
