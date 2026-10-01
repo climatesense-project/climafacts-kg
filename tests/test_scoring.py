@@ -140,3 +140,29 @@ class TestChargedGold:
 
     def test_depth_one_projects_before_charging(self):
         assert charged_gold("2_1", ["3_1", "2_3"], depth=1) == "2_0"
+
+
+class TestDepthThreeAndTies:
+    def test_depth_three_codes_fold_to_depth_two_everywhere(self):
+        assert normalize_label("2_1_1") == "2_1"
+        for pred, gold in (("2_1_1", ["2_1"]), ("2_1", ["2_1_1"])):
+            m = compute_metrics([pred], [gold])
+            assert m.exact == 1.0 and m.hf1 == 1.0 and m.prf[2]["micro"][2] == 1.0  # exact and micro agree
+
+    def test_failure_is_charged_at_depth_one_too(self):
+        assert charged_gold(None, ["3_1", "2_3"], depth=1) == "3_0"
+
+    def test_a_perfect_classifier_reaches_macro_one_despite_tie_only_classes(self):
+        # 2_1 only ever appears as a second acceptable label, so nobody is charged to it and nobody predicts it.
+        m = compute_metrics(["1_1", "0"], [["1_1", "2_1"], ["0_0"]])
+        assert m.prf[2]["macro"][2] == pytest.approx(1.0)
+
+    def test_empty_labels_are_not_classes(self):
+        assert normalize_gold("") == [] and normalize_gold(["", "1_1"]) == ["1_1"]
+
+    def test_bootstrap_interval_brackets_the_macro_estimate(self):
+        preds = ["1_1", "1_1", "2_1", "2_1", "3_1", "3_2", "1_2", "2_2"] * 25
+        golds = [["1_1"], ["1_2"], ["2_1"], ["2_2"], ["3_1"], ["3_1"], ["1_2"], ["2_2", "2_1"]] * 25
+        point = compute_metrics(preds, golds).prf[2]["macro"][2]
+        lo, hi = bootstrap_macro_f1(preds, golds)
+        assert lo <= point <= hi

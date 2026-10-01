@@ -222,10 +222,18 @@ def benchmark_configs(
             save logs a warning and never loses the returned DataFrame.
 
     Returns:
-        DataFrame with columns ``config``, ``dataset``, ``context``, ``n_with_context`` (cases that actually
-            carried context in that run), ``n_cases``,
-        ``exact_match``, ``h_f1``, ``macro_f1``, ``micro_f1``, ``weighted_f1`` and the 95% bootstrap intervals
-        ``exact_lo``/``exact_hi`` and ``h_f1_lo``/``h_f1_hi``.
+        DataFrame with one row per (config, dataset, context mode):
+
+        * identity: ``config``, ``dataset``, ``context``, ``provider``, ``model``, ``prompt``;
+        * sizes: ``n_cases`` (every scored case, failures included), ``n_failed`` (predictions that failed and count
+          as wrong), ``n_with_context``, ``n_unambiguous`` (cases with a single gold label);
+        * scores: ``exact_match``, ``h_f1`` (over all cases), ``exact_answered`` (answered cases only),
+          ``d1_*``/``d2_*`` macro and weighted F1 at taxonomy depth 1 and 2, ``macro_f1``/``weighted_f1`` (= depth 2),
+          ``micro_f1`` (plain accuracy);
+        * context for reading them: ``not_related_rate`` (share of answered predictions saying "not climate"),
+          ``exact_unambiguous`` (exact match on single-label gold only), ``baseline_exact`` (best constant label);
+        * 95% bootstrap intervals over cases: ``exact_lo/hi``, ``h_f1_lo/hi``, ``d2_macro_f1_lo/hi``;
+        * ``error``: the failure text when the whole combination raised (its scores are NaN).
 
     Example::
 
@@ -318,7 +326,7 @@ def benchmark_configs(
             continue
 
         # Cases without a gold label cannot be scored. A failed prediction (None) is a wrong answer, not a missing one.
-        scored = [i for i, case in enumerate(cases) if case.expected_output is not None]
+        scored = [i for i, case in enumerate(cases) if normalize_gold(case.expected_output)]
         s_preds = [preds[i] for i in scored]
         s_golds = [cases[i].expected_output for i in scored]
         metrics = compute_metrics(s_preds, s_golds)
@@ -420,6 +428,8 @@ _MIN_WIDTHS = {
     "n_failed": 4,
     "n_with_context": 3,
 }
+# Integer columns: shown without decimals even when another row (a failed combination) has no value for them.
+_COUNT_COLUMNS = ("n_cases", "n_failed", "n_with_context", "n_unambiguous")
 _COMPACT_COLUMNS = (
     "config",
     "dataset",
@@ -507,6 +517,8 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
         for col, _, _, _, _, _ in present:
             if no_cases and col in _METRIC_COLUMNS:
                 cells.append("—")
+            elif col in _COUNT_COLUMNS:
+                cells.append("—" if pd.isna(row[col]) else str(int(row[col])))
             elif col in ("exact_match", "h_f1"):
                 cells.append(_score_cell(row, col))
             elif isinstance(row[col], float):

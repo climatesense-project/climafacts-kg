@@ -7,11 +7,13 @@ Conventions
 -----------
 * A prediction of ``None`` (the LLM engine's "still failed after retries") is a **wrong answer**: it stays in every
   denominator, and ``n_failed`` reports how many there were.
-* ``"0"`` and ``"0_0"`` are the same class ("not climate misinformation"); both spellings are normalised to ``"0_0"``.
+* Labels are folded to the classifier's depth-2 form on both sides (``"0"`` and ``"0_0"`` are the same class, bare
+  ``"1"`` is ``"1_0"``, a depth-3 id such as ``"2_1_1"`` is ``"2_1"``), so exact match, hF1 and the F1 family agree.
 * Hit/miss is "the prediction is any acceptable gold label". For the F1 family a miss is *charged* to the hierarchically
   closest gold label (a hit is charged to the prediction), giving exactly one false negative per miss.
 * Micro-F1 is computed over every label that occurs, so it equals plain accuracy (failures included). Macro and weighted
-  F1 average over the classes that occur in some gold set, so predicted-only classes do not add zero-F1 entries.
+  F1 average over the classes that occur in some gold set *and* were charged or predicted at least once, so neither
+  predicted-only classes nor classes that only appear as a second option in tied gold sets add zero-F1 entries.
 """
 
 from collections.abc import Iterable, Sequence
@@ -93,9 +95,9 @@ def _hierarchical_f1(a_pred: frozenset[str], a_true: frozenset[str]) -> float:
 
 
 def normalize_label(label: Any) -> str:
-    """Strips a label and pads a bare top-level code to its ``X_0`` form (so ``"0"`` and ``"0_0"`` are one class)."""
+    """Strips a label and folds it to the classifier's depth-2 form (``"0"`` -> ``"0_0"``, ``"2_1_1"`` -> ``"2_1"``)."""
     text = str(label).strip()
-    return f"{text}_0" if text.isdigit() else text
+    return project_to_depth(text, _MAX_CLASSIFIER_DEPTH) if text else text
 
 
 def normalize_gold(expected: Any) -> list[str]:
@@ -103,7 +105,7 @@ def normalize_gold(expected: Any) -> list[str]:
     if expected is None:
         return []
     items = [expected] if isinstance(expected, (str, bytes)) or not isinstance(expected, Iterable) else list(expected)
-    return list(dict.fromkeys(normalize_label(item) for item in items))
+    return [label for label in dict.fromkeys(normalize_label(item) for item in items) if label]
 
 
 def case_scores(pred: str | None, golds: Any) -> tuple[float, float]:
@@ -205,7 +207,10 @@ def compute_metrics(preds: Sequence[str | None], golds: Sequence[Any]) -> Metric
         y_true, y_pred, gold_labels = _charged_arrays(norm_preds, norm_golds, depth)
         prf[depth] = {}
         for strategy in _STRATEGIES:
-            labels = sorted(set(y_true) | set(y_pred)) if strategy == "micro" else sorted(gold_labels)
+            if strategy == "micro":
+                labels = sorted(set(y_true) | set(y_pred))
+            else:
+                labels = sorted(gold_labels & (set(y_true) | set(y_pred)))
             p, r, f1, _ = precision_recall_fscore_support(
                 y_true,
                 y_pred,
@@ -247,7 +252,7 @@ def bootstrap_macro_f1(
     if not norm_preds:
         return (float("nan"), float("nan"))
     y_true, y_pred, gold_labels = _charged_arrays(norm_preds, norm_golds, depth)
-    labels = sorted(gold_labels)
+    labels = sorted(gold_labels & (set(y_true) | set(y_pred)))
     index = {label: i for i, label in enumerate(labels)}
     k = len(labels)
     true_idx = np.array([index[label] for label in y_true])

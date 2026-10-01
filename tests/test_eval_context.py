@@ -309,3 +309,20 @@ class TestFailureColumn:
         assert max(len(line) for line in lines) <= 80
         text = "\n".join(lines)
         assert "D2 Mac" in text and "0.303" in text  # adding a column must not crop the others
+
+
+class TestCountColumnsWithErrorRows:
+    def test_counts_stay_integers_when_another_row_has_no_value(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        ok = _long_summary()
+        ok["n_failed"] = 7
+        failed = ok.copy()
+        failed.loc[0, ["n_failed", "exact_match", "h_f1"]] = float("nan")
+        failed.loc[0, "error"] = "RuntimeError: boom"
+        failed["config"] = "broken"
+        df = pd.concat([ok, failed], ignore_index=True)
+        print_benchmark(df)
+        text = buffer.getvalue()
+
+        assert "7.000" not in text and "143.000" not in text
+        assert "  7  " in text.replace("|", " ")

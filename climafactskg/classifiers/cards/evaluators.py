@@ -42,10 +42,8 @@ from pydantic_evals.evaluators import (
 )
 from pydantic_evals.reporting import TableResult
 
-logger = logging.getLogger(__name__)
-
 # Shared scoring lives in :mod:`.scoring`; these names stay importable from here.
-from .scoring import (  # noqa: E402,F401
+from .scoring import (  # noqa: F401
     _MAX_CLASSIFIER_DEPTH,
     _hierarchical_f1,
     ancestors_of,
@@ -53,6 +51,8 @@ from .scoring import (  # noqa: E402,F401
     compute_metrics,
     project_to_depth,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -117,9 +117,10 @@ class HierarchicalMetricsReportEvaluator(ReportEvaluator[Any, Any, Any]):
         logger.info("Hierarchical match (mean hF1): %.4f", m.hf1)
         logger.info("Exact match (CARDSOneOfMatch): %.4f", m.exact)
 
+        scored = m.n_cases > 0
         rows = [
-            ["Exact match (CARDSOneOfMatch)", f"{m.exact:.4f}"],
-            ["Hierarchical match (hF1)", f"{m.hf1:.4f}"],
+            ["Exact match (CARDSOneOfMatch)", f"{m.exact:.4f}" if scored else "—"],
+            ["Hierarchical match (hF1)", f"{m.hf1:.4f}" if scored else "—"],
         ]
         if m.n_failed:
             rows += [

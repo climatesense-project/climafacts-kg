@@ -229,5 +229,7 @@ class TestReliabilityColumns:
 
     def test_older_runs_without_the_new_columns_still_render(self, tmp_path):
         html = render_html([_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+        table = html[html.index("<h2>Comparison</h2>") : html.index("<h2>Charts</h2>")]
 
-        assert "<h2>Comparison</h2>" in html
+        assert table.count("—") >= 4  # failed / not related / unambiguous / baseline are dashes, not made-up values
+        assert "nan" not in html.lower()

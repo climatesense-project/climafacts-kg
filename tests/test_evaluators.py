@@ -125,3 +125,12 @@ class TestCARDSHierarchicalMatch:
 def test_hierarchical_match_handles_fallback_codes(pred, expected, score):
     ctx = SimpleNamespace(output=pred, expected_output=expected)
     assert CARDSHierarchicalMatch().evaluate(ctx) == score
+
+
+def test_hierarchical_report_without_any_scored_case_shows_dashes():
+    from climafactskg.classifiers.cards.evaluators import HierarchicalMetricsReportEvaluator
+
+    ctx = SimpleNamespace(report=SimpleNamespace(cases=[]))
+    table = HierarchicalMetricsReportEvaluator().evaluate(ctx)
+
+    assert all("nan" not in cell.lower() for row in table.rows for cell in row)

@@ -66,14 +66,22 @@ def test_reliability_columns_are_reported():
     assert abs(row["not_related_rate"] - 1 / 3) < 1e-3  # one of the three answered predictions
     assert row["n_unambiguous"] == 3 and abs(row["exact_unambiguous"] - 1 / 3) < 1e-3
     assert row["baseline_exact"] == 1.0  # always answering a_0 is right on every case
-    assert row["d2_macro_f1_lo"] <= row["d2_macro_f1"] <= row["d2_macro_f1_hi"] or np.isnan(row["d2_macro_f1_lo"])
+
+
+def test_macro_f1_interval_brackets_the_estimate():
+    preds = ["1_1", "1_1", "2_1", "2_1", "3_1", "3_2", "1_2", "2_2"] * 5
+    golds = [["1_1"], ["1_2"], ["2_1"], ["2_2"], ["3_1"], ["3_1"], ["1_2"], ["2_2", "2_1"]] * 5
+
+    row = _row(preds, golds)
+
+    assert row["d2_macro_f1_lo"] <= row["d2_macro_f1"] <= row["d2_macro_f1_hi"]
 
 
 def test_existing_columns_keep_their_meaning():
     row = _row(["1_1", "2_1"], [["1_1"], ["2_3"]])
 
     assert row["d2_macro_f1"] == row["macro_f1"]
-    assert 0.0 <= row["d1_macro_f1"] <= 1.0
+    assert row["d1_macro_f1"] == 1.0  # 2_1 vs gold 2_3 is a hit once both are folded to their depth-1 parent
     assert row["h_f1"] == (1.0 + 0.5) / 2  # exact hit, then a same-parent miss worth 0.5
 
 
@@ -81,3 +89,15 @@ def test_an_empty_dataset_gives_nan_not_zero():
     row = _row([], [])
 
     assert row["n_cases"] == 0 and np.isnan(row["exact_match"]) and np.isnan(row["h_f1"])
+
+
+def test_depth_three_predictions_agree_between_exact_and_micro():
+    row = _row(["2_1_1", "3_2_1"], [["2_1"], ["3_2"]])  # the matcher emits depth-3 ids
+
+    assert row["exact_match"] == 1.0 and row["micro_f1"] == 1.0
+
+
+def test_a_case_without_any_gold_label_is_skipped_not_fatal():
+    row = _row(["1_1", "1_1", "1_1"], [["1_1"], [], ""])
+
+    assert row["n_cases"] == 1 and row["exact_match"] == 1.0
