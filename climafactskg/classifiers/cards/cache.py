@@ -96,7 +96,10 @@ class ClassificationCache:
         with preserve.open(format="sqlite", filename=self.cache_path) as db:
             for i, key in enumerate(keys):
                 if key in db:
-                    value = self._deserialize(db[key]["result"])
+                    entry = db[key]
+                    # Caches written before the shared implementation stored the value under "output" with the same
+                    # keys, so they are still valid hits.
+                    value = self._deserialize(entry["result"] if "result" in entry else entry["output"])
                     results[i] = value
                     on_hit(items[i], value)
                 else:

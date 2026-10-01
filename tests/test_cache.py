@@ -98,3 +98,20 @@ class TestClassificationCache:
         result = cache.get_or_compute([1], key_fn=str, compute_fn=lambda pending: [n * 999 for n in pending])
 
         assert result == [10]  # came from cache, not recomputed with the new multiplier
+
+
+def test_entries_written_before_the_shared_cache_still_hit(tmp_path):
+    """The pre-refactor LLM cache stored the value under "output"; its keys are the same, so it must still be read."""
+    import preserve
+
+    path = str(tmp_path / "cache.db")
+    cache = ClassificationCache(path, fingerprint="fp")
+    with preserve.open(format="sqlite", filename=path) as db:
+        db[cache._key("a")] = {"text": "a", "provider": "p", "model": "m", "system_prompt_hash": "h", "output": "OLD"}
+
+    calls = []
+    result = cache.get_or_compute(
+        ["a"], key_fn=lambda t: t, compute_fn=lambda pending: calls.append(pending) or ["NEW"]
+    )
+
+    assert result == ["OLD"] and calls == []
