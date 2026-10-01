@@ -209,3 +209,6 @@ data/optimised_prompt.txt
 
 # saved evaluation runs
 data/eval_runs/
+
+# local agent working files (specs, plans, task ledgers) - not part of the project
+.superpowers/
