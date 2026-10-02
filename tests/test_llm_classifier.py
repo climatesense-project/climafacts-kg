@@ -51,3 +51,60 @@ class TestCacheKeyCoversEveryPrompt:
     def test_changing_any_prompt_template_changes_the_key(self, field):
         # Editing a template must never be answered from results produced by the old wording.
         assert self._prefix(**{field: "changed {text} {context}"}) != self._prefix()
+
+
+class TestBatchFailuresAndCaching:
+    """classify_batch with the LLM call itself stubbed: failure isolation, caching and context routing."""
+
+    def _classifier(self, tmp_path, outputs):
+        from climafactskg.classifiers.cards.cache import ClassificationCache
+        from climafactskg.classifiers.cards.llm.classifier import CARDSOutput
+
+        clf = CARDSLLMClassifier.__new__(CARDSLLMClassifier)
+        clf._preclassifier = None
+        clf._default_concurrency = 1
+        clf._model = "stub"
+        clf._output_cache = ClassificationCache(
+            str(tmp_path / "c.db"),
+            fingerprint="fp",
+            serialize=lambda out: out.model_dump(),
+            deserialize=lambda data: CARDSOutput.model_validate(data),
+        )
+        clf.calls = []
+
+        async def fake(texts, contexts, concurrency, progress, task_id):
+            clf.calls.append(list(zip(texts, contexts, strict=True)))
+            return [outputs[text] for text in texts]
+
+        clf._classify_batch_async = fake
+        return clf
+
+    def _out(self, category, related=True):
+        from climafactskg.classifiers.cards.llm.classifier import CARDSOutput
+
+        return CARDSOutput(is_climate_related=related, cards_category=category, reasoning="r")
+
+    def test_one_failed_item_is_none_and_the_others_keep_their_labels(self, tmp_path):
+        clf = self._classifier(tmp_path, {"a": self._out("1_1"), "b": RuntimeError("boom"), "c": self._out("2_1")})
+
+        assert clf.classify_batch(["a", "b", "c"]) == ["1_1", None, "2_1"]
+
+    def test_failures_are_not_cached_so_they_are_retried_on_the_next_run(self, tmp_path):
+        clf = self._classifier(tmp_path, {"a": self._out("1_1"), "b": RuntimeError("boom")})
+        clf.classify_batch(["a", "b"])
+        clf.classify_batch(["a", "b"])
+
+        assert [text for text, _ in clf.calls[1]] == ["b"]  # "a" came from the cache, only "b" was asked again
+
+    def test_an_unrelated_or_category_less_answer_is_the_not_related_code(self, tmp_path):
+        clf = self._classifier(tmp_path, {"a": self._out(None), "b": self._out("1_1", related=False)})
+
+        assert clf.classify_batch(["a", "b"]) == ["0_0", "0_0"]
+
+    def test_the_same_text_with_and_without_context_is_two_separate_calls(self, tmp_path):
+        clf = self._classifier(tmp_path, {"a": self._out("1_1")})
+        clf.classify_batch(["a"])
+        clf.classify_batch(["a"], contexts=["review text"])
+        clf.classify_batch(["a"], contexts=["review text"])
+
+        assert clf.calls == [[("a", None)], [("a", "review text")]]  # the third call was fully cached
