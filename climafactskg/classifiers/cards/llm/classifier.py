@@ -275,6 +275,8 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             settings_key += f"|m={max_tokens}"
         if output_mode != "tool":
             settings_key += f"|out={output_mode}"
+        if max_context_chars is not None:
+            settings_key += f"|c={max_context_chars}"  # the request carries context[:max_context_chars]
         # Every template that shapes the request is part of the key, so editing any of them cannot be answered from
         # results produced by the old wording.
         templates = hash_string("\x1f".join((user_prompt, system_prompt_with_context, user_prompt_with_context)))

@@ -45,6 +45,10 @@ class TestCacheKeyCoversEveryPrompt:
     def test_identical_prompts_share_a_key(self):
         assert self._prefix() == self._prefix()
 
+    def test_the_context_length_limit_is_part_of_the_key(self):
+        # The request uses context[:max_context_chars], so two limits must not share cached answers.
+        assert self._prefix(max_context_chars=200) != self._prefix(max_context_chars=400) != self._prefix()
+
     @pytest.mark.parametrize(
         "field", ["system_prompt", "user_prompt", "system_prompt_with_context", "user_prompt_with_context"]
     )
