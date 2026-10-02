@@ -17,7 +17,7 @@ category_scores = "all"
 provider = "openrouter"
 preset = "xplainnlp-nslp"
 cache_path = "data/eval_cache.db"
-concurrency = 16
+concurrency = 32
 [defaults.options]
 temperature = 0.0
 top_p = "none"
@@ -41,7 +41,7 @@ engine = "matcher"
 [[classifiers]]
 label = "deepseek-v4-flash"
 model = "deepseek/deepseek-v4-flash"
-concurrency = 2
+concurrency = 6
 
 [[classifiers]]
 label = "mistral-small-3.2-24b"
