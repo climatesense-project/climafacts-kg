@@ -47,28 +47,39 @@ concurrency = 6
 [[classifiers]]
 label = "mistral-small-3.2-24b"
 model = "mistralai/mistral-small-3.2-24b-instruct"
+[classifiers.options]
+max_tokens = 1500
 
 [[classifiers]]
 label = "qwen3-235b-a22b"
 model = "qwen/qwen3-235b-a22b-2507"
+[classifiers.options]
+max_tokens = 1500
 
 [[classifiers]]
 label = "llama-3.3-70b"
 model = "meta-llama/llama-3.3-70b-instruct"
+[classifiers.options]
+max_tokens = 1500
 
 [[classifiers]]
 label = "gemma-3-27b"
 model = "google/gemma-3-27b-it"
+[classifiers.options]
+max_tokens = 1500
 
 [[classifiers]]
 label = "qwen3-30b-a3b"                 # needs the format asked for in the prompt, or it often returns no category
 model = "qwen/qwen3-30b-a3b-instruct-2507"
 [classifiers.options]
+max_tokens = 1500
 output_mode = "prompted"
 
 [[classifiers]]
 label = "llama-3.1-8b"
 model = "meta-llama/llama-3.1-8b-instruct"
+[classifiers.options]
+max_tokens = 1500
 
 [[classifiers]]
 label = "mistral-nemo"
@@ -76,13 +87,20 @@ model = "mistralai/mistral-nemo"
 size_b = 12                              # not in the model id, so stated for the size plot
 
 # ---- open-weight, reasoning models (slower, a little dearer) -------------------------------------------------------
+[classifiers.options]
+max_tokens = 1500
+
 [[classifiers]]
 label = "nemotron-3-super-120b"
 model = "nvidia/nemotron-3-super-120b-a12b"
+[classifiers.options]
+max_tokens = 8000
 
 [[classifiers]]
 label = "gemma-4-31b"
 model = "google/gemma-4-31b-it"
+[classifiers.options]
+max_tokens = 8000
 
 [[classifiers]]
 label = "glm-4.7-flash"                  # thinks until the default token limit otherwise
@@ -96,30 +114,39 @@ model = "meta-llama/llama-4-maverick"
 size_b = 400
 active_b = 17
 [classifiers.options]
+max_tokens = 1500
 output_mode = "prompted"
 
 [[classifiers]]
 label = "deepseek-v4-pro"
 model = "deepseek/deepseek-v4-pro"
+[classifiers.options]
+max_tokens = 8000
 
 [[classifiers]]
 label = "gpt-oss-120b"                   # still fails on some claims even in prompted mode (counted as wrong)
 model = "openai/gpt-oss-120b"
 [classifiers.options]
+max_tokens = 8000
 output_mode = "prompted"
 
 [[classifiers]]
 label = "gpt-oss-20b"
 model = "openai/gpt-oss-20b"
+[classifiers.options]
+max_tokens = 8000
 
 [[classifiers]]
 label = "qwen3.6-35b"
 model = "qwen/qwen3.6-35b-a3b"
+[classifiers.options]
+max_tokens = 8000
 
 [[classifiers]]
 label = "minimax-m2.7"                   # OpenRouter routes it to a provider that does not serve it unless told not to
 model = "minimax/minimax-m2.7"
 [classifiers.options]
+max_tokens = 8000
 output_mode = "prompted"
 [classifiers.options.extra_body.provider]
 ignore = ["SambaNova"]
