@@ -391,10 +391,10 @@ class TestReadability:
     def test_verdict_words(self):
         from climafactskg.classifiers.cards.report import _verdict
 
-        assert _verdict(0.3, 0.1, 0.5, 0.001) == "significantly better"
-        assert _verdict(-0.3, -0.5, -0.1, 0.001) == "significantly worse"
-        assert _verdict(-0.03, -0.1, 0.04, 0.557) == "within noise"
-        assert _verdict(0.0, float("nan"), float("nan"), float("nan")) == "—"
+        assert _verdict(0.3, 0.001) == "significantly better"
+        assert _verdict(-0.3, 0.001) == "significantly worse"
+        assert _verdict(-0.03, 0.557) == "within noise"
+        assert _verdict(0.0, float("nan")) == "—"
 
     def test_the_model_comparison_says_what_its_p_value_means(self, tmp_path):
         html = self._html(tmp_path, _two_config_run())

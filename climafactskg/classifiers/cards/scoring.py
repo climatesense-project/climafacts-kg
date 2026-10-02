@@ -1,6 +1,6 @@
 """Shared CARDS scoring: label normalisation, per-case scores and aggregate metrics.
 
-One implementation used by ``evaluate`` (console tables) and ``benchmark_configs`` (summary rows), so the numbers cannot
+One implementation used by ``benchmark_configs`` (summary rows; ``evaluate`` is one config of it), so the numbers cannot
 drift apart. Pure functions, no pydantic-evals dependency.
 
 Conventions
@@ -14,10 +14,10 @@ Conventions
 * Micro-F1 is computed over every label that occurs, so it equals plain accuracy (failures included). Macro and weighted
   F1 average over the classes that occur in some gold set *and* were charged or predicted at least once, so neither
   predicted-only classes nor classes that only appear as a second option in tied gold sets add zero-F1 entries.
-* Relatedness ("is this a climate claim at all?") is scored separately from the category (:func:`relatedness`), on every
-  case whose gold is not a tie that includes "not related". A failed prediction is wrong on both sides. The category
-  metrics belong to the climate cases only, so a dataset that also holds not-climate documents is split by
-  :func:`is_not_climate_gold` before :func:`compute_metrics`.
+* Relatedness ("does the classifier find a denial narrative at all?") is scored separately from the category
+  (:func:`relatedness`), on every case whose gold is not a tie that includes "not related". A failed prediction is wrong
+  on both sides. Whether the category metrics then cover every case or only the cases that carry a category is the
+  caller's choice (``benchmark_configs(category_scores=...)``, using :func:`is_not_climate_gold` to split).
 """
 
 from collections.abc import Iterable, Sequence

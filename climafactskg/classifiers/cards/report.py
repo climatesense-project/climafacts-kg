@@ -377,7 +377,7 @@ def _interval(lo, hi) -> str:
     return "—" if pd.isna(lo) or pd.isna(hi) else f"[{lo:+.3f}, {hi:+.3f}]"
 
 
-def _verdict(delta, lo, hi, p) -> str:
+def _verdict(delta, p) -> str:
     """Plain-words reading of a paired difference: significant at 0.05 (with direction), or within noise."""
     if p is None or pd.isna(p) or delta is None or pd.isna(delta):
         return "—"
@@ -455,7 +455,7 @@ def _model_comparison(model_rows) -> str:
                     _td(str(int(r["better"])), num=True),
                     _td(str(int(r["worse"])), num=True),
                     _td(_p(r["p_value"]), num=True),
-                    _td(_verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])),
+                    _td(_verdict(r["delta"], r["p_value"])),
                 ]
             )
     intro = (
@@ -486,7 +486,7 @@ def _context_sections(cases: pd.DataFrame) -> str:
             _td(str(int(r["broken"])), num=True),
             _td(str(int(r["unchanged"])), num=True),
             _td(_p(r["p_value"]), num=True),
-            _td(_verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])),
+            _td(_verdict(r["delta"], r["p_value"])),
         ]
         for _, r in effect.iterrows()
     ]
@@ -594,14 +594,14 @@ def _glance(summary: pd.DataFrame, cases: pd.DataFrame, model_rows) -> str:
     if model_rows is not None:
         comparison, baseline, mode = model_rows
         for _, r in comparison.iterrows():
-            verdict = _verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])
+            verdict = _verdict(r["delta"], r["p_value"])
             items.append(
                 f"<b>{_esc(str(r['config']))}</b> against {_esc(baseline)} on {_esc(str(r['dataset']))}: "
                 f"{r['delta']:+.3f} exact match ({verdict}, p {_p_relation(r['p_value'])})."
             )
     effect = context_effect(cases)
     for _, r in effect.iterrows():
-        verdict = _verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])
+        verdict = _verdict(r["delta"], r["p_value"])
         items.append(
             f"Adding context to <b>{_esc(str(r['config']))}</b> on {_esc(str(r['dataset']))}: {r['delta']:+.3f} exact "
             f"match ({verdict}; {int(r['fixed'])} cases fixed, {int(r['broken'])} broken)."

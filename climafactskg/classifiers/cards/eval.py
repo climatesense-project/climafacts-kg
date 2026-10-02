@@ -507,7 +507,7 @@ def _print_relatedness(df: pd.DataFrame) -> None:
     table = Table(
         title="Narrative detection (denial narrative vs 0_0)", box=box.SIMPLE, collapse_padding=True, pad_edge=False
     )
-    for header, justify in (("Config", "left"), ("Dataset", "left"), ("Ctx", "left"), ("Not clim.", "right")):
+    for header, justify in (("Config", "left"), ("Dataset", "left"), ("Ctx", "left"), ("0_0 docs", "right")):
         table.add_column(header, justify=cast(Literal["left", "right"], justify), no_wrap=True, max_width=14)
     for header in ("Prec", "Recall", "F1", "False alarm"):
         table.add_column(header, justify="right", no_wrap=True, min_width=6)
@@ -517,7 +517,10 @@ def _print_relatedness(df: pd.DataFrame) -> None:
             str(row["dataset"]),
             str(row.get("context", "")),
             str(int(row["n_not_climate"])),
-            *(f"{row[c]:.3f}" for c in ("rel_precision", "rel_recall", "rel_f1", "rel_fpr")),
+            *(
+                "—" if pd.isna(row[c]) else f"{row[c]:.3f}"
+                for c in ("rel_precision", "rel_recall", "rel_f1", "rel_fpr")
+            ),
         )
     _console.print(table)
 

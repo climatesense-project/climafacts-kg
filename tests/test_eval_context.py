@@ -375,3 +375,21 @@ class TestPrintedRelatedness:
         print_benchmark(pd.DataFrame([mixed]))
         out = capsys.readouterr().out
         assert "Narrative detection" in out and "0.850" in out and "0.200" in out
+
+
+def test_a_missing_narrative_detection_score_prints_a_dash_not_nan(monkeypatch):
+    buffer = _capture(monkeypatch, width=100)
+    row = {
+        "config": "c",
+        "dataset": "d",
+        "context": "none",
+        "n_cases": 0,
+        "n_not_climate": 3,
+        "rel_precision": float("nan"),
+        "rel_recall": float("nan"),
+        "rel_f1": 0.5,
+        "rel_fpr": 0.2,
+    }
+    print_benchmark(pd.DataFrame([row]))
+
+    assert "nan" not in buffer.getvalue().lower()

@@ -412,10 +412,14 @@ def fetch_url_content(
     content = response.text
 
     # Store the content in the cache (written to a temp file first, so an interrupted write leaves no partial file)
-    tmp_path = f"{cache_path}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as cache_file:
-        json.dump({"content": content, "timestamp": datetime.now().isoformat()}, cache_file)
-    os.replace(tmp_path, cache_path)
+    tmp_path = f"{cache_path}.{os.getpid()}.tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as cache_file:
+            json.dump({"content": content, "timestamp": datetime.now().isoformat()}, cache_file)
+        os.replace(tmp_path, cache_path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)  # a failed write leaves nothing behind
 
     return content
 
