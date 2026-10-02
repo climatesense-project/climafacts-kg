@@ -14,6 +14,7 @@ the LLM call itself needs ``text`` and ``context`` as separate arguments
 (different prompt templates), not a joined string.
 """
 
+import os
 from typing import Callable, Optional, TypeVar
 
 import preserve
@@ -56,8 +57,8 @@ class ClassificationCache:
 
     def count_cached(self, items: list[Item], key_fn: Callable[[Item], str]) -> int:
         """How many *items* :meth:`get_or_compute` would find in the cache. Computes and writes nothing."""
-        if self.cache_path is None or not items:
-            return 0
+        if self.cache_path is None or not items or not os.path.exists(self.cache_path):
+            return 0  # no cache yet: nothing to count, and opening it would create the file
         keys = [self._key(key_fn(item)) for item in items]
         with preserve.open(format="sqlite", filename=self.cache_path) as db:
             return sum(1 for key in keys if key in db)

@@ -124,3 +124,12 @@ def test_count_cached_counts_hits_without_computing_or_writing(tmp_path):
     assert cache.count_cached(["a", "b", "c"], key_fn=lambda t: t) == 2
     assert cache.count_cached(["c"], key_fn=lambda t: t) == 0  # still a miss: counting did not write anything
     assert ClassificationCache(None, fingerprint="fp").count_cached(["a"], key_fn=lambda t: t) == 0
+
+
+def test_count_cached_on_a_missing_cache_is_zero_and_creates_nothing(tmp_path):
+    existing_dir = ClassificationCache(str(tmp_path / "new.db"), fingerprint="fp")
+    missing_dir = ClassificationCache(str(tmp_path / "no_such_dir" / "c.db"), fingerprint="fp")
+
+    assert existing_dir.count_cached(["a"], key_fn=lambda t: t) == 0
+    assert missing_dir.count_cached(["a"], key_fn=lambda t: t) == 0  # used to raise OperationalError
+    assert not (tmp_path / "new.db").exists() and not (tmp_path / "no_such_dir").exists()
