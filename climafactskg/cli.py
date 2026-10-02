@@ -78,6 +78,13 @@ def callback(
         raise typer.Exit()
 
 
+def _exit_if_failed(failed: list[str], total: int) -> None:
+    """Steps run independently, so one failure does not stop the rest, but it must not look like success either."""
+    if failed:
+        logger.error("%d of %d step(s) failed: %s", len(failed), total, ", ".join(failed))
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def collect():
     """Collect data for the ClimaFactsKG knowledge graph."""
@@ -99,11 +106,14 @@ def collect():
         ("skepticalscience skstiptionary", fetch_skstiptionary),
     ]
 
+    failed = []
     for name, run in steps:
         try:
             run()
         except Exception:
             logger.exception("Step %r failed; continuing with remaining steps.", name)
+            failed.append(name)
+    _exit_if_failed(failed, len(steps))
 
 
 @app.command()
@@ -214,12 +224,15 @@ def process(
         ),
     ]
 
+    failed = []
     for name, open_db, run in steps:
         try:
             with open_db() as db:
                 run(db)
         except Exception:
             logger.exception("Step %r failed; continuing with remaining steps.", name)
+            failed.append(name)
+    _exit_if_failed(failed, len(steps))
 
 
 @app.command()

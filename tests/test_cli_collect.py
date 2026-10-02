@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 
-def test_collect_continues_after_one_step_fails():
+def test_collect_continues_after_one_step_fails_and_then_exits_non_zero():
     with (
         patch(
             "climafactskg.collectors.skepticalscience.fetch_arguments_urls",
@@ -27,7 +27,7 @@ def test_collect_continues_after_one_step_fails():
     ):
         result = runner.invoke(app, ["collect"])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1  # the remaining steps ran, but the failure is not hidden from scripts and CI
     assert misinformers.called
     assert cimplekg.called
     assert climatesensekg.called
@@ -47,3 +47,14 @@ def test_collect_runs_all_steps_on_success():
     assert result.exit_code == 0
     for mock in (arguments, misinformers, cimplekg, climatesensekg, skstiptionary):
         assert mock.called
+
+
+def test_the_failure_exit_helper_is_silent_on_success_and_exits_one_otherwise():
+    import pytest
+    import typer
+    from climafactskg.cli import _exit_if_failed
+
+    _exit_if_failed([], 5)  # nothing failed: returns normally
+    with pytest.raises(typer.Exit) as info:
+        _exit_if_failed(["a", "b"], 5)
+    assert info.value.exit_code == 1
