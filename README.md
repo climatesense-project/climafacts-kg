@@ -378,7 +378,7 @@ A run that calls a hosted LLM provider (anything except `ollama` / `lmstudio`) a
 climafactskg eval report data/eval_runs/<run> [<other run> ...] --baseline "gpt-4o-mini"
 ```
 
-The report is a single self-contained HTML file (no JavaScript or external assets). It opens with an "At a glance" summary written from the data (best result, each model against the baseline, the effect of context, each with a plain-words verdict such as "within noise"), a collapsible "How to read this report" glossary, then the comparison table, charts, paired model comparison, context effect and the cases that changed. A dataset that repeats another dataset's category scores (for example one loaded with `climate_only = false`) is folded into the Narrative detection table instead of repeating rows.
+The report is a single self-contained HTML file (no JavaScript or external assets). It opens with an "At a glance" summary written from the data (best result, each model against the baseline, the effect of context, each with a plain-words verdict such as "within noise"), a collapsible "How to read this report" glossary, then the comparison table, charts, paired model comparison, context effect and the cases that changed. The main table also shows exact match on the cases that carry a category whenever a dataset holds `0_0` documents, the model comparison lists the baseline as its own row, and "At a glance" says so when a score is no better than always guessing the most common label (which on a mixed dataset is `0_0`). A dataset that repeats another dataset's category scores (for example one loaded with `climate_only = false`) is folded into the Narrative detection table instead of repeating rows.
 
 ## ©️ Licenses
 

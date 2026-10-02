@@ -190,7 +190,12 @@ def _count(value) -> str:
     return "—" if value is None or pd.isna(value) else str(int(value))
 
 
+def _has_not_climate(summary: pd.DataFrame) -> bool:
+    return "n_not_climate" in summary.columns and bool((summary["n_not_climate"].fillna(0) > 0).any())
+
+
 def _comparison(summary: pd.DataFrame) -> str:
+    show_category = _has_not_climate(summary) and "exact_category" in summary.columns
     best: dict[tuple[str, str], float] = {}
     for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
         if metric in summary.columns:
@@ -199,7 +204,10 @@ def _comparison(summary: pd.DataFrame) -> str:
                 if not values.empty:
                     best[(str(dataset), metric)] = float(values.max())
     headers = [("Config", False), ("Dataset", False), ("Context", False), ("N", True), ("Failed", True)]
-    headers += [("Exact", True), ("hF1", True), ("D1 macro", True), ("D2 macro", True), ("Note", False)]
+    headers += [("Exact", True)]
+    if show_category:
+        headers += [("Exact, category cases", True)]
+    headers += [("hF1", True), ("D1 macro", True), ("D2 macro", True), ("Note", False)]
     rows = []
     for _, r in summary.iterrows():
         failed = bool(str(r.get("error", "")).strip()) or int(r["n_cases"]) == 0  # nothing evaluated: show dashes
@@ -215,6 +223,11 @@ def _comparison(summary: pd.DataFrame) -> str:
             _td(_count(r.get("n_failed")), num=True),
         ]
         for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
+            if metric == "h_f1" and show_category:
+                n_category, category = r.get("n_category"), r.get("exact_category")
+                has_category = not failed and category is not None and not pd.isna(category)
+                label = f"{_fmt(category)} (n={_count(n_category)})" if has_category else "—"
+                cells.append(_td(label, num=True))
             value = r.get(metric)
             is_best = not failed and (str(r["dataset"]), metric) in best and value == best[(str(r["dataset"]), metric)]
             text = "—" if failed else _esc(_fmt(value))
@@ -390,22 +403,43 @@ def _model_comparison(model_rows) -> str:
     comparison, baseline, mode = model_rows
     headers = [("Dataset", False), ("Config", False), ("Paired", True), ("Baseline", True), ("Config exact", True)]
     headers += [("Δ", True), ("Δ 95% CI", True), ("Better", True), ("Worse", True), ("p", True), ("Verdict", False)]
-    rows = [
-        [
-            _td(str(r["dataset"])),
-            _td(str(r["config"])),
-            _td(str(int(r["n_paired"])), num=True),
-            _td(_fmt(r["exact_baseline"]), num=True),
-            _td(_fmt(r["exact_config"]), num=True),
-            _td(f"{r['delta']:+.3f}", num=True),
-            _td(_interval(r["delta_lo"], r["delta_hi"]), num=True),
-            _td(str(int(r["better"])), num=True),
-            _td(str(int(r["worse"])), num=True),
-            _td(_p(r["p_value"]), num=True),
-            _td(_verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])),
-        ]
-        for _, r in comparison.iterrows()
-    ]
+    rows: list[list[str]] = []
+    dash = _td("—", num=True)
+    for dataset in dict.fromkeys(comparison["dataset"].astype(str)):
+        group = comparison[comparison["dataset"].astype(str) == dataset]
+        first = group.iloc[0]
+        # The baseline gets a row of its own so it is visible, not only named in the sentence above the table.
+        rows.append(
+            [
+                _td(dataset),
+                _td(baseline),
+                _td(str(int(first["n_paired"])), num=True),
+                _td(_fmt(first["exact_baseline"]), num=True),
+                _td(_fmt(first["exact_baseline"]), num=True),
+                dash,
+                dash,
+                dash,
+                dash,
+                dash,
+                _td("baseline"),
+            ]
+        )
+        for _, r in group.iterrows():
+            rows.append(
+                [
+                    _td(str(r["dataset"])),
+                    _td(str(r["config"])),
+                    _td(str(int(r["n_paired"])), num=True),
+                    _td(_fmt(r["exact_baseline"]), num=True),
+                    _td(_fmt(r["exact_config"]), num=True),
+                    _td(f"{r['delta']:+.3f}", num=True),
+                    _td(_interval(r["delta_lo"], r["delta_hi"]), num=True),
+                    _td(str(int(r["better"])), num=True),
+                    _td(str(int(r["worse"])), num=True),
+                    _td(_p(r["p_value"]), num=True),
+                    _td(_verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])),
+                ]
+            )
     intro = (
         f'<p class="muted">Each config against <b>{_esc(baseline)}</b> on the cases both answered '
         f"(context: {_esc(mode)}). Δ is exact match, config minus baseline; the interval is a 95% bootstrap over the "
@@ -512,15 +546,33 @@ def _glance(summary: pd.DataFrame, cases: pd.DataFrame, model_rows) -> str:
     usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
     for dataset in dict.fromkeys(usable["dataset"].astype(str)):
         group = usable[usable["dataset"].astype(str) == dataset]
-        top = group.loc[group["exact_match"].idxmax()]
-        text = f"Best exact match on {_esc(dataset)}: <b>{_esc(str(top['config']))}</b>"
-        text += f" ({'with' if top['context'] == 'with' else 'no'} context) at {top['exact_match']:.3f}"
-        if "exact_lo" in top and not pd.isna(top["exact_lo"]) and not pd.isna(top["exact_hi"]):
+        mixed = "n_not_climate" in group.columns and bool((group["n_not_climate"].fillna(0) > 0).any())
+        has_category = mixed and "exact_category" in group.columns and group["exact_category"].notna().any()
+        metric = "exact_category" if has_category else "exact_match"
+        top = group.loc[group[metric].idxmax()]
+        scope = f" on the {_count(top.get('n_category'))} cases with a category" if metric == "exact_category" else ""
+        text = f"Best exact match on {_esc(dataset)}{scope}: <b>{_esc(str(top['config']))}</b>"
+        text += f" ({'with' if top['context'] == 'with' else 'no'} context) at {top[metric]:.3f}"
+        if (
+            metric == "exact_match"
+            and "exact_lo" in top
+            and not pd.isna(top["exact_lo"])
+            and not pd.isna(top["exact_hi"])
+        ):
             text += f" [{top['exact_lo']:.2f}–{top['exact_hi']:.2f}]"
         base = top.get("baseline_exact")
-        if base is not None and not pd.isna(base):
+        if metric == "exact_match" and base is not None and not pd.isna(base):
             text += f"; always guessing the most common label scores {base:.3f}"
         items.append(text + ".")
+        if "baseline_exact" in group.columns:
+            best_per_config = group.sort_values("exact_match", ascending=False).drop_duplicates("config")
+            for _, r in best_per_config.iterrows():
+                if not pd.isna(r["baseline_exact"]) and r["exact_match"] <= r["baseline_exact"]:
+                    items.append(
+                        f"<b>{_esc(str(r['config']))}</b> is no better than always guessing the most common label on "
+                        f"{_esc(dataset)} ({r['exact_match']:.3f} against {r['baseline_exact']:.3f})"
+                        + ("; with many 0_0 documents that label is 0_0." if mixed else ".")
+                    )
     if model_rows is not None:
         comparison, baseline, mode = model_rows
         for _, r in comparison.iterrows():
@@ -545,6 +597,10 @@ _GLOSSARY = (
     ("Exact", "Share of claims where the prediction is one of the acceptable human labels (some claims have a tie)."),
     ("hF1", "Exact match with partial credit through the taxonomy: a near miss (2_1 for 2_3) scores above a far one."),
     ("D1 macro, D2 macro", "F1 averaged over categories at depth 1 (5 main categories) and depth 2 (subcategories)."),
+    (
+        "Exact, category cases",
+        "Exact match on the documents that carry a category, when the dataset also holds 0_0 documents.",
+    ),
     ("Failed", "Predictions that errored out. They count as wrong and stay in every denominator."),
     ("Not related", "Share of answered claims predicted as code 0_0 (no denial narrative)."),
     ("Unambiguous", "Exact match on claims with a single acceptable label, where there is no tie to be lenient about."),

@@ -154,3 +154,20 @@ def test_a_dataset_of_only_not_climate_cases_does_not_crash_in_either_mode():
 
     assert default["n_cases"] == 2 and default["exact_match"] == 0.5
     assert narrative["n_cases"] == 0 and narrative["n_not_climate"] == 2 and narrative["rel_fpr"] == 0.5
+
+
+def test_exact_on_cases_with_a_category_is_reported_next_to_the_all_cases_figure():
+    # Gold has two category cases and two 0_0 cases; the classifier answers a category for everything but the last.
+    df = benchmark_configs(
+        {"x": _Fixed(["1_1", "1_1", "1_1", "0"])}, {"d": _dataset([["1_1"], ["1_1"], ["0_0"], ["0_0"]])}
+    )
+    row = df.iloc[0]
+
+    assert row["n_cases"] == 4 and row["exact_match"] == 0.75  # every case
+    assert row["n_category"] == 2 and row["exact_category"] == 1.0  # only the cases that carry a category
+
+
+def test_exact_category_equals_exact_match_without_not_climate_gold():
+    row = _row(["1_1", "2_2"], [["1_1"], ["1_1"]])
+
+    assert row["n_category"] == 2 and row["exact_category"] == row["exact_match"] == 0.5

@@ -322,6 +322,8 @@ def benchmark_configs(
                     "not_related_rate": float("nan"),
                     "exact_unambiguous": float("nan"),
                     "n_unambiguous": float("nan"),
+                    "n_category": float("nan"),
+                    "exact_category": float("nan"),
                     "n_not_climate": float("nan"),
                     "rel_precision": float("nan"),
                     "rel_recall": float("nan"),
@@ -352,6 +354,9 @@ def benchmark_configs(
         hier_lo, hier_hi = bootstrap_ci([score[1] for score in per_case])
         macro_lo, macro_hi = bootstrap_macro_f1(s_preds, s_golds)
         has_negatives = relation.n_not_related > 0
+        with_category = [
+            score[0] for score, gold in zip(per_case, s_golds, strict=True) if not is_not_climate_gold(gold)
+        ]
 
         for i, (pred, gold, (exact, hf1)) in zip(scored, zip(s_preds, s_golds, per_case, strict=True), strict=True):
             case = cases[i]
@@ -396,6 +401,8 @@ def benchmark_configs(
                 "not_related_rate": round(metrics.not_related_rate, 4),
                 "exact_unambiguous": round(metrics.exact_unambiguous, 4),
                 "n_unambiguous": metrics.n_unambiguous,
+                "n_category": len(with_category),
+                "exact_category": round(sum(with_category) / len(with_category), 4) if with_category else float("nan"),
                 "n_not_climate": relation.n_not_related,
                 # Only meaningful when the dataset has not-climate documents (load it with climate_only=False).
                 "rel_precision": round(relation.precision, 4) if has_negatives else float("nan"),

@@ -381,3 +381,52 @@ class TestReadability:
         section = html[html.index("<h2>Context effect</h2>") :]
 
         assert "<th>Verdict</th>" in section and "within noise" in section
+
+
+class TestBaselineAwareReport:
+    def _html(self, tmp_path, run):
+        return render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+    def _mixed(self, **extra):
+        return {
+            **_summary_row(dataset="mixed", context="none", exact=0.45, hf1=0.55),
+            "baseline_exact": 0.55,
+            "exact_category": 0.7,
+            "n_category": 6,
+            **_REPEAT,
+            **extra,
+        }
+
+    def test_a_score_at_or_below_the_always_guess_baseline_is_called_out(self, tmp_path):
+        html = self._html(tmp_path, _run(with_context=False, extra_summary=[self._mixed()]))
+        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+
+        assert "no better than always guessing" in section and "0.550" in section
+
+    def test_the_zero_zero_remark_only_appears_for_datasets_that_have_such_documents(self, tmp_path):
+        weak = _summary_row(dataset="plain", context="none", exact=0.1, hf1=0.2)
+        html = self._html(tmp_path, _run(with_context=False, extra_summary=[{**weak, "baseline_exact": 0.3}]))
+        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+
+        assert "no better than always guessing" in section and "that label is 0_0" not in section
+
+    def test_a_score_above_the_baseline_is_not_flagged(self, tmp_path):
+        html = self._html(tmp_path, _run(with_context=False, extra_summary=[self._mixed(baseline_exact=0.2)]))
+        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+
+        assert "no better than always guessing" not in section
+
+    def test_the_category_case_exact_column_appears_only_when_there_are_not_climate_documents(self, tmp_path):
+        plain = self._html(tmp_path, _run(with_context=False))
+        mixed = self._html(tmp_path, _run(with_context=False, extra_summary=[self._mixed()]))
+
+        header = '<th class="num">Exact, category cases</th>'
+        assert header not in plain
+        table = mixed[mixed.index("<h2>Comparison</h2>") : mixed.index("<h3>Reliability</h3>")]
+        assert header in table and "0.700" in table
+
+    def test_the_model_comparison_lists_the_baseline_as_a_row(self, tmp_path):
+        html = self._html(tmp_path, _two_config_run())
+        section = html[html.index("<h2>Model comparison</h2>") :].split("</table>")[0]
+
+        assert "<td>baseline</td>" in section
