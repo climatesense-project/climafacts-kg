@@ -417,6 +417,16 @@ class CARDSLLMClassifier(CARDSClassifierBase):
                 return self._agent.run_sync(user_msg, model_settings=self._model_settings).output
         return self._agent.run_sync(self._user_prompt.format(text=text), model_settings=self._model_settings).output
 
+    async def _run_with_deadline(self, user_msg: str):
+        """Runs the agent, giving up after ``request_timeout`` seconds in total.
+
+        The HTTP client's own timeout is per read, and OpenRouter keeps a slow connection alive with keep-alive bytes,
+        so it never fires on a stalled provider; this deadline covers the whole call.
+        """
+        run = self._agent.run(user_msg, model_settings=self._model_settings)
+        timeout = self._model_settings.get("timeout")
+        return await (asyncio.wait_for(run, timeout) if timeout else run)
+
     async def _call_llm_async(self, text: str, semaphore: asyncio.Semaphore, context: str | None = None) -> CARDSOutput:
         """Runs one async LLM call, bounded by the provided semaphore.
 
@@ -436,10 +446,20 @@ class CARDSLLMClassifier(CARDSClassifierBase):
                 async with semaphore:
                     if context:
                         with self._agent.override(instructions=self._system_prompt_with_context):
-                            result = await self._agent.run(user_msg, model_settings=self._model_settings)
+                            result = await self._run_with_deadline(user_msg)
                     else:
-                        result = await self._agent.run(user_msg, model_settings=self._model_settings)
+                        result = await self._run_with_deadline(user_msg)
                 return result.output
+            except asyncio.TimeoutError:
+                # The whole call exceeded the deadline (a stalled provider); retry like any transient failure.
+                if attempt == _DEFAULT_MAX_RETRIES:
+                    raise
+                logger.warning(
+                    "Request exceeded %.0fs on attempt %d/%d, retrying",
+                    self._model_settings.get("timeout", 0),
+                    attempt + 1,
+                    _DEFAULT_MAX_RETRIES + 1,
+                )
             except ModelAPIError as exc:
                 # An HTTP error is retried for transient status codes; an error without a status (a timeout or a
                 # dropped connection) is always transient.

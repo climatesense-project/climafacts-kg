@@ -212,3 +212,67 @@ class TestRequestTimeoutAndRetries:
         with pytest.raises(ModelHTTPError):
             asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1)))
         assert calls["n"] == 1
+
+
+class TestOverallDeadline:
+    """The timeout must be enforced around the whole call, not only per HTTP read.
+
+    A read timeout resets on every byte, and OpenRouter keeps a slow connection alive with keep-alive bytes.
+    """
+
+    def _clf(self, monkeypatch, request_timeout, first_call_seconds):
+        import asyncio
+
+        from climafactskg.classifiers.cards.llm import classifier as module
+        from climafactskg.classifiers.cards.llm.classifier import CARDSOutput
+
+        monkeypatch.setattr(module, "_DEFAULT_RETRY_BASE_DELAY", 0.0)
+        clf = CARDSLLMClassifier(provider="ollama", model="m", use_preclassifier=False, request_timeout=request_timeout)
+        calls = {"n": 0}
+
+        class _Result:
+            output = CARDSOutput(is_climate_related=True, cards_category="1_1", reasoning="r")
+
+        class _Agent:
+            async def run(self, *args, **kwargs):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    await asyncio.sleep(first_call_seconds)  # a stalled provider: bytes may trickle in, no answer
+                return _Result()
+
+        clf._agent = _Agent()
+        return clf, calls, asyncio
+
+    def test_a_call_that_exceeds_the_deadline_is_cut_off_and_retried(self, monkeypatch):
+        clf, calls, asyncio = self._clf(monkeypatch, request_timeout=0.05, first_call_seconds=5)
+
+        out = asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1)))
+
+        assert out.cards_category == "1_1" and calls["n"] == 2  # did not wait the 5 seconds
+
+    def test_without_a_timeout_nothing_is_cut_off(self, monkeypatch):
+        clf, calls, asyncio = self._clf(monkeypatch, request_timeout=None, first_call_seconds=0.2)
+
+        out = asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1)))
+
+        assert out.cards_category == "1_1" and calls["n"] == 1
+
+    def test_a_call_that_always_stalls_raises_after_the_retry_limit(self, monkeypatch):
+        import pytest
+
+        clf, calls, asyncio = self._clf(monkeypatch, request_timeout=0.02, first_call_seconds=5)
+        clf._agent.run = _always_stall(calls)
+
+        with pytest.raises(asyncio.TimeoutError):
+            asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1)))
+        assert calls["n"] == 4  # the first try plus three retries
+
+
+def _always_stall(calls):
+    import asyncio
+
+    async def run(*args, **kwargs):
+        calls["n"] += 1
+        await asyncio.sleep(5)
+
+    return run
