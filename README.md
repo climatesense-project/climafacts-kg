@@ -329,7 +329,7 @@ class MyCARDSLLMConfig(CARDSLLMConfig):
 
 ### 📏 Evaluation and benchmarking
 
-The `eval` extra adds a pipeline that scores the classifiers against annotated ground truth (the ClimateCheck NSLP data and the ClimateSense annotation rounds `climatesense_v1` / `climatesense_v2`). Metrics are exact match, hierarchical F1 and macro/weighted F1 at taxonomy depth 1 and 2, with 95% bootstrap intervals. A failed prediction counts as wrong and stays in the denominators.
+The `eval` extra adds a pipeline (commands `eval run`, `eval context` and `eval report`; without the extra they print an install hint, and the old names `eval-context` / `eval-report` from 2.2.0 still work) that scores the classifiers against annotated ground truth (the ClimateCheck NSLP data and the ClimateSense annotation rounds `climatesense_v1` / `climatesense_v2`). Metrics are exact match, hierarchical F1 and macro/weighted F1 at taxonomy depth 1 and 2, with 95% bootstrap intervals. A failed prediction counts as wrong and stays in the denominators.
 
 **Review context is opt-in.** ClimateSense claims can be classified with the fact-check's review text as context. Build the context sidecar once (needs the cached consensus CSV and, for CimpleKG reviews, network access), then load datasets with `with_context=True`:
 
@@ -345,6 +345,7 @@ Context is selected deterministically, with no LLM: it drops the claim restateme
 [run]
 save_dir = "data/eval_runs"
 context_modes = ["none", "with"]
+# category_scores = "all"        # or "narrative_only", see below
 
 [defaults]                       # applied to every LLM classifier
 provider = "openrouter"
@@ -365,14 +366,14 @@ with_context = true              # partial context: cases without a review are c
 ```
 
 ```bash
-climafactskg eval run eval.toml --dry-run   # show cases per dataset and the estimated number of paid calls
+climafactskg eval run eval.toml --dry-run   # show cases per dataset and paid calls: planned, already cached, new
 climafactskg eval run eval.toml --report    # run, save, and write report.html next to the results
 climafactskg eval run eval.toml --yes       # skip the confirmation before paid LLM calls
 ```
 
 **Narrative detection (denial narrative or none).** By default the ClimateSense datasets keep only documents annotated with a CARDS category, so the classifier's first decision (any narrative, or code `0_0`) is never tested on a real negative. Set `climate_only = false` on a dataset to include the `0_0` documents (v1: 398 instead of 153, v2: 277 instead of 143). Whenever a dataset has pure `0_0` documents (the NSLP test split does too: 124 of 172), a second "Narrative detection" table (console and HTML report) gives precision, recall, F1 and the false-alarm rate (share of `0_0` documents given a category). Code `0_0` means no climate-misinformation narrative, which covers both text that is not about climate and climate text without a denial narrative, so this is not a pure "climate or not" test. A wrong category on a document that has one is still a correct detection, and a failed prediction counts as wrong. Gold sets that tie `0_0` with a category are left out. The category scores (exact, hF1, F1) cover every case by default, so existing numbers do not change; set `category_scores = "narrative_only"` under `[run]` to score them on the cases that carry a category only. In that mode the `0_0` documents are not written to `cases.csv`, so context and model comparisons stay on the category cases. A mixed run costs more calls, so check `--dry-run` first.
 
-A run that calls a hosted LLM provider (anything except `ollama` / `lmstudio`) asks for confirmation first, unless `--yes` is given. The config file is validated up front, so a misspelled key or an unknown dataset option fails before anything is spent. Each run is saved to its own timestamped directory under `save_dir` (`run.json`, `cases.csv`, `summary.csv`, plus a copy of the config); runs are never overwritten. To compare runs or re-render a report later:
+A run that calls a hosted LLM provider (anything except `ollama` / `lmstudio`) first prints how many calls are planned, already cached and new (the cache is checked for free), then asks for confirmation unless `--yes` is given. The LLM result cache is keyed by provider, model, sampling settings and all four prompt templates, so editing a prompt never returns answers produced by the old wording. The config file is validated up front, so a misspelled key or an unknown dataset option fails before anything is spent. Each run is saved to its own timestamped directory under `save_dir` (`run.json`, `cases.csv`, `summary.csv`, plus a copy of the config); runs are never overwritten. To compare runs or re-render a report later:
 
 ```bash
 climafactskg eval report data/eval_runs/<run> [<other run> ...] --baseline "gpt-4o-mini"
