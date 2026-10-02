@@ -50,8 +50,8 @@ def stubs(monkeypatch, tmp_path):
         def __eq__(self, other):
             return other == f"clf:{self.label}"
 
-    def build_classifier(spec):
-        calls["classifiers"].append(spec.label)
+    def build_classifier(spec, peek=False):
+        calls["classifiers"].append((spec.label, peek))
         return _Clf(spec.label)
 
     def benchmark(configs, datasets, **kwargs):
@@ -69,9 +69,13 @@ def stubs(monkeypatch, tmp_path):
     return calls
 
 
+def _config_text(tmp_path, template):
+    return template.format(save=tmp_path / "runs")
+
+
 def _config(tmp_path, template):
     path = tmp_path / "eval.toml"
-    path.write_text(template.format(save=tmp_path / "runs"), encoding="utf-8")
+    path.write_text(_config_text(tmp_path, template), encoding="utf-8")
     return str(path)
 
 
@@ -82,6 +86,21 @@ def test_dry_run_prints_the_plan_and_builds_nothing(stubs, tmp_path):
     assert "gpt" in result.output and "climatesense_v2" in result.output
     assert "8" in result.output  # 4 cases x 2 context modes x 1 paid classifier
     assert stubs["benchmark"] == []
+    # Only the paid classifier is touched, and only to read its cache (peek): no local model is loaded, nothing runs.
+    assert stubs["classifiers"] == [("gpt", True)]
+
+
+def test_a_dry_run_never_builds_free_classifiers(stubs, tmp_path):
+    path = tmp_path / "mixed.toml"
+    # a transformer classifier must stay unbuilt: constructing it would load torch and a model
+    path.write_text(
+        _config_text(tmp_path, PAID) + '\n[[classifiers]]\nlabel = "tf"\nengine = "transformer"\n', encoding="utf-8"
+    )
+
+    result = runner.invoke(app, ["eval", "run", str(path), "--dry-run"])
+
+    assert result.exit_code == 0
+    assert [label for label, _ in stubs["classifiers"]] == ["gpt"]
 
 
 def test_a_paid_run_needs_confirmation(stubs, tmp_path):
@@ -170,7 +189,7 @@ def test_the_plan_separates_cached_from_new_paid_calls(stubs, tmp_path):
 
 
 def test_the_plan_falls_back_to_an_upper_bound_when_the_classifier_cannot_be_built(stubs, tmp_path, monkeypatch):
-    def broken(spec):
+    def broken(spec, peek=False):
         raise RuntimeError("no API key")
 
     monkeypatch.setattr(runconfig, "build_classifier", broken)

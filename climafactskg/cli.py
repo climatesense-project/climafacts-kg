@@ -392,11 +392,12 @@ def eval_run(
 
     datasets = {d.label: runconfig.build_dataset(d) for d in spec.datasets}
     paid = [c for c in spec.classifiers if runconfig.is_paid(c)]
-    # Paid classifiers are built early so their cache can be consulted: counting hits is free.
+    # Paid classifiers are built (without the local ClimateBERT gate) only to consult their cache: counting hits is
+    # free, no model is called and nothing local is loaded. Free classifiers are not touched until the run.
     built: dict[str, object] = {}
     for classifier_spec in paid:
         try:
-            built[classifier_spec.label] = runconfig.build_classifier(classifier_spec)
+            built[classifier_spec.label] = runconfig.build_classifier(classifier_spec, peek=True)
         except Exception as exc:
             logger.warning("Could not build %s to check its cache: %s", classifier_spec.label, exc)
     calls = cached = 0
@@ -432,7 +433,11 @@ def eval_run(
     if paid and not yes and not typer.confirm("Run and spend on the paid APIs?", default=False):
         raise typer.Exit(code=1)
 
-    configs = {c.label: built[c.label] if c.label in built else runconfig.build_classifier(c) for c in spec.classifiers}
+    try:
+        configs = {c.label: runconfig.build_classifier(c) for c in spec.classifiers}
+    except Exception as exc:
+        logger.error("Could not build the classifiers: %s", exc)
+        raise typer.Exit(code=1) from exc
     df = cards_eval.benchmark_configs(
         configs,
         datasets,

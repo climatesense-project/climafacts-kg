@@ -164,8 +164,12 @@ def build_dataset(spec: DatasetSpec) -> Any:
     return getattr(datasets, _DATASET_FACTORIES[spec.name])(**options)
 
 
-def build_classifier(spec: ClassifierSpec) -> Any:
-    """Builds the classifier named by the spec (imports its engine lazily)."""
+def build_classifier(spec: ClassifierSpec, peek: bool = False) -> Any:
+    """Builds the classifier named by the spec (imports its engine lazily).
+
+    ``peek=True`` is for reading an LLM classifier's result cache only (the run plan): the ClimateBERT gate is left
+    out, since counting cache hits never consults it and constructing it would load a local model.
+    """
     if spec.engine == "matcher":
         from climafactskg.classifiers.cards.matcher import CARDSMatcher
 
@@ -180,7 +184,7 @@ def build_classifier(spec: ClassifierSpec) -> Any:
 
     # TOML has no null, so "none" switches a preset's value off (e.g. top_p = "none").
     options = {k: None if v == "none" else v for k, v in spec.options.items()}
-    kwargs: dict[str, Any] = {"use_preclassifier": spec.use_preclassifier, **options}
+    kwargs: dict[str, Any] = {"use_preclassifier": spec.use_preclassifier and not peek, **options}
     for key, value in (
         ("provider", spec.provider),
         ("model", spec.model),

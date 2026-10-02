@@ -267,3 +267,19 @@ name = "nslp"
     assert (a.engine, a.cache_path, a.provider) == ("transformer", "c.db", None)  # llm-only defaults do not leak
     assert (b.engine, b.cache_path) == ("matcher", None)
     assert not is_paid(a)  # it used to become a paid LLM classifier
+
+
+def test_peek_builds_an_llm_classifier_without_the_preclassifier_gate(tmp_path, monkeypatch):
+    from climafactskg.classifiers.cards.llm.classifier import CARDSLLMClassifier
+
+    seen = {}
+    monkeypatch.setattr(
+        CARDSLLMClassifier, "from_preset", classmethod(lambda cls, name, **kw: seen.update(kw) or "clf")
+    )
+    text = MINIMAL.replace("\n[[datasets]]", '\npreset = "p"\nuse_preclassifier = true\n[[datasets]]')
+    config, _ = load_run_config(_write(tmp_path, text))
+
+    runconfig.build_classifier(config.classifiers[0])
+    assert seen["use_preclassifier"] is True
+    runconfig.build_classifier(config.classifiers[0], peek=True)  # only reads the cache: must not load ClimateBERT
+    assert seen["use_preclassifier"] is False
