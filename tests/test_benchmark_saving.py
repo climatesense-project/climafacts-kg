@@ -89,3 +89,28 @@ def test_unwritable_save_dir_logs_a_warning_and_still_returns_results(tmp_path, 
     assert isinstance(df, pd.DataFrame) and len(df) == 1
     assert "run_dir" not in df.attrs
     assert any("Could not save" in record.message for record in caplog.records)
+
+
+class _Sized(_Stub):
+    _model = "qwen/qwen3-235b-a22b-2507"
+
+
+def test_model_size_is_recorded_in_run_json_from_the_model_id(tmp_path):
+    df = benchmark_configs({"big": _Sized(), "plain": _Stub()}, {"d": _dataset([None, None])}, save_dir=str(tmp_path))
+
+    configs = {c["label"]: c for c in load_run(df.attrs["run_dir"]).meta["configs"]}
+    assert (configs["big"]["size_b"], configs["big"]["active_b"]) == (235.0, 22.0)
+    assert configs["plain"]["size_b"] is None  # "stub-model" has no published size
+
+
+def test_an_explicit_size_overrides_the_id_and_fills_in_unknown_sizes(tmp_path):
+    df = benchmark_configs(
+        {"big": _Sized(), "plain": _Stub()},
+        {"d": _dataset([None, None])},
+        save_dir=str(tmp_path),
+        config_meta={"big": {"size_b": 100.0, "active_b": None}, "plain": {"size_b": 12.0}},
+    )
+
+    configs = {c["label"]: c for c in load_run(df.attrs["run_dir"]).meta["configs"]}
+    assert (configs["big"]["size_b"], configs["big"]["active_b"]) == (100.0, None)
+    assert configs["plain"]["size_b"] == 12.0

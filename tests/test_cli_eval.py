@@ -225,3 +225,17 @@ def test_a_clean_run_exits_zero_even_though_the_error_column_exists(stubs, tmp_p
     monkeypatch.setattr(cards_eval, "benchmark_configs", clean)
 
     assert runner.invoke(app, ["eval", "run", _config(tmp_path, FREE)]).exit_code == 0
+
+
+def test_stated_model_sizes_are_passed_to_the_benchmark(stubs, tmp_path):
+    text = PAID.replace('model = "openai/gpt-4o-mini"', 'model = "openai/gpt-4o-mini"\nsize_b = 8\nactive_b = 2')
+    runner.invoke(app, ["eval", "run", _config(tmp_path, text), "--yes"])
+
+    kwargs = stubs["benchmark"][0][2]
+    assert kwargs["config_meta"] == {"gpt": {"size_b": 8.0, "active_b": 2.0}}
+
+
+def test_no_stated_size_means_no_config_meta_entry(stubs, tmp_path):
+    runner.invoke(app, ["eval", "run", _config(tmp_path, PAID), "--yes"])
+
+    assert stubs["benchmark"][0][2]["config_meta"] == {}

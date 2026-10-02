@@ -4,6 +4,7 @@ import json
 import logging
 import math
 import os
+import re
 import subprocess
 import uuid
 from collections.abc import Iterable, Sequence
@@ -270,6 +271,25 @@ def changed_cases(cases: pd.DataFrame, limit: int = 20) -> pd.DataFrame:
     changed["change"] = np.where(changed["fixed"], "fixed", "broken")
     changed = changed.groupby(["config", "dataset"], sort=False).head(limit)
     return changed[list(_CHANGED_COLUMNS)].reset_index(drop=True)
+
+
+_SIZE_RE = re.compile(r"(?:^|[-/_:])(\d+(?:\.\d+)?)b(?![a-z0-9])")
+_ACTIVE_RE = re.compile(r"(?:^|[-/_:])a(\d+(?:\.\d+)?)b(?![a-z0-9])")
+
+
+def model_size_from_id(model_id: str | None) -> tuple[float | None, float | None]:
+    """``(total, active)`` parameters in billions as published in a model id, or ``None`` where it carries none.
+
+    ``qwen3-235b-a22b`` gives ``(235.0, 22.0)`` (a mixture of experts: 22B active per token), ``llama-3.3-70b`` gives
+    ``(70.0, None)``. Ids without a size (``gpt-4o-mini``, ``deepseek-v4-pro``) give ``(None, None)``: state those in
+    the config (``size_b`` / ``active_b``) when they are known.
+    """
+    if not model_id:
+        return None, None
+    text = model_id.lower()
+    size = _SIZE_RE.search(text)
+    active = _ACTIVE_RE.search(text)
+    return (float(size.group(1)) if size else None, float(active.group(1)) if active else None)
 
 
 def _git_commit() -> str | None:

@@ -14,6 +14,7 @@ from climafactskg.classifiers.cards.runs import (
     context_effect,
     load_run,
     mcnemar_exact,
+    model_size_from_id,
     save_run,
 )
 
@@ -306,3 +307,42 @@ class TestCompareConfigs:
         out = compare_configs(pd.DataFrame(_config_rows("A", ids, ids), columns=CASE_COLUMNS), baseline="A")
 
         assert out.empty and {"delta", "p_value", "better", "worse"} <= set(out.columns)
+
+
+class TestModelSizeFromId:
+    @pytest.mark.parametrize(
+        ("model", "expected"),
+        [
+            ("meta-llama/llama-3.3-70b-instruct", (70.0, None)),
+            ("openai/gpt-oss-120b", (120.0, None)),
+            ("openai/gpt-oss-20b:batch", (20.0, None)),
+            ("qwen/qwen3-235b-a22b-2507", (235.0, 22.0)),
+            ("qwen/qwen3.6-35b-a3b", (35.0, 3.0)),
+            ("qwen/qwen3-30b-a3b-instruct-2507", (30.0, 3.0)),
+            ("nvidia/nemotron-3-super-120b-a12b", (120.0, 12.0)),
+            ("mistralai/mistral-small-3.2-24b-instruct", (24.0, None)),
+            ("google/gemma-4-31b-it", (31.0, None)),
+            ("meta-llama/llama-3.1-8b-instruct", (8.0, None)),
+            ("qwen/qwen3-8b:nitro", (8.0, None)),
+            ("some/tiny-0.6b", (0.6, None)),
+        ],
+    )
+    def test_the_parameter_count_is_read_from_the_model_id(self, model, expected):
+        assert model_size_from_id(model) == expected
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "openai/gpt-4o-mini",  # "4o" is not a size
+            "openai/gpt-5.2",
+            "deepseek/deepseek-v4-pro",
+            "minimax/minimax-m2.7",
+            "z-ai/glm-4.7-flash",
+            "mistralai/mistral-nemo",
+            "meta-llama/llama-4-maverick",
+            "",
+            None,
+        ],
+    )
+    def test_an_id_without_a_published_size_gives_none(self, model):
+        assert model_size_from_id(model) == (None, None)

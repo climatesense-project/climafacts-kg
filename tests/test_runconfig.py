@@ -283,3 +283,23 @@ def test_peek_builds_an_llm_classifier_without_the_preclassifier_gate(tmp_path, 
     assert seen["use_preclassifier"] is True
     runconfig.build_classifier(config.classifiers[0], peek=True)  # only reads the cache: must not load ClimateBERT
     assert seen["use_preclassifier"] is False
+
+
+class TestModelSizeFields:
+    def _spec(self, tmp_path, extra):
+        text = MINIMAL.replace('model = "openai/gpt-4o-mini"', f'model = "openai/gpt-4o-mini"\n{extra}')
+        return load_run_config(_write(tmp_path, text))[0].classifiers[0]
+
+    def test_size_and_active_size_are_optional_numbers_in_billions(self, tmp_path):
+        spec = self._spec(tmp_path, "size_b = 235\nactive_b = 22")
+        assert (spec.size_b, spec.active_b) == (235.0, 22.0)
+        assert (self._spec(tmp_path, "").size_b, self._spec(tmp_path, "").active_b) == (None, None)
+
+    def test_sizes_must_be_positive_and_active_cannot_exceed_total(self, tmp_path):
+        for extra in ("size_b = 0", "size_b = -3", "size_b = 10\nactive_b = 20"):
+            with pytest.raises(ConfigError):
+                self._spec(tmp_path, extra)
+
+    def test_a_non_llm_classifier_may_state_its_size(self, tmp_path):
+        text = '[[classifiers]]\nlabel = "t"\nengine = "transformer"\nsize_b = 0.2\n[[datasets]]\nname = "nslp"\n'
+        assert load_run_config(_write(tmp_path, text))[0].classifiers[0].size_b == 0.2

@@ -433,6 +433,11 @@ def eval_run(
     if paid and not yes and not typer.confirm("Run and spend on the paid APIs?", default=False):
         raise typer.Exit(code=1)
 
+    config_meta = {
+        c.label: {k: v for k, v in (("size_b", c.size_b), ("active_b", c.active_b)) if v is not None}
+        for c in spec.classifiers
+        if c.size_b is not None or c.active_b is not None
+    }
     try:
         configs = {c.label: runconfig.build_classifier(c) for c in spec.classifiers}
     except Exception as exc:
@@ -444,6 +449,7 @@ def eval_run(
         context_modes=spec.run.context_modes,
         min_context_coverage=spec.run.min_context_coverage,
         category_scores=spec.run.category_scores,
+        config_meta=config_meta,
         save_dir=spec.run.save_dir,
     )
     cards_eval.print_benchmark(df)

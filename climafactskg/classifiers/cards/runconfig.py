@@ -50,6 +50,16 @@ class ClassifierSpec(_Strict):
     concurrency: int | None = Field(None, ge=1)
     use_preclassifier: bool = False
     options: dict[str, Any] = Field(default_factory=dict)
+    # Model size in billions of parameters, for the report's size plot. Read from the model id when it carries one
+    # (qwen3-235b-a22b); state it here for models that do not (closed or unpublished), or to override.
+    size_b: float | None = Field(None, gt=0)
+    active_b: float | None = Field(None, gt=0)
+
+    @model_validator(mode="after")
+    def _active_size_within_total(self) -> "ClassifierSpec":
+        if self.size_b is not None and self.active_b is not None and self.active_b > self.size_b:
+            raise ValueError("active_b cannot exceed size_b")
+        return self
 
     @model_validator(mode="after")
     def _llm_settings_only_for_llm(self) -> "ClassifierSpec":

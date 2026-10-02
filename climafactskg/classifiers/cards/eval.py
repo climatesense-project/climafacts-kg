@@ -40,7 +40,15 @@ from .evaluators import (  # noqa: F401
     ancestors_of,
     project_to_depth,
 )
-from .runs import CASE_COLUMNS, BenchmarkRun, bootstrap_ci, collect_meta, context_effect, save_run
+from .runs import (
+    CASE_COLUMNS,
+    BenchmarkRun,
+    bootstrap_ci,
+    collect_meta,
+    context_effect,
+    model_size_from_id,
+    save_run,
+)
 from .scoring import (
     Metrics,
     bootstrap_macro_f1,
@@ -122,6 +130,7 @@ def benchmark_configs(
     min_context_coverage: float = 0.5,
     save_dir: str | None = None,
     category_scores: Literal["all", "narrative_only"] = "all",
+    config_meta: dict[str, dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """Evaluate multiple classifier configs across multiple datasets.
 
@@ -145,6 +154,9 @@ def benchmark_configs(
             (default) scores every case, including those whose gold is exactly ``0_0``. ``"narrative_only"`` scores
             only the cases that carry a category, so ``n_cases`` counts those alone. The narrative-detection columns
             (``n_not_climate``, ``rel_*``) are filled in either way whenever a dataset has ``0_0`` cases.
+        config_meta: Extra facts per config label saved with the run, currently ``size_b`` / ``active_b`` (model size in
+            billions of parameters). They override what is read from the model id (see
+            :func:`~climafactskg.classifiers.cards.runs.model_size_from_id`).
 
     Returns:
         DataFrame with one row per (config, dataset, context mode):
@@ -347,15 +359,20 @@ def benchmark_configs(
     df = pd.DataFrame(rows)
     if save_dir is not None:
         try:
-            configs_meta = [
-                {
+            configs_meta = []
+            for name, clf in configs.items():
+                model = str(getattr(clf, "_model", type(clf).__name__))
+                size_b, active_b = model_size_from_id(model)
+                entry = {
                     "label": name,
                     "provider": str(getattr(clf, "_provider", "")),
-                    "model": str(getattr(clf, "_model", type(clf).__name__)),
+                    "model": model,
                     "prompt": _prompt_id(clf),
+                    "size_b": size_b,
+                    "active_b": active_b,
                 }
-                for name, clf in configs.items()
-            ]
+                entry.update((config_meta or {}).get(name, {}))
+                configs_meta.append(entry)
             run = BenchmarkRun(
                 meta=collect_meta(datasets, context_modes, min_context_coverage, configs_meta, category_scores),
                 summary=df,
