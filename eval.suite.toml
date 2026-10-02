@@ -1,0 +1,146 @@
+# The standard full evaluation: one roster on every benchmark, in one run, so every model is compared on the same
+# claims with the same baseline and the same provenance.
+#
+#   climafactskg eval run eval.suite.toml --dry-run    # plan and cost (already cached vs new calls)
+#   climafactskg eval run eval.suite.toml --report     # run it and write report.html
+#
+# Results are cached per model, so rerunning after adding a model only pays for the new one. Each dataset is loaded
+# with its 0_0 documents (climate_only = false): the category scores cover the documents that carry a CARDS category,
+# and the Narrative detection table scores the climate-misinformation-or-not decision on all of them.
+
+[run]
+save_dir = "data/eval_runs"
+context_modes = ["none", "with"]       # "with" only runs where a benchmark has review context (v2)
+category_scores = "all"
+
+[defaults]
+provider = "openrouter"
+preset = "xplainnlp-nslp"
+cache_path = "data/eval_cache.db"
+concurrency = 4
+[defaults.options]
+temperature = 0.0
+top_p = "none"
+max_tokens = "none"
+
+# ---- baseline first: every comparison in the report is against the first classifier -------------------------------
+[[classifiers]]
+label = "gpt-4o-mini"
+model = "openai/gpt-4o-mini"
+
+# ---- local, free ---------------------------------------------------------------------------------------------------
+[[classifiers]]
+label = "transformer"
+engine = "transformer"
+
+[[classifiers]]
+label = "matcher"
+engine = "matcher"
+
+# ---- open-weight, cheap --------------------------------------------------------------------------------------------
+[[classifiers]]
+label = "deepseek-v4-flash"
+model = "deepseek/deepseek-v4-flash"
+concurrency = 2
+
+[[classifiers]]
+label = "mistral-small-3.2-24b"
+model = "mistralai/mistral-small-3.2-24b-instruct"
+
+[[classifiers]]
+label = "qwen3-235b-a22b"
+model = "qwen/qwen3-235b-a22b-2507"
+
+[[classifiers]]
+label = "llama-3.3-70b"
+model = "meta-llama/llama-3.3-70b-instruct"
+
+[[classifiers]]
+label = "gemma-3-27b"
+model = "google/gemma-3-27b-it"
+
+[[classifiers]]
+label = "qwen3-30b-a3b"                 # needs the format asked for in the prompt, or it often returns no category
+model = "qwen/qwen3-30b-a3b-instruct-2507"
+[classifiers.options]
+output_mode = "prompted"
+
+[[classifiers]]
+label = "llama-3.1-8b"
+model = "meta-llama/llama-3.1-8b-instruct"
+
+[[classifiers]]
+label = "mistral-nemo"
+model = "mistralai/mistral-nemo"
+size_b = 12                              # not in the model id, so stated for the size plot
+
+# ---- open-weight, reasoning models (slower, a little dearer) -------------------------------------------------------
+[[classifiers]]
+label = "nemotron-3-super-120b"
+model = "nvidia/nemotron-3-super-120b-a12b"
+
+[[classifiers]]
+label = "gemma-4-31b"
+model = "google/gemma-4-31b-it"
+
+[[classifiers]]
+label = "glm-4.7-flash"                  # thinks until the default token limit otherwise
+model = "z-ai/glm-4.7-flash"
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "llama-4-maverick"               # leaves the category empty in tool mode, so ask for it in the prompt
+model = "meta-llama/llama-4-maverick"
+size_b = 400
+active_b = 17
+[classifiers.options]
+output_mode = "prompted"
+
+[[classifiers]]
+label = "deepseek-v4-pro"
+model = "deepseek/deepseek-v4-pro"
+
+[[classifiers]]
+label = "gpt-oss-120b"                   # still fails on some claims even in prompted mode (counted as wrong)
+model = "openai/gpt-oss-120b"
+[classifiers.options]
+output_mode = "prompted"
+
+[[classifiers]]
+label = "gpt-oss-20b"
+model = "openai/gpt-oss-20b"
+
+[[classifiers]]
+label = "qwen3.6-35b"
+model = "qwen/qwen3.6-35b-a3b"
+
+[[classifiers]]
+label = "minimax-m2.7"                   # OpenRouter routes it to a provider that does not serve it unless told not to
+model = "minimax/minimax-m2.7"
+[classifiers.options]
+output_mode = "prompted"
+[classifiers.options.extra_body.provider]
+ignore = ["SambaNova"]
+
+# ---- closed, expensive: about $7 to $21 for the three benchmarks, so left out unless wanted ------------------------
+# [[classifiers]]
+# label = "gpt-5.2"
+# model = "openai/gpt-5.2"
+
+# ---- the benchmarks: one dataset per family, each with its 0_0 documents ----------------------------------------------
+[[datasets]]
+name = "climatesense_v1"
+label = "climatesense_v1"
+climate_only = false
+
+[[datasets]]
+name = "climatesense_v2"
+label = "climatesense_v2"
+climate_only = false
+with_context = true                      # review context for the "with" mode
+
+[[datasets]]
+name = "nslp"
+label = "nslp"
+split = "test"
