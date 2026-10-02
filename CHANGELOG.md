@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v2.3.0 (2026-10-02)
+
+### Bug Fixes
+
+- **classifiers**: Read classification cache entries written before the shared cache
+  ([`464b05c`](https://github.com/climatesense-project/climafacts-kg/commit/464b05c01d2d7c3e3c8ccf0372cc62264e20fabf))
+
+- **eval**: Keep dataset labels distinguishable in the compact benchmark table
+  ([`7212ff4`](https://github.com/climatesense-project/climafacts-kg/commit/7212ff48231f80a5fb719f96f5595c18598a1bb6))
+
+### Chores
+
+- Refresh GitHub contributors
+  ([`a849bc7`](https://github.com/climatesense-project/climafacts-kg/commit/a849bc70713488c87463b322ddb0a6f9a466840c))
+
+### Documentation
+
+- Remove agent design specs and plans from the repo
+  ([`d793ffd`](https://github.com/climatesense-project/climafacts-kg/commit/d793ffd429d23cfc041623ba31220b1569385fec))
+
+### Features
+
+- **eval**: Eval command group and config-driven benchmark
+  ([`8d50157`](https://github.com/climatesense-project/climafacts-kg/commit/8d501572f12a6941db001c417774115529358e28))
+
+- **eval**: Paired significance for context and model comparisons
+  ([`c70a5a0`](https://github.com/climatesense-project/climafacts-kg/commit/c70a5a02242287d7304d35603af165724a0a8cd1))
+
+- **eval**: Score the climate-or-not decision on not-climate documents
+  ([`3610129`](https://github.com/climatesense-project/climafacts-kg/commit/36101290fb575180c207038910272d43bfcf98b6))
+
+
 ## v2.2.0 (2026-10-01)
 
 ### Bug Fixes
