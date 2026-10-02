@@ -5,6 +5,7 @@ import logging
 import re
 
 import pandas as pd
+import pytest
 from climafactskg.classifiers.cards import eval as eval_module
 from climafactskg.classifiers.cards.base import CARDSClassifierBase
 from climafactskg.classifiers.cards.eval import (
@@ -14,11 +15,7 @@ from climafactskg.classifiers.cards.eval import (
     print_benchmark,
     print_context_effect,
 )
-from climafactskg.classifiers.cards.evaluators import (
-    CARDSHierarchicalMatch,
-    CARDSOneOfMatch,
-    HierarchicalMetricsReportEvaluator,
-)
+from climafactskg.classifiers.cards.evaluators import CARDSHierarchicalMatch, CARDSOneOfMatch
 from climafactskg.classifiers.cards.runs import CASE_COLUMNS
 from pydantic_evals import Case, Dataset
 from rich.console import Console
@@ -51,9 +48,9 @@ class TestEvaluateUseContext:
 
     def test_use_context_false_passes_none_even_when_present(self):
         clf = _Recorder()
-        report = evaluate(clf, _dataset("d", ["ctx a", "ctx b"]), use_context=False)
+        df = evaluate(clf, _dataset("d", ["ctx a", "ctx b"]), use_context=False)
         assert clf.seen == [None, None]
-        assert len(report.cases) == 2  # scoring still finds every case's prediction
+        assert df.iloc[0]["n_cases"] == 2 and df.iloc[0]["context"] == "none"
 
     def test_default_keeps_using_context(self):
         clf = _Recorder()
@@ -295,25 +292,44 @@ class _Flaky(CARDSClassifierBase):
 
 
 class TestEvaluateWithFailedPredictions:
-    def test_evaluate_survives_failures_and_says_how_many(self, monkeypatch):
+    def test_evaluate_survives_failures_and_counts_them_as_wrong(self):
+        row = evaluate(_Flaky(), _dataset("d", [None, None, None])).iloc[0]
+
+        assert (row["n_cases"], row["n_failed"]) == (3, 1)
+        assert abs(row["exact_match"] - 2 / 3) < 1e-3  # 2 right out of 3, not 2 of the 2 that answered
+
+
+class TestEvaluateIsOneConfigOfTheBenchmark:
+    def test_it_returns_the_one_row_benchmark_summary_named_after_the_classifier_and_dataset(self):
+        df = evaluate(_Recorder(), _dataset("my-data", [None]))
+
+        assert len(df) == 1
+        assert (df.iloc[0]["config"], df.iloc[0]["dataset"]) == ("_Recorder", "my-data")
+        assert "n_not_climate" in df.columns and "exact_category" in df.columns
+
+    def test_it_prints_the_benchmark_table(self, monkeypatch):
         buffer = _capture(monkeypatch, width=100)
+        evaluate(_Recorder(), _dataset("d", [None]))
 
-        report = evaluate(_Flaky(), _dataset("d", [None, None, None]))
+        assert "Benchmark Results" in buffer.getvalue()
 
-        assert len(report.cases) == 3
-        assert "1 of 3 predictions failed" in " ".join(buffer.getvalue().split())
+    def test_category_scores_is_passed_through(self):
+        cases = [
+            Case(name="c0", inputs=CARDSInput(text="claim 0"), expected_output=["1_1"]),
+            Case(name="c1", inputs=CARDSInput(text="claim 1"), expected_output=["0_0"]),
+        ]
+        dataset = Dataset(cases=cases, name="d", evaluators=[CARDSOneOfMatch()])
 
-    def test_report_tables_keep_failures_in_the_denominator(self, monkeypatch):
-        buffer = _capture(monkeypatch, width=100)
-        dataset = _dataset("d", [None, None, None])
-        dataset.report_evaluators.append(HierarchicalMetricsReportEvaluator())
+        assert evaluate(_Recorder(), dataset).iloc[0]["n_cases"] == 2
+        assert evaluate(_Recorder(), dataset, category_scores="narrative_only").iloc[0]["n_cases"] == 1
 
-        evaluate(_Flaky(), dataset)
+    def test_a_classifier_that_raises_makes_evaluate_raise(self):
+        class _Broken(CARDSClassifierBase):
+            def classify(self, text, context=None):
+                raise RuntimeError("boom")
 
-        text = " ".join(buffer.getvalue().split())
-        assert "0.6667" in text  # 2 right out of 3, not 2 of the 2 that answered
-        assert "Failed predictions (counted as wrong)" in text and "1 of 3" in text
-        assert "Exact match (answered only)" in text and "1.0000" in text
+        with pytest.raises(RuntimeError, match="boom"):
+            evaluate(_Broken(), _dataset("d", [None]))
 
 
 class TestFailureColumn:

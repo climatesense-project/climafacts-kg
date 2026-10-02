@@ -49,9 +49,6 @@ from .evaluators import (
     _MAX_CLASSIFIER_DEPTH,
     CARDSHierarchicalMatch,
     CARDSOneOfMatch,
-    DepthMetricsReportEvaluator,
-    HierarchicalMetricsReportEvaluator,
-    MultiMetricsReportEvaluator,
     project_to_depth,
 )
 
@@ -78,11 +75,6 @@ _BRACKET_CODE_RE = re.compile(r"^\[([^\]]+)\]")
 
 # Evaluators attached to every dataset returned by this module.
 _DEFAULT_EVALUATORS = [CARDSOneOfMatch(), CARDSHierarchicalMatch()]
-_DEFAULT_REPORT_EVALUATORS = [
-    MultiMetricsReportEvaluator(),
-    HierarchicalMetricsReportEvaluator(),
-    DepthMetricsReportEvaluator(),
-]
 
 
 def nslp_dataset(limit: int | None = None, split: Literal["train", "test"] = "train") -> Dataset:
@@ -122,7 +114,6 @@ def nslp_dataset(limit: int | None = None, split: Literal["train", "test"] = "tr
         cases=cases,
         name="NSLP Claims Evaluation Dataset",
         evaluators=_DEFAULT_EVALUATORS,
-        report_evaluators=_DEFAULT_REPORT_EVALUATORS,
     )
 
 
@@ -528,7 +519,6 @@ def _load_climatesense_dataset(
         cases=cases,
         name=dataset_name,
         evaluators=_DEFAULT_EVALUATORS,
-        report_evaluators=_DEFAULT_REPORT_EVALUATORS,
     )
 
 

@@ -23,10 +23,15 @@ max_tokens = "none"
 label = "gpt-4o-mini | xplainnlp"
 model = "openai/gpt-4o-mini"
 
+# Lower concurrency helps models whose OpenRouter backends rate-limit quickly (the errors can cascade into
+# fallback-provider failures); the default is 8.
 [[classifiers]]
 label = "llama-3.1-8b | xplainnlp"
 model = "meta-llama/llama-3.1-8b-instruct"
 concurrency = 2
+
+# Other prompts: preset = "climatesense-nslp" (the CARDS reasoning prompt) or "cards-narrative" (infers the narrative a
+# claim promotes). Presets keep their own sampling settings unless overridden under options.
 
 [[classifiers]]
 label = "local | xplainnlp"          # local providers (ollama, lmstudio) are not counted as paid

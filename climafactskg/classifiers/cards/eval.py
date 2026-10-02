@@ -1,48 +1,11 @@
-"""CARDS classifier evaluation — runner and benchmarking utilities.
+"""CARDS classifier evaluation: benchmarking, printing and the single-classifier shortcut.
 
-This module is the main entry point for evaluating CARDS classifiers.  It
-re-exports all public symbols from :mod:`.evaluators` and :mod:`.datasets` so
-that existing ``from climafactskg.classifiers.cards.eval import ...`` imports
-continue to work without change.
+``benchmark_configs`` evaluates a dict of classifier configs on a dict of datasets and returns a tidy summary DataFrame
+(optionally saving the run, see :mod:`.runs`); ``climafactskg eval run`` drives it from a TOML config. ``evaluate`` is
+the same thing for one classifier on one dataset. ``print_benchmark`` and ``print_context_effect`` render the results.
 
-Per-case evaluators
--------------------
-CARDSOneOfMatch
-    Exact match: 1.0 if prediction ∈ gold set.
-
-CARDSHierarchicalMatch
-    Partial-credit hF1 against the best-matching gold label.
-
-Aggregate report evaluators
-----------------------------
-MultiMetricsReportEvaluator
-    Macro / micro / weighted precision, recall, and F1 via scikit-learn.
-
-HierarchicalMetricsReportEvaluator
-    Mean exact-match rate and mean hF1.
-
-DepthMetricsReportEvaluator
-    P / R / F1 at taxonomy depths 1 and 2.
-
-Dataset factories
------------------
-nslp_dataset
-    NSLP / ClimateCheck claims from HuggingFace.
-
-climatesense_dataset_v1
-    ClimateSense internal annotation round 1.
-
-climatesense_dataset_v2
-    ClimateSense internal annotation round 2.
-
-Runners
--------
-evaluate
-    Single-classifier evaluation with full per-case tables printed to the console.
-
-benchmark_configs
-    Grid evaluation over a dict of configs × dict of datasets; returns a tidy
-    summary DataFrame.
+For convenience this module re-exports the per-case evaluators (:mod:`.evaluators`) and the dataset factories
+(:mod:`.datasets`), so ``from climafactskg.classifiers.cards.eval import nslp_dataset`` keeps working.
 """
 
 import logging
@@ -53,7 +16,6 @@ import pandas as pd
 from pydantic_evals import Dataset
 from rich import box
 from rich.console import Console
-from rich.rule import Rule
 from rich.table import Table
 
 from .base import CARDSClassifierBase
@@ -74,9 +36,6 @@ from .evaluators import (  # noqa: F401
     _MAX_CLASSIFIER_DEPTH,
     CARDSHierarchicalMatch,
     CARDSOneOfMatch,
-    DepthMetricsReportEvaluator,
-    HierarchicalMetricsReportEvaluator,
-    MultiMetricsReportEvaluator,
     _hierarchical_f1,
     ancestors_of,
     project_to_depth,
@@ -106,16 +65,19 @@ def _prompt_id(classifier, max_chars: int = 60) -> str:
     return first_line[:max_chars] + ("…" if len(first_line) > max_chars else "")
 
 
-def evaluate(classifier, dataset: Dataset, use_context: bool = True):
-    """Evaluate a CARDS classifier against a pydantic-evals Dataset.
+def evaluate(
+    classifier,
+    dataset: Dataset,
+    use_context: bool = True,
+    category_scores: Literal["all", "narrative_only"] = "all",
+) -> pd.DataFrame:
+    """Evaluate one classifier on one dataset: :func:`benchmark_configs` with a single config and a single dataset.
 
-    Predictions are collected via :meth:`classify_batch` (when available) or
-    sequential :meth:`classify` calls, then scored against ground-truth labels.
-    All registered evaluators and report evaluators on the dataset are run, and
-    their tables are printed to the console.
+    The benchmark table (and the narrative-detection table, when the dataset has ``0_0`` documents) is printed and the
+    one-row summary is returned, so quick checks and full benchmarks score the same way.
 
-    Works with any classifier that exposes a ``classify(text: str) -> str``
-    method (or optionally ``classify_batch(texts: list[str]) -> list[str]``).
+    Works with any classifier that exposes ``classify(text) -> str`` (or ``classify_batch``); only
+    :class:`CARDSClassifierBase` subclasses receive context.
 
     Args:
         classifier: Classifier instance with ``classify`` / ``classify_batch``.
@@ -123,73 +85,29 @@ def evaluate(classifier, dataset: Dataset, use_context: bool = True):
         use_context: When ``False``, ignore every case's ``context`` and classify the claim text alone (the gold
             labels are claim-only annotations, so this is the like-for-like run). Defaults to ``True``: contexts
             are used when present and the classifier supports them.
+        category_scores: See :func:`benchmark_configs`.
 
     Returns:
-        The pydantic-evals :class:`EvaluationReport` (per-case scores for all
-        registered evaluators).
+        The one-row summary DataFrame of :func:`benchmark_configs`.
+
+    Raises:
+        RuntimeError: if the classifier raised, so nothing could be scored.
     """
-    cases = list(dataset.cases)
-    inputs = [case.inputs for case in cases]
-    texts = [inp.text if isinstance(inp, CARDSInput) else inp for inp in inputs]
-    contexts = [inp.context if isinstance(inp, CARDSInput) else None for inp in inputs]
-    # `contexts` (the dataset's own) keys the prediction lookup below; `predict_contexts` is what the classifier sees.
-    predict_contexts = contexts if use_context else [None] * len(texts)
-    # All three CARDS engines (CARDSClassifierBase subclasses) accept `context`
-    # via classify/classify_batch. Duck-typed classifiers that don't inherit it
-    # (arbitrary external `classify(text) -> str` objects, per this function's
-    # docstring) fall back to plain text — passing `context=` to something that
-    # doesn't accept it would raise a TypeError.
-    supports_context = isinstance(classifier, CARDSClassifierBase)
-    if use_context and supports_context and any(contexts):
-        _console.print("[dim]Note: gold labels were annotated from claim text only.[/dim]")
-    classifier_name = type(classifier).__name__
-    logger.info("Starting evaluation: %s on '%s' (%d cases)", classifier_name, dataset.name, len(cases))
-    if hasattr(classifier, "classify_batch"):
-        logger.info("Running classify_batch")
-        if any(predict_contexts) and supports_context:
-            preds = classifier.classify_batch(texts, contexts=predict_contexts)
-        else:
-            preds = classifier.classify_batch(texts)
-    else:
-        from rich.progress import track
-
-        logger.info("Running sequential classify")
-        pass_context = any(predict_contexts) and supports_context
-        preds = [
-            classifier.classify(t, context=ctx) if pass_context else classifier.classify(t)
-            for t, ctx in track(
-                zip(texts, predict_contexts, strict=True), description="Classifying...", total=len(texts)
-            )
-        ]
-
-    logger.info("Predictions complete — running pydantic-evals scoring")
-
-    from pydantic_evals.reporting import _render_analysis
-    from rich.columns import Columns
-
-    provider = getattr(classifier, "_provider", None)
-    model = getattr(classifier, "_model", classifier_name)
-    identity = f"{model} ({provider})" if provider else model
-    _console.print(Rule(f"{identity}  |  {_prompt_id(classifier)}  |  {len(cases)} cases"))
-
-    n_failed = sum(pred is None for pred in preds)
-    if n_failed:
-        _console.print(f"[yellow]{n_failed} of {len(preds)} predictions failed and count as wrong.[/yellow]")
-    unique_labels = sorted({pred for pred in preds if pred is not None})
-    logger.info("Predicted label set (%d unique): %s", len(unique_labels), unique_labels)
-    _console.print(f"Predicted labels ({len(unique_labels)} unique):", Columns(unique_labels))
-
-    cache = {(t, c): p for t, c, p in zip(texts, contexts, preds, strict=True)}
-    report = dataset.evaluate_sync(
-        lambda inp, _c=cache: _c[(inp.text, inp.context) if isinstance(inp, CARDSInput) else (str(inp), None)]
+    has_context = any(isinstance(case.inputs, CARDSInput) and case.inputs.context for case in dataset.cases)
+    mode: Literal["none", "with"] = (
+        "with" if use_context and has_context and isinstance(classifier, CARDSClassifierBase) else "none"
     )
-
-    logger.info("Rendering report analyses (%d)", len(report.analyses))
-    for analysis in report.analyses:
-        _console.print(_render_analysis(analysis))
-
-    logger.info("Evaluation complete: %s on '%s'", classifier_name, dataset.name)
-    return report
+    df = benchmark_configs(
+        {type(classifier).__name__: classifier},
+        {dataset.name or "dataset": dataset},
+        context_modes=(mode,),
+        category_scores=category_scores,
+    )
+    print_benchmark(df)
+    error = str(df.iloc[0].get("error", "") or "").strip()
+    if error:
+        raise RuntimeError(f"evaluation failed: {error}")
+    return df
 
 
 def _f1(metrics: Metrics, depth: int, strategy: str) -> float:
@@ -652,64 +570,3 @@ def print_context_effect(cases: pd.DataFrame) -> None:
         )
     _console.print(table)
     _console.print("[dim]p: exact two-sided McNemar test on the cases that changed.[/dim]")
-
-
-if __name__ == "__main__":
-    import logging as _logging
-
-    _logging.basicConfig(level=_logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-
-    from climafactskg.classifiers.cards.llm.classifier import CARDSLLMClassifier
-
-    def _clf(preset: str, model: str, concurrency: int = 8, **kw) -> CARDSLLMClassifier:
-        return CARDSLLMClassifier.from_preset(
-            preset,
-            provider="openrouter",
-            model=model,
-            use_preclassifier=False,
-            cache_path="data/eval_cache.db",
-            default_concurrency=concurrency,
-            **kw,
-        )
-
-    _greedy = {"temperature": 0.0, "top_p": None, "max_tokens": None}
-
-    configs = {
-        # --- prompt comparison (gpt-4o-mini, three presets) ---
-        "gpt-4o-mini | climatesense": _clf("climatesense-nslp", "openai/gpt-4o-mini"),
-        "gpt-4o-mini | xplainnlp": _clf("xplainnlp-nslp", "openai/gpt-4o-mini", **_greedy),
-        "gpt-4o-mini | narrative": _clf("cards-narrative", "openai/gpt-4o-mini"),
-        # --- model comparison (xplainnlp preset) ---
-        # closed — expensive
-        "gpt-5.2 | xplainnlp": _clf("xplainnlp-nslp", "openai/gpt-5.2", **_greedy),
-        # open-weight — OpenAI OSS 120B
-        "gpt-oss-120b | xplainnlp": _clf("xplainnlp-nslp", "openai/gpt-oss-120b", **_greedy),
-        # open-weight — frontier MoE (284B/13B active, 1M context, current top-adoption
-        # open-weight model on OpenRouter, cheaper per-token than qwen3.6-35b-a3b).
-        # Lower concurrency: high demand means its upstream OpenRouter backend
-        # providers (Fireworks, WandB, AkashML, DeepInfra) rate-limit quickly under
-        # concurrency=8, which can cascade into fallback-provider errors.
-        "deepseek-v4-flash | xplainnlp": _clf("xplainnlp-nslp", "deepseek/deepseek-v4-flash", concurrency=2, **_greedy),
-        # open-weight — large dense
-        "llama-3.3-70b | xplainnlp": _clf("xplainnlp-nslp", "meta-llama/llama-3.3-70b-instruct", **_greedy),
-        # open-weight — OpenAI OSS 20B
-        "gpt-oss-20b | xplainnlp": _clf("xplainnlp-nslp", "openai/gpt-oss-20b", **_greedy),
-        # open-weight — small MoE (3B active / 35B total, very cheap)
-        "qwen3.6-35b | xplainnlp": _clf("xplainnlp-nslp", "qwen/qwen3.6-35b-a3b", **_greedy),
-        # open-weight — tiny
-        "llama-3.1-8b | xplainnlp": _clf("xplainnlp-nslp", "meta-llama/llama-3.1-8b-instruct", **_greedy),
-        # No Gemma entry: verified against OpenRouter's live /api/v1/models catalog and no
-        # "gemma" model is currently listed there at all — the "Gemma 4" model info found via
-        # web search was wrong (unreliable third-party sites), confirmed by 100% failed runs.
-        # --- Qwen3 (keep original thinking-mode temperature/top_p/max_tokens) ---
-        # "qwen3-8b | xplainnlp": _clf("xplainnlp-nslp", "qwen/qwen3-8b:nitro"),
-    }
-
-    datasets = {
-        "nslp": nslp_dataset(),
-        "climatesense_v1": climatesense_dataset_v1(),
-        "climatesense_v2": climatesense_dataset_v2(),
-    }
-
-    results = benchmark_configs(configs, datasets)
-    print_benchmark(results)
