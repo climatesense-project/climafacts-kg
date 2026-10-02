@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-from climafactskg.utils import has_scientific_citation, query_sparqlendpoint
+from climafactskg.utils import SPARQL_TIMEOUT_SECONDS, has_scientific_citation, query_sparqlendpoint
 
 
 class TestQuerySparqlendpoint:
@@ -37,14 +37,14 @@ class TestQuerySparqlendpoint:
         mock_wrapper.setTimeout.assert_called_once_with(5)
 
     @patch("climafactskg.utils.SPARQLWrapper")
-    def test_no_timeout_leaves_the_wrapper_default(self, mock_wrapper_cls, tmp_path):
+    def test_no_timeout_falls_back_to_the_package_default(self, mock_wrapper_cls, tmp_path):
         mock_wrapper = MagicMock()
         mock_wrapper.query.return_value.response = io.BytesIO(b"a,b\n1,2\n")
         mock_wrapper_cls.return_value = mock_wrapper
 
         query_sparqlendpoint("https://example.org/sparql", "SELECT 2", cache_dir=str(tmp_path))
 
-        mock_wrapper.setTimeout.assert_not_called()
+        mock_wrapper.setTimeout.assert_called_once_with(SPARQL_TIMEOUT_SECONDS)
 
     @patch("climafactskg.utils.SPARQLWrapper")
     def test_malformed_non_empty_response_returns_empty_dataframe(self, mock_wrapper_cls, tmp_path):
@@ -167,3 +167,23 @@ class TestFetchUrlContent:
             fetch_url_content("https://x.test/a", cache_dir=str(tmp_path))
 
         assert not list(tmp_path.glob("*.tmp"))
+
+
+class TestSparqlTimeout:
+    def _run(self, tmp_path, **kwargs):
+        wrapper = MagicMock()
+        wrapper.query.return_value.response = io.StringIO("a\n1\n")
+        with patch("climafactskg.utils.SPARQLWrapper", return_value=wrapper):
+            query_sparqlendpoint("https://e.test/sparql", f"SELECT {tmp_path.name}", cache_dir=str(tmp_path), **kwargs)
+        return wrapper
+
+    def test_a_default_timeout_is_applied_when_none_is_given(self, tmp_path):
+        wrapper = self._run(tmp_path)
+
+        wrapper.setTimeout.assert_called_once()
+        assert wrapper.setTimeout.call_args.args[0] > 0  # a hung endpoint must not stall collect forever
+
+    def test_an_explicit_timeout_wins(self, tmp_path):
+        wrapper = self._run(tmp_path, timeout=7)
+
+        wrapper.setTimeout.assert_called_once_with(7)

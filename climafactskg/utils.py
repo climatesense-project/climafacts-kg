@@ -14,6 +14,8 @@ import preserve
 import requests
 from SPARQLWrapper import CSV, SPARQLWrapper
 
+SPARQL_TIMEOUT_SECONDS = int(os.getenv("CLIMAFACTSKG_SPARQL_TIMEOUT", 300))
+
 
 @lru_cache(maxsize=32)
 def query_sparqlendpoint(
@@ -47,7 +49,8 @@ def query_sparqlendpoint(
             Defaults to the ``CLIMAFACTSKG_SPARQL_CACHE_EXPIRY`` env var
             (seconds), or 12 hours — these endpoints get new content roughly
             daily, so that's a reasonable freshness/redundant-fetch tradeoff.
-        timeout (int, optional): Request timeout in seconds. Defaults to SPARQLWrapper's own default (no timeout).
+        timeout (int, optional): Request timeout in seconds. Defaults to ``CLIMAFACTSKG_SPARQL_TIMEOUT`` (300),
+            so a hung endpoint cannot stall a collector forever.
 
     Returns:
         pandas.DataFrame: A DataFrame containing the query results, where each row corresponds to a result binding.
@@ -76,8 +79,7 @@ def query_sparqlendpoint(
                 pass  # fall through and re-fetch on a corrupt/stale cache file
 
     sparql = SPARQLWrapper(endpoint_url)
-    if timeout is not None:
-        sparql.setTimeout(timeout)
+    sparql.setTimeout(timeout if timeout is not None else SPARQL_TIMEOUT_SECONDS)
     sparql.setQuery(query)
     sparql.setReturnFormat(CSV)
 
