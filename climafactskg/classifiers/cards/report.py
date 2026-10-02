@@ -806,6 +806,9 @@ def _details(runs: Sequence[BenchmarkRun]) -> str:
     return "".join(out)
 
 
+_GLANCE_MODEL_LIMIT = 8  # more models than this and At a glance lists only the significant differences
+
+
 def _glance(summary: pd.DataFrame, cases: pd.DataFrame, model_rows) -> str:
     """A few plain sentences with the headline results, generated from the data."""
     items: list[str] = []
@@ -841,12 +844,26 @@ def _glance(summary: pd.DataFrame, cases: pd.DataFrame, model_rows) -> str:
                     )
     if model_rows is not None:
         comparison, baseline, mode = model_rows
-        for _, r in comparison.iterrows():
-            verdict = _verdict(r["delta"], r["p_value"])
-            items.append(
-                f"<b>{_esc(str(r['config']))}</b> against {_esc(baseline)} on {_esc(str(r['dataset']))}: "
-                f"{r['delta']:+.3f} exact match ({verdict}, p {_p_relation(r['p_value'])})."
-            )
+        for dataset in dict.fromkeys(comparison["dataset"].astype(str)):
+            rows = comparison[comparison["dataset"].astype(str) == dataset]
+            verdicts = [_verdict(r["delta"], r["p_value"]) for _, r in rows.iterrows()]
+            # A long list of "within noise" lines hides the few differences that matter, so with many models only
+            # the significant ones are listed and the rest are counted in one line.
+            crowded = len(rows) > _GLANCE_MODEL_LIMIT
+            quiet = 0
+            for (_, r), verdict in zip(rows.iterrows(), verdicts, strict=True):
+                if crowded and not verdict.startswith("significantly"):
+                    quiet += 1
+                    continue
+                items.append(
+                    f"<b>{_esc(str(r['config']))}</b> against {_esc(baseline)} on {_esc(dataset)}: "
+                    f"{r['delta']:+.3f} exact match ({verdict}, p {_p_relation(r['p_value'])})."
+                )
+            if quiet:
+                items.append(
+                    f"{quiet} other model{'s' if quiet != 1 else ''} are within noise of {_esc(baseline)} on "
+                    f"{_esc(dataset)} (see Model comparison)."
+                )
     effect = context_effect(cases)
     for _, r in effect.iterrows():
         verdict = _verdict(r["delta"], r["p_value"])

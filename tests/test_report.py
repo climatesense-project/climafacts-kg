@@ -576,3 +576,33 @@ class TestRankedBars:
         html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
 
         assert 'class="legend"' in html
+
+
+class TestGlanceWithManyModels:
+    def _glance(self, tmp_path, n_models):
+        run = _run(with_context=False)
+        cases, summary = [], []
+        ids = [f"c{i}" for i in range(10)]
+        for k in range(n_models):
+            label = f"M{k}"
+            right = ids[
+                : 5 if k == 0 else (5 if k % 2 else 10)
+            ]  # M0 baseline; odd models tie it, even ones are far better
+            summary.append(_summary_row(config=label, context="none", exact=len(right) / 10))
+            for cid in ids:
+                cases.append(_case(label, "none", cid, 1.0 if cid in right else 0.0))
+        run.summary = pd.DataFrame(summary)
+        run.cases = pd.DataFrame(cases, columns=list(CASE_COLUMNS))
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+        return html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+
+    def test_few_models_are_all_listed(self, tmp_path):
+        section = self._glance(tmp_path, 4)
+
+        assert section.count(" against ") == 3
+
+    def test_many_models_list_only_the_significant_ones_and_summarise_the_rest(self, tmp_path):
+        section = self._glance(tmp_path, 14)
+
+        assert section.count("<li>") < 14
+        assert "within noise" in section and "other model" in section  # one summary line for the rest
