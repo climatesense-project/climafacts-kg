@@ -451,7 +451,6 @@ _COMPACT_COLUMNS = (
     "config",
     "dataset",
     "context",
-    "n_with_context",
     "n_cases",
     "n_failed",
     "exact_match",
@@ -461,6 +460,14 @@ _COMPACT_COLUMNS = (
 )
 # Metric columns that show a dash when nothing was evaluated (n_cases == 0), never a made-up 0.000.
 _METRIC_COLUMNS = ("exact_match", "h_f1", "d1_macro_f1", "d1_weighted_f1", "d2_macro_f1", "d2_weighted_f1")
+
+
+def _shorten_middle(text: str, width: int) -> str:
+    """Shortens to *width* keeping both ends, so labels that share a prefix (or a suffix) stay distinguishable."""
+    if len(text) <= width:
+        return text
+    tail = (width - 1) // 2
+    return f"{text[: width - 1 - tail]}…{text[len(text) - tail :]}"
 
 
 def _score_cell(row: pd.Series, col: str) -> str:
@@ -485,7 +492,7 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
     # macro_f1/micro_f1/weighted_f1 are omitted — d2_* carry the same values.
     col_spec: list[tuple[str, str, str, str, int | None, bool]] = [
         ("config", "Config", "bold cyan", "left", 22 if wide else 8, True),
-        ("dataset", "Dataset", "", "left", 16 if wide else 6, True),
+        ("dataset", "Dataset", "", "left", 16 if wide else 10, True),
         ("context", "Ctx", "dim", "left", 4, True),
         ("n_with_context", "Ctx#", "dim", "right", None, False),
         ("provider", "Provider", "dim", "left", 12, True),
@@ -531,7 +538,7 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
     for _, row in df.iterrows():
         cells = []
         no_cases = "n_cases" in df.columns and row["n_cases"] == 0
-        for col, _, _, _, _, _ in present:
+        for col, _, _, _, mw, _ in present:
             if no_cases and col in _METRIC_COLUMNS:
                 cells.append("—")
             elif col in _COUNT_COLUMNS:
@@ -540,6 +547,8 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
                 cells.append(_score_cell(row, col))
             elif isinstance(row[col], float):
                 cells.append("—" if pd.isna(row[col]) else f"{row[col]:.3f}")
+            elif not wide and col in ("config", "dataset"):
+                cells.append(_shorten_middle(str(row[col]), cast(int, mw)))
             else:
                 cells.append(str(row[col]))
         table.add_row(*cells)

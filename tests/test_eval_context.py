@@ -189,6 +189,23 @@ class TestCompactPrintBenchmark:
         assert "D2 Mac" in text and "0.303" in text  # the last column must not be cropped away
         assert "Provider" not in text and "Prompt" not in text
 
+    def test_datasets_that_share_a_prefix_stay_distinguishable_at_80_columns(self, monkeypatch):
+        buffer = _capture(monkeypatch)
+        summary = pd.concat(
+            [
+                _long_summary().assign(dataset="climatesense_v2", config="gpt-4o-mini | xplainnlp"),
+                _long_summary().assign(dataset="climatesense_v2 (incl. not climate)", config="gpt-4o-mini | xplainnlp"),
+            ],
+            ignore_index=True,
+        )
+        print_benchmark(summary)
+        lines = buffer.getvalue().splitlines()
+        rows = [line for line in lines if "0.378" in line]
+
+        assert max(len(line) for line in lines) <= 80
+        assert len(rows) == 2 and rows[0].split()[1] != rows[1].split()[1]
+        assert "D2 Mac" in "\n".join(lines)
+
     def test_wide_shows_every_column(self, monkeypatch):
         buffer = _capture(monkeypatch, width=250)
         print_benchmark(_long_summary(), wide=True)
