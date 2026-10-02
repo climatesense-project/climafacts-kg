@@ -272,22 +272,28 @@ def _reliability(summary: pd.DataFrame) -> str:
     return "<h3>Reliability</h3>" + _table(headers, rows)
 
 
-def _repeat_datasets(summary: pd.DataFrame) -> list[str]:
-    """Datasets whose every category row repeats an earlier dataset's (same classifications on the same cases)."""
-    metrics = [m for m in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1") if m in summary.columns]
-    seen: set[tuple] = set()
+def _repeat_datasets(summary: pd.DataFrame, cases: pd.DataFrame) -> list[str]:
+    """Datasets whose every (config, context) result repeats an earlier dataset's: the same cases, the same predictions.
+
+    Decided from the saved case rows, never from equal scores alone (two different datasets can score alike). Without
+    case rows for a dataset nothing is folded.
+    """
+    if cases.empty:
+        return []
+    signatures: dict[tuple[str, str, str], frozenset] = {}
+    for key, group in cases.groupby(["dataset", "config", "context"], sort=False):
+        dataset, config, context = (str(part) for part in key)
+        signatures[(dataset, config, context)] = frozenset(
+            zip(group["case_id"].astype(str), group["text"].astype(str), group["pred"].astype(str), strict=True)
+        )
+    seen: set[tuple[str, str, frozenset]] = set()
     repeats: list[str] = []
     for dataset in dict.fromkeys(summary["dataset"].astype(str)):
-        rows = summary[summary["dataset"].astype(str) == dataset]
-        keys = [
-            (str(r["config"]), str(r["context"]), int(r["n_cases"]), *(round(float(r[m]), 6) for m in metrics))
-            for _, r in rows.iterrows()
-            if int(r["n_cases"]) > 0 and not any(pd.isna(r[m]) for m in metrics)
-        ]
-        if keys and all(key in seen for key in keys):
+        own = {(config, context, sig) for (d, config, context), sig in signatures.items() if d == dataset}
+        if own and own <= seen:
             repeats.append(dataset)
         else:
-            seen.update(keys)
+            seen |= own
     return repeats
 
 
@@ -651,7 +657,7 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
             "with claim-only labels, not accuracy against a context-informed truth. Intervals are 95% bootstrap over "
             "cases; differences inside them are noise.</p>"
         )
-    repeats = _repeat_datasets(summary)
+    repeats = _repeat_datasets(summary, cases)
     category = summary[~summary["dataset"].astype(str).isin(repeats)] if repeats else summary
     category_cases = cases[~cases["dataset"].astype(str).isin(repeats)] if repeats and not cases.empty else cases
     model_rows, model_note = _model_rows(category_cases, category, baseline)

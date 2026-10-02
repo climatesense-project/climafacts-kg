@@ -340,9 +340,35 @@ class TestReadability:
         assert all(f'<th class="num">{h}</th>' in rest for h in ("Not related", "Unambiguous", "Baseline"))
         assert "D2 macro" in table
 
-    def test_a_dataset_that_repeats_another_datasets_category_scores_is_shown_once(self, tmp_path):
+    def _with_repeat_cases(self, run, dataset="mixed", same_cases=True):
+        """Adds case rows for *dataset*: the same cases as dataset 'd' (a repeat) or different ones."""
+        rows = run.cases[run.cases["dataset"] == "d"].copy()
+        rows["dataset"] = dataset
+        if not same_cases:
+            rows["case_id"] = rows["case_id"] + "-other"
+            rows["text"] = rows["text"] + " (a different claim)"
+        run.cases = pd.concat([run.cases, rows], ignore_index=True)
+        return run
+
+    def test_datasets_with_equal_scores_but_different_cases_are_not_folded_together(self, tmp_path):
+        repeat = {**_summary_row(dataset="mixed", context="none"), **_REPEAT}
+        run = self._with_repeat_cases(_run(with_context=False, extra_summary=[repeat]), same_cases=False)
+        html = self._html(tmp_path, run)
+        category_part = html[html.index("<h2>Comparison</h2>") : html.index("<h2>Narrative detection</h2>")]
+
+        assert "<td>mixed</td>" in category_part  # identical numbers on different claims is not a repeat
+        assert "repeats the category scores" not in html
+
+    def test_without_case_rows_nothing_is_folded(self, tmp_path):
         repeat = {**_summary_row(dataset="mixed", context="none"), **_REPEAT}
         html = self._html(tmp_path, _run(with_context=False, extra_summary=[repeat]))
+
+        assert "repeats the category scores" not in html
+
+    def test_a_dataset_that_repeats_another_datasets_category_scores_is_shown_once(self, tmp_path):
+        repeat = {**_summary_row(dataset="mixed", context="none"), **_REPEAT}
+        run = self._with_repeat_cases(_run(with_context=False, extra_summary=[repeat]))
+        html = self._html(tmp_path, run)
         category_part = html[html.index("<h2>Comparison</h2>") : html.index("<h2>Narrative detection</h2>")]
         charts = html[html.index("<h2>Charts</h2>") :]
 
