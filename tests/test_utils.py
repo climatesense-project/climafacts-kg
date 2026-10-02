@@ -5,6 +5,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 from climafactskg.utils import has_scientific_citation, query_sparqlendpoint
 
 
@@ -120,3 +121,49 @@ class TestHasScientificCitation:
 
     def test_no_citation(self):
         assert not has_scientific_citation("The weather was nice today.")
+
+
+class TestFetchUrlContent:
+    def _response(self, status=200, text="<html>page</html>"):
+        response = MagicMock()
+        response.status_code = status
+        response.ok = status < 400
+        response.text = text
+        return response
+
+    def test_a_successful_page_is_returned_and_cached(self, tmp_path):
+        from climafactskg.utils import fetch_url_content
+
+        with patch("climafactskg.utils.requests.get", return_value=self._response()) as get:
+            first = fetch_url_content("https://x.test/a", cache_dir=str(tmp_path))
+            second = fetch_url_content("https://x.test/a", cache_dir=str(tmp_path))
+
+        assert first == second == "<html>page</html>"
+        assert get.call_count == 1  # the second call came from the cache
+
+    def test_requests_carry_a_timeout(self, tmp_path):
+        from climafactskg.utils import fetch_url_content
+
+        with patch("climafactskg.utils.requests.get", return_value=self._response()) as get:
+            fetch_url_content("https://x.test/a", cache_dir=str(tmp_path))
+
+        assert get.call_args.kwargs["timeout"] > 0  # a hung server must not stall the collector forever
+
+    @pytest.mark.parametrize("status", [404, 429, 500, 503])
+    def test_an_error_status_raises_and_is_not_cached(self, tmp_path, status):
+        from climafactskg.utils import fetch_url_content
+
+        with patch("climafactskg.utils.requests.get", return_value=self._response(status, "<html>oops</html>")):
+            with pytest.raises(ValueError, match=str(status)):
+                fetch_url_content("https://x.test/a", cache_dir=str(tmp_path))
+        with patch("climafactskg.utils.requests.get", return_value=self._response()) as get:
+            assert fetch_url_content("https://x.test/a", cache_dir=str(tmp_path)) == "<html>page</html>"
+        assert get.call_count == 1  # the failed response was not served from the cache
+
+    def test_no_partial_cache_file_is_left_behind(self, tmp_path):
+        from climafactskg.utils import fetch_url_content
+
+        with patch("climafactskg.utils.requests.get", return_value=self._response()):
+            fetch_url_content("https://x.test/a", cache_dir=str(tmp_path))
+
+        assert not list(tmp_path.glob("*.tmp"))

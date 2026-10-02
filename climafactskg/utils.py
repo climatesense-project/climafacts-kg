@@ -353,6 +353,9 @@ def parse_apa_citation_html(definition_html: str) -> dict:
     return out
 
 
+FETCH_TIMEOUT_SECONDS = int(os.getenv("CLIMAFACTSKG_FETCH_TIMEOUT", 30))
+
+
 def fetch_url_content(
     url: str,
     cache_dir: Optional[str] = None,
@@ -373,7 +376,8 @@ def fetch_url_content(
         str: The content of the URL.
 
     Raises:
-        requests.RequestException: If the request fails.
+        requests.RequestException: If the request fails or times out (``CLIMAFACTSKG_FETCH_TIMEOUT`` seconds, 30).
+        ValueError: If the server answers with an error status; nothing is cached then.
     """
     if cache_dir is None:
         cache_dir = os.getenv("CLIMAFACTSKG_CACHE_DIR", tempfile.gettempdir())
@@ -398,15 +402,18 @@ def fetch_url_content(
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"  # noqa: E501
     }
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200 and "not found" in response.text.strip().lower():
+    response = requests.get(url, headers=headers, timeout=FETCH_TIMEOUT_SECONDS)
+    # Any error status is a failure: an error page must neither be parsed as the page nor sit in the cache.
+    if not response.ok:
         raise ValueError(f"Failed to fetch URL content for '{url}'. Status code: {response.status_code}")
 
     content = response.text
 
-    # Store the content in the cache
-    with open(cache_path, "w", encoding="utf-8") as cache_file:
+    # Store the content in the cache (written to a temp file first, so an interrupted write leaves no partial file)
+    tmp_path = f"{cache_path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as cache_file:
         json.dump({"content": content, "timestamp": datetime.now().isoformat()}, cache_file)
+    os.replace(tmp_path, cache_path)
 
     return content
 
