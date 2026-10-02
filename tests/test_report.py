@@ -9,6 +9,20 @@ from climafactskg.classifiers.cards.report import bar_chart_svg, render_html
 from climafactskg.classifiers.cards.runs import CASE_COLUMNS, BenchmarkRun
 
 
+def _benchmark(html, name):
+    """The part of a multi-benchmark report that belongs to one benchmark."""
+    start = html.index(f"<h2>{name}</h2>")
+    end = html.find('<section class="benchmark">', start + 1)
+    return html[start : end if end != -1 else len(html)]
+
+
+def _sub(section, heading):
+    """The text under one heading of a benchmark section, up to the next heading of the same level."""
+    start = section.index(f"<h3>{heading}</h3>")
+    end = section.find("<h3>", start + 1)
+    return section[start : end if end != -1 else len(section)]
+
+
 def _summary_row(config="gpt", dataset="d", context="none", exact=0.4, hf1=0.6, error="", n=10, n_ctx=10):
     ok = not error
     nan = float("nan")
@@ -340,46 +354,10 @@ class TestReadability:
         assert all(f'<th class="num">{h}</th>' in rest for h in ("Not related", "Unambiguous", "Baseline"))
         assert "D2 macro" in table
 
-    def _with_repeat_cases(self, run, dataset="mixed", same_cases=True):
-        """Adds case rows for *dataset*: the same cases as dataset 'd' (a repeat) or different ones."""
-        rows = run.cases[run.cases["dataset"] == "d"].copy()
-        rows["dataset"] = dataset
-        if not same_cases:
-            rows["case_id"] = rows["case_id"] + "-other"
-            rows["text"] = rows["text"] + " (a different claim)"
-        run.cases = pd.concat([run.cases, rows], ignore_index=True)
-        return run
-
-    def test_datasets_with_equal_scores_but_different_cases_are_not_folded_together(self, tmp_path):
-        repeat = {**_summary_row(dataset="mixed", context="none"), **_REPEAT}
-        run = self._with_repeat_cases(_run(with_context=False, extra_summary=[repeat]), same_cases=False)
-        html = self._html(tmp_path, run)
-        category_part = html[html.index("<h2>Comparison</h2>") : html.index("<h2>Narrative detection</h2>")]
-
-        assert "<td>mixed</td>" in category_part  # identical numbers on different claims is not a repeat
-        assert "repeats the category scores" not in html
-
-    def test_without_case_rows_nothing_is_folded(self, tmp_path):
-        repeat = {**_summary_row(dataset="mixed", context="none"), **_REPEAT}
-        html = self._html(tmp_path, _run(with_context=False, extra_summary=[repeat]))
-
-        assert "repeats the category scores" not in html
-
-    def test_a_dataset_that_repeats_another_datasets_category_scores_is_shown_once(self, tmp_path):
-        repeat = {**_summary_row(dataset="mixed", context="none"), **_REPEAT}
-        run = self._with_repeat_cases(_run(with_context=False, extra_summary=[repeat]))
-        html = self._html(tmp_path, run)
-        category_part = html[html.index("<h2>Comparison</h2>") : html.index("<h2>Narrative detection</h2>")]
-        charts = html[html.index("<h2>Charts</h2>") :]
-
-        assert "<td>mixed</td>" not in category_part and "mixed" not in charts.split("<h2>Run details</h2>")[0]
-        assert "mixed" in html[html.index("<h2>Narrative detection</h2>") : html.index("<h2>Charts</h2>")]
-        assert "repeat" in category_part  # a note says which dataset was folded away
-
     def test_narrative_detection_is_described_as_denial_narrative_versus_none(self, tmp_path):
         row = {**_summary_row(dataset="mixed"), **_REPEAT}
         html = self._html(tmp_path, _run(with_context=False, extra_summary=[row]))
-        section = html[html.index("<h2>Narrative detection</h2>") : html.index("<h2>Charts</h2>")]
+        section = _sub(_benchmark(html, "mixed"), "Narrative detection")
 
         assert "0_0" in section and "climate or not" not in section.lower()
 
@@ -425,20 +403,20 @@ class TestBaselineAwareReport:
 
     def test_a_score_at_or_below_the_always_guess_baseline_is_called_out(self, tmp_path):
         html = self._html(tmp_path, _run(with_context=False, extra_summary=[self._mixed()]))
-        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+        section = _sub(_benchmark(html, "mixed"), "At a glance")
 
         assert "no better than always guessing" in section and "0.550" in section
 
     def test_the_zero_zero_remark_only_appears_for_datasets_that_have_such_documents(self, tmp_path):
         weak = _summary_row(dataset="plain", context="none", exact=0.1, hf1=0.2)
         html = self._html(tmp_path, _run(with_context=False, extra_summary=[{**weak, "baseline_exact": 0.3}]))
-        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+        section = _sub(_benchmark(html, "plain"), "At a glance")
 
         assert "no better than always guessing" in section and "that label is 0_0" not in section
 
     def test_a_score_above_the_baseline_is_not_flagged(self, tmp_path):
         html = self._html(tmp_path, _run(with_context=False, extra_summary=[self._mixed(baseline_exact=0.2)]))
-        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+        section = _sub(_benchmark(html, "mixed"), "At a glance")
 
         assert "no better than always guessing" not in section
 
@@ -448,8 +426,9 @@ class TestBaselineAwareReport:
 
         header = '<th class="num">Exact, category cases</th>'
         assert header not in plain
-        table = mixed[mixed.index("<h2>Comparison</h2>") : mixed.index("<h3>Reliability</h3>")]
+        table = _sub(_benchmark(mixed, "mixed"), "Comparison")
         assert header in table and "0.700" in table
+        assert header not in _sub(_benchmark(mixed, "d"), "Comparison")  # the plain benchmark has no such column
 
     def test_the_model_comparison_lists_the_baseline_as_a_row(self, tmp_path):
         html = self._html(tmp_path, _two_config_run())
@@ -576,3 +555,143 @@ class TestRankedBars:
         html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
 
         assert 'class="legend"' in html
+
+
+class TestGlanceWithManyModels:
+    def _glance(self, tmp_path, n_models):
+        run = _run(with_context=False)
+        cases, summary = [], []
+        ids = [f"c{i}" for i in range(10)]
+        for k in range(n_models):
+            label = f"M{k}"
+            right = ids[
+                : 5 if k == 0 else (5 if k % 2 else 10)
+            ]  # M0 baseline; odd models tie it, even ones are far better
+            summary.append(_summary_row(config=label, context="none", exact=len(right) / 10))
+            for cid in ids:
+                cases.append(_case(label, "none", cid, 1.0 if cid in right else 0.0))
+        run.summary = pd.DataFrame(summary)
+        run.cases = pd.DataFrame(cases, columns=list(CASE_COLUMNS))
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+        return html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+
+    def test_few_models_are_all_listed(self, tmp_path):
+        section = self._glance(tmp_path, 4)
+
+        assert section.count(" against ") == 3
+
+    def test_many_models_list_only_the_significant_ones_and_summarise_the_rest(self, tmp_path):
+        section = self._glance(tmp_path, 14)
+
+        assert section.count("<li>") < 14
+        assert "within noise" in section and "other model" in section  # one summary line for the rest
+
+
+def _two_benchmarks_run():
+    """Configs A and B on benchmarks d1 and d2, plus C on d1 only; d1 also has with-context rows for A."""
+    ids = [f"c{i}" for i in range(10)]
+    summary, cases = [], []
+    plan = {
+        "d1": {"A": 0.5, "B": 0.9, "C": 0.2},
+        "d2": {"A": 0.4, "B": 0.6},
+    }
+    for dataset, models in plan.items():
+        for config, exact in models.items():
+            summary.append(_summary_row(config=config, dataset=dataset, context="none", exact=exact))
+            right = ids[: round(exact * 10)]
+            for cid in ids:
+                row = _case(config, "none", cid, 1.0 if cid in right else 0.0)
+                row["dataset"] = dataset
+                cases.append(row)
+    run = _run(with_context=False)
+    run.summary = pd.DataFrame(summary)
+    run.cases = pd.DataFrame(cases, columns=list(CASE_COLUMNS))
+    return run
+
+
+class TestOneSectionPerBenchmark:
+    def _html(self, tmp_path, run=None):
+        return render_html([run or _two_benchmarks_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+    def test_every_benchmark_gets_its_own_section_with_the_same_subsections(self, tmp_path):
+        html = self._html(tmp_path)
+        d1, d2 = _benchmark(html, "d1"), _benchmark(html, "d2")
+        headings = lambda section: re.findall(r"<h3>(.*?)</h3>", section)  # noqa: E731
+
+        assert headings(d1) == headings(d2)
+        assert {"At a glance", "Comparison", "Charts", "Model comparison"} <= set(headings(d1))
+
+    def test_charts_stay_inside_their_own_benchmark(self, tmp_path):
+        html = self._html(tmp_path)
+        charts1 = _sub(_benchmark(html, "d1"), "Charts")
+        charts2 = _sub(_benchmark(html, "d2"), "Charts")
+
+        assert ">d1<" in charts1 and ">d2<" not in charts1  # the group label of the bars is the benchmark itself
+        assert ">d2<" in charts2 and ">d1<" not in charts2
+
+    def test_the_overview_has_models_as_rows_benchmarks_as_columns_and_dashes_where_not_run(self, tmp_path):
+        html = self._html(tmp_path)
+        overview = html[html.index("<h2>Overview</h2>") : html.index('<section class="benchmark">')]
+
+        assert '<th class="num">d1</th>' in overview and '<th class="num">d2</th>' in overview
+        row_c = re.search(r"<tr><td>C</td>(.*?)</tr>", overview).group(1)
+        assert "0.200" in row_c and "—" in row_c  # C was run on d1 only
+        assert "<b>0.900</b>" in overview and "<b>0.600</b>" in overview  # the best per benchmark is bold
+
+    def test_each_benchmark_compares_against_the_baseline_where_it_has_one(self, tmp_path):
+        html = self._html(tmp_path)
+
+        assert "<td>baseline</td>" in _benchmark(html, "d1") and "<td>baseline</td>" in _benchmark(html, "d2")
+        assert "<b>A</b>" in _sub(_benchmark(html, "d2"), "Model comparison")
+
+    def test_a_baseline_that_was_not_run_on_a_benchmark_is_a_note_there_not_an_error(self, tmp_path):
+        run = _two_benchmarks_run()
+        run.summary = run.summary[~((run.summary["config"] == "C") & (run.summary["dataset"] == "d2"))]
+        html = render_html([run], tmp_path / "r.html", baseline="C").read_text(encoding="utf-8")
+
+        assert "was not run here" in _benchmark(html, "d2")
+        assert "<b>C</b>" in _sub(_benchmark(html, "d1"), "Model comparison")
+
+    def test_an_unknown_baseline_is_still_an_error(self, tmp_path):
+        with pytest.raises(ValueError, match="baseline"):
+            render_html([_two_benchmarks_run()], tmp_path / "r.html", baseline="nope")
+
+    def test_one_benchmark_keeps_the_flat_layout_without_an_overview(self, tmp_path):
+        html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "<h2>Comparison</h2>" in html and "<h2>Overview</h2>" not in html
+        assert '<section class="benchmark">' not in html
+
+
+class TestStandardSections:
+    def test_a_section_without_data_still_appears_with_its_reason(self, tmp_path):
+        html = render_html([_two_benchmarks_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+        d2 = _benchmark(html, "d2")
+
+        for heading, reason in (
+            ("Narrative detection", "no documents annotated 0_0"),
+            ("Size and result", "at least two models with a known size"),
+            ("Context effect", "No model was run with review context"),
+        ):
+            assert reason in _sub(d2, heading)
+
+    def test_every_benchmark_lists_all_standard_headings_in_the_same_order(self, tmp_path):
+        html = render_html([_two_benchmarks_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+        expected = [
+            "At a glance",
+            "Comparison",
+            "Narrative detection",
+            "Charts",
+            "Size and result",
+            "Model comparison",
+            "Context effect",
+        ]
+
+        for name in ("d1", "d2"):
+            headings = [h for h in re.findall(r"<h3>(.*?)</h3>", _benchmark(html, name)) if h in expected]
+            assert headings == expected, name
+
+    def test_a_single_benchmark_report_does_not_get_empty_placeholder_sections(self, tmp_path):
+        html = render_html([_run(with_context=False)], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "No model was run with review context" not in html and "Size and result" not in html

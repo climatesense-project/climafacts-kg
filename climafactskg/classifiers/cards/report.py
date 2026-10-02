@@ -76,6 +76,8 @@ td b {{ font-weight: 700; }}
 .chart .dot.hollow {{ fill: var(--surface); stroke: var(--s0); }}
 {series_rules}
 details {{ margin: 8px 0; }}
+h4 {{ font-size: 0.98rem; margin: 20px 0 6px; }}
+section.benchmark {{ margin-top: 44px; padding-top: 4px; border-top: 2px solid var(--rule); }}
 dl {{ display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 8px 0; }}
 dt {{ color: var(--text2); }} dd {{ margin: 0; }}
 """
@@ -487,31 +489,6 @@ def _reliability(summary: pd.DataFrame) -> str:
     return "<h3>Reliability</h3>" + _table(headers, rows)
 
 
-def _repeat_datasets(summary: pd.DataFrame, cases: pd.DataFrame) -> list[str]:
-    """Datasets whose every (config, context) result repeats an earlier dataset's: the same cases, the same predictions.
-
-    Decided from the saved case rows, never from equal scores alone (two different datasets can score alike). Without
-    case rows for a dataset nothing is folded.
-    """
-    if cases.empty:
-        return []
-    signatures: dict[tuple[str, str, str], frozenset] = {}
-    for key, group in cases.groupby(["dataset", "config", "context"], sort=False):
-        dataset, config, context = (str(part) for part in key)
-        signatures[(dataset, config, context)] = frozenset(
-            zip(group["case_id"].astype(str), group["text"].astype(str), group["pred"].astype(str), strict=True)
-        )
-    seen: set[tuple[str, str, frozenset]] = set()
-    repeats: list[str] = []
-    for dataset in dict.fromkeys(summary["dataset"].astype(str)):
-        own = {(config, context, sig) for (d, config, context), sig in signatures.items() if d == dataset}
-        if own and own <= seen:
-            repeats.append(dataset)
-        else:
-            seen |= own
-    return repeats
-
-
 def _narrative_detection(summary: pd.DataFrame) -> str:
     """Denial narrative vs none; empty unless a run included documents annotated as code 0_0."""
     if "rel_f1" not in summary.columns or summary["rel_f1"].isna().all():
@@ -641,8 +618,6 @@ def _model_rows(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str | None
     report; an explicit baseline without results is explained in the note instead of raising.
     """
     configs = list(dict.fromkeys(summary["config"].astype(str)))
-    if baseline is not None and baseline not in configs:
-        raise ValueError(f"unknown baseline {baseline!r}; choose one of: {', '.join(configs)}")
     modes = list(dict.fromkeys(cases["context"])) if not cases.empty else []
     if len(configs) < 2 or not modes:
         return None, ""
@@ -650,7 +625,8 @@ def _model_rows(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str | None
     answered = set(cases.loc[cases["context"] == mode, "config"].astype(str))
     with_results = [config for config in configs if config in answered]
     if baseline is not None and baseline not in with_results:
-        return None, f"Baseline {baseline} has no results (it failed), so there is no model comparison."
+        why = "was not run here" if baseline not in configs else "has no results (it failed)"
+        return None, f"Baseline {baseline} {why}, so there is no model comparison."
     baseline = baseline or (with_results[0] if with_results else None)
     if baseline is None or len(with_results) < 2:
         return None, ""
@@ -806,6 +782,9 @@ def _details(runs: Sequence[BenchmarkRun]) -> str:
     return "".join(out)
 
 
+_GLANCE_MODEL_LIMIT = 8  # more models than this and At a glance lists only the significant differences
+
+
 def _glance(summary: pd.DataFrame, cases: pd.DataFrame, model_rows) -> str:
     """A few plain sentences with the headline results, generated from the data."""
     items: list[str] = []
@@ -841,12 +820,26 @@ def _glance(summary: pd.DataFrame, cases: pd.DataFrame, model_rows) -> str:
                     )
     if model_rows is not None:
         comparison, baseline, mode = model_rows
-        for _, r in comparison.iterrows():
-            verdict = _verdict(r["delta"], r["p_value"])
-            items.append(
-                f"<b>{_esc(str(r['config']))}</b> against {_esc(baseline)} on {_esc(str(r['dataset']))}: "
-                f"{r['delta']:+.3f} exact match ({verdict}, p {_p_relation(r['p_value'])})."
-            )
+        for dataset in dict.fromkeys(comparison["dataset"].astype(str)):
+            rows = comparison[comparison["dataset"].astype(str) == dataset]
+            verdicts = [_verdict(r["delta"], r["p_value"]) for _, r in rows.iterrows()]
+            # A long list of "within noise" lines hides the few differences that matter, so with many models only
+            # the significant ones are listed and the rest are counted in one line.
+            crowded = len(rows) > _GLANCE_MODEL_LIMIT
+            quiet = 0
+            for (_, r), verdict in zip(rows.iterrows(), verdicts, strict=True):
+                if crowded and not verdict.startswith("significantly"):
+                    quiet += 1
+                    continue
+                items.append(
+                    f"<b>{_esc(str(r['config']))}</b> against {_esc(baseline)} on {_esc(dataset)}: "
+                    f"{r['delta']:+.3f} exact match ({verdict}, p {_p_relation(r['p_value'])})."
+                )
+            if quiet:
+                items.append(
+                    f"{quiet} other model{'s' if quiet != 1 else ''} are within noise of {_esc(baseline)} on "
+                    f"{_esc(dataset)} (see Model comparison)."
+                )
     effect = context_effect(cases)
     for _, r in effect.iterrows():
         verdict = _verdict(r["delta"], r["p_value"])
@@ -886,6 +879,83 @@ def _glossary() -> str:
     return f"<details><summary>How to read this report</summary><dl>{items}</dl></details>"
 
 
+def _demote(html_text: str) -> str:
+    """Shifts headings one level down (h3 to h4, h2 to h3) so a section can sit inside a benchmark's h2."""
+    return html_text.replace("<h3>", "<h4>").replace("</h3>", "</h4>").replace("<h2>", "<h3>").replace("</h2>", "</h3>")
+
+
+_PLACEHOLDERS = {
+    "Narrative detection": "This benchmark has no documents annotated 0_0 (no denial narrative), so nothing to detect.",
+    "Size and result": "Needs at least two models with a known size; state size_b for the others in the config.",
+    "Model comparison": "Needs at least two models with results on this benchmark.",
+    "Context effect": "No model was run with review context on this benchmark.",
+}
+
+
+def _benchmark_body(
+    summary: pd.DataFrame, cases: pd.DataFrame, baseline: str | None, placeholders: bool = False
+) -> str:
+    """The standard sections for one benchmark, always in this order.
+
+    A section without data is left out, or, with ``placeholders`` (reports of several benchmarks), shown with the
+    reason, so every benchmark lists the same headings in the same order.
+    """
+    model_rows, model_note = _model_rows(cases, summary, baseline)
+
+    def standard(heading: str, content: str) -> str:
+        if content or not placeholders:
+            return content
+        return f'<h2>{heading}</h2><p class="muted">{_PLACEHOLDERS[heading]}</p>'
+
+    return (
+        f"{_glance(summary, cases, model_rows)}"
+        f"<h2>Comparison</h2>{_comparison(summary)}{_reliability(summary)}"
+        f"{standard('Narrative detection', _narrative_detection(summary))}"
+        f"<h2>Charts</h2>{_charts(summary)}"
+        f"{standard('Size and result', _size_section(summary))}"
+        f"{standard('Model comparison', _model_comparison(model_rows) or _model_note(model_note))}"
+        f"{standard('Context effect', _context_sections(cases))}"
+    )
+
+
+def _overview(summary: pd.DataFrame) -> str:
+    """Models by benchmarks in one table: the score each model reached where it was run, a dash where it was not."""
+    datasets = list(dict.fromkeys(summary["dataset"].astype(str)))
+    configs = list(dict.fromkeys(summary["config"].astype(str)))
+    usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
+    metric_of = {}
+    for dataset in datasets:
+        group = usable[usable["dataset"].astype(str) == dataset]
+        mixed = _has_not_climate(group) and "exact_category" in group.columns and group["exact_category"].notna().any()
+        metric_of[dataset] = "exact_category" if mixed else "exact_match"
+    cell: dict[tuple[str, str], tuple[float, bool]] = {}
+    for (config, dataset), rows in usable.groupby([usable["config"].astype(str), usable["dataset"].astype(str)]):
+        row = rows[rows["context"] == "none"].iloc[0] if (rows["context"] == "none").any() else rows.iloc[0]
+        value = row[metric_of[dataset]]
+        if pd.isna(value):
+            continue
+        failed = (0 if pd.isna(row.get("n_failed")) else float(row["n_failed"])) / max(float(row["n_cases"]), 1) > 0.10
+        cell[(config, dataset)] = (float(value), failed)
+    best = {d: max((v for (c, dd), (v, _) in cell.items() if dd == d), default=None) for d in datasets}
+    headers = [("Model", False)] + [(d, True) for d in datasets]
+    rows_html = []
+    for config in configs:
+        tds = [_td(config)]
+        for dataset in datasets:
+            if (config, dataset) not in cell:
+                tds.append(_td("—", num=True))
+                continue
+            value, failed = cell[(config, dataset)]
+            tds.append(_td(f"{value:.3f}{' †' if failed else ''}", num=True, best=value == best[dataset]))
+        rows_html.append(tds)
+    intro = (
+        '<p class="muted">Exact match per model and benchmark (context: none where it was run). On benchmarks that '
+        "also hold 0_0 documents the score is on the cases that carry a category. Bold: best on that benchmark; "
+        "—: not run; †: failed on more than 10% of claims, so the score understates the model.</p>"
+    )
+    return "<h2>Overview</h2>" + intro + _table(headers, rows_html)
+
+
 def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: str | None = None) -> Path:
     """Renders *runs* as one self-contained HTML report at *out_path* and returns the path.
 
@@ -905,27 +975,29 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
             "with claim-only labels, not accuracy against a context-informed truth. Intervals are 95% bootstrap over "
             "cases; differences inside them are noise.</p>"
         )
-    repeats = _repeat_datasets(summary, cases)
-    category = summary[~summary["dataset"].astype(str).isin(repeats)] if repeats else summary
-    category_cases = cases[~cases["dataset"].astype(str).isin(repeats)] if repeats and not cases.empty else cases
-    model_rows, model_note = _model_rows(category_cases, category, baseline)
-    repeat_note = ""
-    if repeats:
-        names = ", ".join(_esc(name) for name in repeats)
-        repeat_note = (
-            f'<p class="note">{names}: repeats the category scores of an earlier dataset (the same classifications '
-            "on the same cases), so it is shown only under Narrative detection.</p>"
-        )
+    configs = list(dict.fromkeys(summary["config"].astype(str)))
+    if baseline is not None and baseline not in configs:
+        raise ValueError(f"unknown baseline {baseline!r}; choose one of: {', '.join(configs)}")
+    datasets = list(dict.fromkeys(summary["dataset"].astype(str)))
+    if len(datasets) == 1:  # one benchmark: the standard sections directly
+        body = _benchmark_body(summary, cases, baseline)
+    else:  # several: an overview across benchmarks, then the same standard sections for each
+        sections = []
+        for dataset in datasets:
+            part = summary[summary["dataset"].astype(str) == dataset]
+            part_cases = cases[cases["dataset"].astype(str) == dataset] if not cases.empty else cases
+            sections.append(
+                f'<section class="benchmark"><h2>{_esc(dataset)}</h2>'
+                f"{_demote(_benchmark_body(part, part_cases, baseline, placeholders=True))}</section>"
+            )
+        body = _overview(summary) + "".join(sections)
     document = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1"><title>CARDS evaluation report</title>'
         f"<style>{_css()}</style></head><body><main><h1>CARDS evaluation report</h1>"
-        f'<p class="muted">{len(runs)} run(s), {len(summary)} result row(s).</p>'
-        f"{_glance(category, category_cases, model_rows)}{_glossary()}{caveat}"
-        f"<h2>Comparison</h2>{_comparison(category)}{repeat_note}{_reliability(category)}"
-        f"{_narrative_detection(summary)}<h2>Charts</h2>{_charts(category)}{_size_section(category)}"
-        f"{_model_comparison(model_rows) or _model_note(model_note)}{_context_sections(category_cases)}"
-        f"{_details(runs)}</main></body></html>"
+        f'<p class="muted">{len(runs)} run(s), {len(summary)} result row(s), '
+        f"{len(datasets)} benchmark{'s' if len(datasets) != 1 else ''}.</p>"
+        f"{_glossary()}{caveat}{body}{_details(runs)}</main></body></html>"
     )
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
