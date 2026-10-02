@@ -428,7 +428,7 @@ class TestBaselineAwareReport:
         assert header not in plain
         table = _sub(_benchmark(mixed, "mixed"), "Comparison")
         assert header in table and "0.700" in table
-        assert header not in _sub(_benchmark(mixed, "d"), "Comparison")  # the plain benchmark has no such column
+        assert header in _sub(_benchmark(mixed, "d"), "Comparison")  # every benchmark gets the same columns
 
     def test_the_model_comparison_lists_the_baseline_as_a_row(self, tmp_path):
         html = self._html(tmp_path, _two_config_run())
@@ -551,13 +551,11 @@ class TestRankedBars:
         assert "further series are not drawn" not in html
         assert all(f">M{i}<" in charts for i in range(10))  # every model is drawn, without a redundant suffix
 
-    def test_few_models_keep_the_grouped_bars(self, tmp_path):
+    def test_few_models_get_the_same_ranked_chart_as_many(self, tmp_path):
         html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
 
-        assert 'class="legend"' in html
+        assert 'class="legend"' not in html and '<rect class="s0"' in html
 
-
-class TestGlanceWithManyModels:
     def _glance(self, tmp_path, n_models):
         run = _run(with_context=False)
         cases, summary = [], []
@@ -626,8 +624,9 @@ class TestOneSectionPerBenchmark:
         charts1 = _sub(_benchmark(html, "d1"), "Charts")
         charts2 = _sub(_benchmark(html, "d2"), "Charts")
 
-        assert ">d1<" in charts1 and ">d2<" not in charts1  # the group label of the bars is the benchmark itself
-        assert ">d2<" in charts2 and ">d1<" not in charts2
+        assert 'aria-label="Exact match, d1"' in charts1 and "Exact match, d2" not in charts1
+        assert 'aria-label="Exact match, d2"' in charts2 and "Exact match, d1" not in charts2
+        assert ">C<" in charts1 and ">C<" not in charts2  # model C was only run on d1
 
     def test_the_overview_has_models_as_rows_benchmarks_as_columns_and_dashes_where_not_run(self, tmp_path):
         html = self._html(tmp_path)
@@ -695,3 +694,51 @@ class TestStandardSections:
         html = render_html([_run(with_context=False)], tmp_path / "r.html").read_text(encoding="utf-8")
 
         assert "No model was run with review context" not in html and "Size and result" not in html
+
+
+class TestSameShapeEverywhere:
+    def _html(self, tmp_path):
+        return render_html([_two_benchmarks_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+    def test_every_benchmark_uses_the_same_chart_type_whatever_the_number_of_models(self, tmp_path):
+        html = self._html(tmp_path)
+
+        for name, models in (("d1", 3), ("d2", 2)):  # d1 has three models, d2 two: both get ranked bars
+            charts = _sub(_benchmark(html, name), "Charts")
+            assert 'class="legend"' not in charts
+            assert charts.count('<rect class="s0"') == 3 * models  # three metrics, one bar per model
+
+    def test_every_benchmark_table_has_the_same_columns(self, tmp_path):
+        html = self._html(tmp_path)
+        headers = {
+            name: re.findall(r"<th[^>]*>(.*?)</th>", _sub(_benchmark(html, name), "Comparison").split("</thead>")[0])
+            for name in ("d1", "d2")
+        }
+
+        assert headers["d1"] == headers["d2"]
+        assert any("category cases" in h for h in headers["d1"])  # present even without 0_0 documents
+
+    def test_the_overview_scores_every_benchmark_on_the_same_metric(self, tmp_path):
+        run = _two_benchmarks_run()
+        run.summary["exact_category"] = run.summary["exact_match"] - 0.05  # differs from exact so the metric shows
+        run.summary["n_category"] = 10
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+        overview = html[html.index("<h2>Overview</h2>") : html.index('<section class="benchmark">')]
+
+        assert "0.850" in overview and "0.550" in overview  # exact_category (0.9 - 0.05, 0.6 - 0.05) on both benchmarks
+        assert "category" in overview.split("<table")[0]  # the note says which metric the cells show
+
+    def test_size_plots_share_one_x_axis_across_benchmarks(self, tmp_path):
+        run = _two_benchmarks_run()
+        run.meta = {
+            **run.meta,
+            "configs": [
+                {"label": "A", "size_b": 8.0, "active_b": None},
+                {"label": "B", "size_b": 70.0, "active_b": None},
+                {"label": "C", "size_b": 400.0, "active_b": None},  # only on d1, but it sets the range for both
+            ],
+        }
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        d2_plot = _sub(_benchmark(html, "d2"), "Size and result")
+        assert ">300B<" in d2_plot  # d2 has only A and B (8B and 70B) yet shows the axis of the whole report

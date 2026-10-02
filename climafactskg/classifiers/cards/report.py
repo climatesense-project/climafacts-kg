@@ -216,7 +216,13 @@ def _fmt_size(size: float, active: float | None = None) -> str:
     return f"{text} ({active:g}B active)" if active else text
 
 
-def size_scatter_svg(title: str, points: Sequence[dict], width: int = 900, height: int = 420) -> str:
+def size_scatter_svg(
+    title: str,
+    points: Sequence[dict],
+    width: int = 900,
+    height: int = 420,
+    size_range: tuple[float, float] | None = None,
+) -> str:
     """Result against model size as inline SVG: log x axis, 95% interval whiskers and the efficient frontier.
 
     *points* are dicts with ``label``, ``size`` (billions of parameters), ``active`` (or ``None``), ``value`` (0..1),
@@ -224,7 +230,8 @@ def size_scatter_svg(title: str, points: Sequence[dict], width: int = 900, heigh
     """
     left, right, top, bottom = 44, 24, 18, 46
     plot_w, plot_h = width - left - right, height - top - bottom
-    sizes = [p["size"] for p in points]
+    # ``size_range`` fixes the x axis (smallest, largest size in billions) so several plots can share one scale.
+    sizes = [p["size"] for p in points] + list(size_range or ())
     # The axis hugs the data (a little padding either side) so points are not squeezed into one corner.
     lo_log = math.log10(min(sizes)) - 0.2
     hi_log = math.log10(max(sizes)) + 0.2
@@ -318,7 +325,7 @@ def size_scatter_svg(title: str, points: Sequence[dict], width: int = 900, heigh
     return "".join(parts)
 
 
-def _size_section(summary: pd.DataFrame) -> str:
+def _size_section(summary: pd.DataFrame, size_range: tuple[float, float] | None = None) -> str:
     """Result against model size per dataset; empty unless at least two configs of a dataset have a known size."""
     if "size_b" not in summary.columns:
         return ""
@@ -354,7 +361,7 @@ def _size_section(summary: pd.DataFrame) -> str:
         if len(points) < 2:
             continue
         title = f"{dataset}: {'exact match on cases with a category' if mixed else 'exact match'} against model size"
-        block = f"<h3>{_esc(dataset)}</h3>" + size_scatter_svg(title, points)
+        block = f"<h3>{_esc(dataset)}</h3>" + size_scatter_svg(title, points, size_range=size_range)
         notes = ["Dashed line: models that no smaller model beats."]
         if any(p["flag"] for p in points):
             notes.append("Hollow marker: failed on more than 10% of claims, so its score understates the model.")
@@ -411,8 +418,9 @@ def _has_not_climate(summary: pd.DataFrame) -> bool:
     return "n_not_climate" in summary.columns and bool((summary["n_not_climate"].fillna(0) > 0).any())
 
 
-def _comparison(summary: pd.DataFrame) -> str:
-    show_category = _has_not_climate(summary) and "exact_category" in summary.columns
+def _comparison(summary: pd.DataFrame, standard: bool = False) -> str:
+    # ``standard``: every benchmark of a multi-benchmark report gets the same columns, with or without 0_0 documents.
+    show_category = standard or (_has_not_climate(summary) and "exact_category" in summary.columns)
     best: dict[tuple[str, str], float] = {}
     for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
         if metric in summary.columns:
@@ -442,6 +450,8 @@ def _comparison(summary: pd.DataFrame) -> str:
         for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
             if metric == "h_f1" and show_category:
                 n_category, category = r.get("n_category"), r.get("exact_category")
+                if (category is None or pd.isna(category)) and not failed and standard:
+                    category, n_category = r.get("exact_match"), r.get("n_cases")  # no 0_0 documents: the same cases
                 has_category = not failed and category is not None and not pd.isna(category)
                 label = f"{_fmt(category)} (n={_count(n_category)})" if has_category else "—"
                 cells.append(_td(label, num=True))
@@ -547,44 +557,9 @@ def _ranked_charts(usable: pd.DataFrame) -> str:
 
 
 def _charts(summary: pd.DataFrame) -> str:
+    """The same ranked bar charts for every benchmark, whatever the number of models."""
     usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
-    if usable.empty:
-        return ""
-    groups = list(dict.fromkeys(usable["dataset"].astype(str)))
-    labels = list(
-        dict.fromkeys(
-            f"{c} · {'with context' if m == 'with' else 'no context'}"
-            for c, m in zip(usable["config"], usable["context"], strict=True)
-        )
-    )
-    if len(labels) > MAX_SERIES:  # too many series for grouped bars: one ranked chart per dataset and metric
-        return _ranked_charts(usable)
-    dropped = max(0, len(labels) - MAX_SERIES)
-    labels = labels[:MAX_SERIES]
-    legend = "".join(f'<li><span class="swatch k{i}"></span>{_esc(label)}</li>' for i, label in enumerate(labels))
-    out = [f'<ul class="legend">{legend}</ul>'] if len(labels) > 1 else []
-    for metric, title in _METRICS:
-        if metric not in usable.columns:
-            continue
-        nan = float("nan")
-        values = [[nan] * len(groups) for _ in labels]
-        lows = [[nan] * len(groups) for _ in labels]
-        highs = [[nan] * len(groups) for _ in labels]
-        lo_col, hi_col = _CI_COLUMNS.get(metric, (None, None))
-        for _, r in usable.iterrows():
-            label = f"{r['config']} · {'with context' if r['context'] == 'with' else 'no context'}"
-            if label not in labels:
-                continue
-            s, g = labels.index(label), groups.index(str(r["dataset"]))
-            values[s][g] = float(r[metric]) if not pd.isna(r[metric]) else nan
-            if lo_col and lo_col in usable.columns:
-                lows[s][g] = float(r[lo_col]) if not pd.isna(r[lo_col]) else nan
-                highs[s][g] = float(r[hi_col]) if not pd.isna(r[hi_col]) else nan
-        out.append(f"<h3>{_esc(title)}</h3>")
-        out.append(bar_chart_svg(title, groups, labels, values, lows if lo_col else None, highs if lo_col else None))
-    if dropped:
-        out.append(f'<p class="note">{dropped} further series are not drawn; see the comparison table.</p>')
-    return "".join(out)
+    return "" if usable.empty else _ranked_charts(usable)
 
 
 def _p(p) -> str:
@@ -893,7 +868,11 @@ _PLACEHOLDERS = {
 
 
 def _benchmark_body(
-    summary: pd.DataFrame, cases: pd.DataFrame, baseline: str | None, placeholders: bool = False
+    summary: pd.DataFrame,
+    cases: pd.DataFrame,
+    baseline: str | None,
+    placeholders: bool = False,
+    size_range: tuple[float, float] | None = None,
 ) -> str:
     """The standard sections for one benchmark, always in this order.
 
@@ -909,10 +888,10 @@ def _benchmark_body(
 
     return (
         f"{_glance(summary, cases, model_rows)}"
-        f"<h2>Comparison</h2>{_comparison(summary)}{_reliability(summary)}"
+        f"<h2>Comparison</h2>{_comparison(summary, standard=placeholders)}{_reliability(summary)}"
         f"{standard('Narrative detection', _narrative_detection(summary))}"
         f"<h2>Charts</h2>{_charts(summary)}"
-        f"{standard('Size and result', _size_section(summary))}"
+        f"{standard('Size and result', _size_section(summary, size_range))}"
         f"{standard('Model comparison', _model_comparison(model_rows) or _model_note(model_note))}"
         f"{standard('Context effect', _context_sections(cases))}"
     )
@@ -923,15 +902,20 @@ def _overview(summary: pd.DataFrame) -> str:
     datasets = list(dict.fromkeys(summary["dataset"].astype(str)))
     configs = list(dict.fromkeys(summary["config"].astype(str)))
     usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
-    metric_of = {}
-    for dataset in datasets:
-        group = usable[usable["dataset"].astype(str) == dataset]
-        mixed = _has_not_climate(group) and "exact_category" in group.columns and group["exact_category"].notna().any()
-        metric_of[dataset] = "exact_category" if mixed else "exact_match"
+    # One metric for every benchmark: exact match on the cases that carry a category (equal to plain exact match
+    # where a benchmark has no 0_0 documents); older runs without that column fall back to exact match.
+    metric = (
+        "exact_category"
+        if "exact_category" in usable.columns and usable["exact_category"].notna().any()
+        else "exact_match"
+    )
+    metric_of = dict.fromkeys(datasets, metric)
     cell: dict[tuple[str, str], tuple[float, bool]] = {}
     for (config, dataset), rows in usable.groupby([usable["config"].astype(str), usable["dataset"].astype(str)]):
         row = rows[rows["context"] == "none"].iloc[0] if (rows["context"] == "none").any() else rows.iloc[0]
         value = row[metric_of[dataset]]
+        if pd.isna(value):
+            value = row["exact_match"]
         if pd.isna(value):
             continue
         failed = (0 if pd.isna(row.get("n_failed")) else float(row["n_failed"])) / max(float(row["n_cases"]), 1) > 0.10
@@ -950,7 +934,8 @@ def _overview(summary: pd.DataFrame) -> str:
         rows_html.append(tds)
     intro = (
         '<p class="muted">Exact match per model and benchmark (context: none where it was run). On benchmarks that '
-        "also hold 0_0 documents the score is on the cases that carry a category. Bold: best on that benchmark; "
+        "also hold 0_0 documents the score is on the cases that carry a category (the same metric on every "
+        "benchmark). Bold: best on that benchmark; "
         "—: not run; †: failed on more than 10% of claims, so the score understates the model.</p>"
     )
     return "<h2>Overview</h2>" + intro + _table(headers, rows_html)
@@ -979,6 +964,8 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
     if baseline is not None and baseline not in configs:
         raise ValueError(f"unknown baseline {baseline!r}; choose one of: {', '.join(configs)}")
     datasets = list(dict.fromkeys(summary["dataset"].astype(str)))
+    sizes = pd.to_numeric(summary["size_b"], errors="coerce").dropna() if "size_b" in summary.columns else []
+    size_range = (float(min(sizes)), float(max(sizes))) if len(sizes) else None  # one x axis for every size plot
     if len(datasets) == 1:  # one benchmark: the standard sections directly
         body = _benchmark_body(summary, cases, baseline)
     else:  # several: an overview across benchmarks, then the same standard sections for each
@@ -988,7 +975,7 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
             part_cases = cases[cases["dataset"].astype(str) == dataset] if not cases.empty else cases
             sections.append(
                 f'<section class="benchmark"><h2>{_esc(dataset)}</h2>'
-                f"{_demote(_benchmark_body(part, part_cases, baseline, placeholders=True))}</section>"
+                f"{_demote(_benchmark_body(part, part_cases, baseline, True, size_range))}</section>"
             )
         body = _overview(summary) + "".join(sections)
     document = (
