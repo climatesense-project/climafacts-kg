@@ -303,3 +303,25 @@ class TestModelSizeFields:
     def test_a_non_llm_classifier_may_state_its_size(self, tmp_path):
         text = '[[classifiers]]\nlabel = "t"\nengine = "transformer"\nsize_b = 0.2\n[[datasets]]\nname = "nslp"\n'
         assert load_run_config(_write(tmp_path, text))[0].classifiers[0].size_b == 0.2
+
+
+def test_a_nested_extra_body_table_reaches_the_classifier_unchanged(tmp_path, monkeypatch):
+    from climafactskg.classifiers.cards.llm.classifier import CARDSLLMClassifier
+
+    seen = {}
+    monkeypatch.setattr(
+        CARDSLLMClassifier, "from_preset", classmethod(lambda cls, name, **kw: seen.update(kw) or "clf")
+    )
+    extra = (
+        'preset = "p"\n'
+        "[classifiers.options.extra_body]\n"
+        'provider = { ignore = ["X"] }\n'
+        "[classifiers.options.extra_body.reasoning]\n"
+        'effort = "low"\n'
+    )
+    text = MINIMAL.replace("\n[[datasets]]", "\n" + extra + "[[datasets]]")
+    config, _ = load_run_config(_write(tmp_path, text))
+
+    runconfig.build_classifier(config.classifiers[0])
+
+    assert seen["extra_body"] == {"provider": {"ignore": ["X"]}, "reasoning": {"effort": "low"}}

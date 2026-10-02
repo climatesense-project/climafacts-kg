@@ -112,3 +112,32 @@ class TestBatchFailuresAndCaching:
         clf.classify_batch(["a"], contexts=["review text"])
 
         assert clf.calls == [[("a", None)], [("a", "review text")]]  # the third call was fully cached
+
+
+class TestExtraBody:
+    def _clf(self, **kw):
+        return CARDSLLMClassifier(provider="ollama", model="m", use_preclassifier=False, **kw)
+
+    def test_extra_body_is_sent_with_every_request(self):
+        clf = self._clf(extra_body={"reasoning": {"effort": "low"}})
+
+        assert clf._model_settings["extra_body"] == {"reasoning": {"effort": "low"}}
+        assert "extra_body" not in self._clf()._model_settings
+
+    def test_it_is_part_of_the_cache_key_independent_of_key_order(self):
+        base = self._clf()._run_prefix
+        a = self._clf(extra_body={"reasoning": {"effort": "low"}, "x": 1})._run_prefix
+        b = self._clf(extra_body={"x": 1, "reasoning": {"effort": "low"}})._run_prefix
+        c = self._clf(extra_body={"reasoning": {"effort": "high"}, "x": 1})._run_prefix
+
+        assert a == b != base and a != c
+
+    def test_without_it_the_key_is_unchanged_so_existing_cache_entries_stay_valid(self):
+        assert "|x=" not in self._clf()._run_prefix
+
+    def test_presets_accept_it_as_an_override(self):
+        clf = CARDSLLMClassifier.from_preset(
+            "xplainnlp-nslp", provider="ollama", model="m", use_preclassifier=False, extra_body={"a": 1}
+        )
+
+        assert clf._model_settings["extra_body"] == {"a": 1}

@@ -135,6 +135,9 @@ class CARDSLLMConfig:
             ``"prompted"``. See :class:`.CARDSLLMClassifier` for when
             ``"prompted"`` is needed (e.g. thinking-mode models that reject a
             forced ``tool_choice``, such as ``qwen/qwen3-8b`` on OpenRouter).
+        extra_body: Provider-specific request fields merged into every request, e.g.
+            ``{"reasoning": {"effort": "low"}}`` to cap a reasoning model's thinking, or
+            ``{"provider": {"ignore": ["SambaNova"]}}`` to route around a provider on OpenRouter.
     """
 
     provider: str = dataclasses.field(default_factory=lambda: CARDS_LLM_DEFAULT_PROVIDER)
@@ -155,6 +158,7 @@ class CARDSLLMConfig:
     top_p: float | None = None
     max_tokens: int | None = None
     output_mode: str = "tool"
+    extra_body: dict | None = None
 
 
 # ---------------------------------------------------------------------------

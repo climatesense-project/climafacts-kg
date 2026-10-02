@@ -3,6 +3,7 @@
 
 import asyncio
 import dataclasses
+import json
 import logging
 import os
 import random
@@ -232,6 +233,8 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             unusable through OpenRouter: it requires pydantic-ai to recognise
             the specific model as supporting it, which it does not for
             OpenRouter's proxied catalog — hence "prompted" as the fallback.)
+        extra_body (dict | None): Provider-specific request fields sent with every request (e.g. reasoning effort,
+            OpenRouter provider routing); part of the cache key.
     """
 
     def __init__(
@@ -251,6 +254,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
         top_p: float | None = None,
         max_tokens: int | None = None,
         output_mode: str = "tool",
+        extra_body: dict | None = None,
     ):
         if output_mode not in ("tool", "prompted"):
             raise ValueError(f"output_mode must be 'tool' or 'prompted', got {output_mode!r}")
@@ -268,6 +272,8 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             self._model_settings["top_p"] = top_p
         if max_tokens is not None:
             self._model_settings["max_tokens"] = max_tokens
+        if extra_body:
+            self._model_settings["extra_body"] = extra_body
         settings_key = f"t={temperature}"
         if top_p is not None:
             settings_key += f"|p={top_p}"
@@ -277,6 +283,9 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             settings_key += f"|out={output_mode}"
         if max_context_chars is not None:
             settings_key += f"|c={max_context_chars}"  # the request carries context[:max_context_chars]
+        if extra_body:
+            # Provider-specific request fields (e.g. reasoning effort, provider routing) change the answers.
+            settings_key += f"|x={hash_string(json.dumps(extra_body, sort_keys=True, default=str))[:12]}"
         # Every template that shapes the request is part of the key, so editing any of them cannot be answered from
         # results produced by the old wording.
         templates = hash_string("\x1f".join((user_prompt, system_prompt_with_context, user_prompt_with_context)))
@@ -364,6 +373,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             top_p=cfg.top_p,
             max_tokens=cfg.max_tokens,
             output_mode=cfg.output_mode,
+            extra_body=cfg.extra_body,
         )
 
     # ------------------------------------------------------------------
