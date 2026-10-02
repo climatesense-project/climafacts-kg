@@ -381,19 +381,31 @@ def _verdict(delta, lo, hi, p) -> str:
 
 
 def _model_rows(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str | None):
-    """``(comparison, baseline, mode)`` of each config against *baseline* in one context mode, or ``None``."""
+    """``((comparison, baseline, mode) | None, note)``: each config against *baseline* in one context mode.
+
+    The default baseline is the first config that has results, so a config that failed outright never blocks the
+    report; an explicit baseline without results is explained in the note instead of raising.
+    """
     configs = list(dict.fromkeys(summary["config"].astype(str)))
     if baseline is not None and baseline not in configs:
         raise ValueError(f"unknown baseline {baseline!r}; choose one of: {', '.join(configs)}")
-    if len(configs) < 2:
-        return None
-    baseline = baseline or configs[0]
     modes = list(dict.fromkeys(cases["context"])) if not cases.empty else []
-    if not modes:
-        return None
+    if len(configs) < 2 or not modes:
+        return None, ""
     mode = "none" if "none" in modes else modes[0]
+    answered = set(cases.loc[cases["context"] == mode, "config"].astype(str))
+    with_results = [config for config in configs if config in answered]
+    if baseline is not None and baseline not in with_results:
+        return None, f"Baseline {baseline} has no results (it failed), so there is no model comparison."
+    baseline = baseline or (with_results[0] if with_results else None)
+    if baseline is None or len(with_results) < 2:
+        return None, ""
     comparison = compare_configs(cases, baseline, context=mode)
-    return None if comparison.empty else (comparison, baseline, mode)
+    return (None if comparison.empty else (comparison, baseline, mode)), ""
+
+
+def _model_note(note: str) -> str:
+    return f'<h2>Model comparison</h2><p class="note">{_esc(note)}</p>' if note else ""
 
 
 def _model_comparison(model_rows) -> str:
@@ -642,7 +654,7 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
     repeats = _repeat_datasets(summary)
     category = summary[~summary["dataset"].astype(str).isin(repeats)] if repeats else summary
     category_cases = cases[~cases["dataset"].astype(str).isin(repeats)] if repeats and not cases.empty else cases
-    model_rows = _model_rows(category_cases, category, baseline)
+    model_rows, model_note = _model_rows(category_cases, category, baseline)
     repeat_note = ""
     if repeats:
         names = ", ".join(_esc(name) for name in repeats)
@@ -658,7 +670,8 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
         f"{_glance(category, category_cases, model_rows)}{_glossary()}{caveat}"
         f"<h2>Comparison</h2>{_comparison(category)}{repeat_note}{_reliability(category)}"
         f"{_narrative_detection(summary)}<h2>Charts</h2>{_charts(category)}"
-        f"{_model_comparison(model_rows)}{_context_sections(category_cases)}{_details(runs)}</main></body></html>"
+        f"{_model_comparison(model_rows) or _model_note(model_note)}{_context_sections(category_cases)}"
+        f"{_details(runs)}</main></body></html>"
     )
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)

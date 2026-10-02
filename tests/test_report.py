@@ -430,3 +430,31 @@ class TestBaselineAwareReport:
         section = html[html.index("<h2>Model comparison</h2>") :].split("</table>")[0]
 
         assert "<td>baseline</td>" in section
+
+
+class TestReportWithAFailedConfig:
+    def _run_with_failed(self, failed="A", ok="B"):
+        base = _two_config_run()
+        summary = pd.DataFrame([_summary_row(config=failed, error="boom"), _summary_row(config=ok)])
+        cases = base.cases[base.cases["config"] == ok].reset_index(drop=True)
+        return BenchmarkRun(meta=base.meta, summary=summary, cases=cases)
+
+    def test_a_failed_first_config_does_not_break_the_report(self, tmp_path):
+        html = render_html([self._run_with_failed()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "failed: boom" in html  # the failure is still shown
+        assert "<h2>Comparison</h2>" in html
+
+    def test_an_explicit_baseline_without_results_is_explained_not_raised(self, tmp_path):
+        html = render_html([self._run_with_failed()], tmp_path / "r.html", baseline="A").read_text(encoding="utf-8")
+        section = html[html.index("<h2>Model comparison</h2>") :]
+
+        assert "no results" in section.split("<h2>")[1]
+
+    def test_the_default_baseline_skips_a_config_without_results(self, tmp_path):
+        base = _two_config_run()
+        summary = pd.concat([pd.DataFrame([_summary_row(config="Z", error="boom")]), base.summary], ignore_index=True)
+        run = BenchmarkRun(meta=base.meta, summary=summary, cases=base.cases)
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "<b>A</b>" in html[html.index("<h2>Model comparison</h2>") :]
