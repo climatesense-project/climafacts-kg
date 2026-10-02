@@ -242,3 +242,28 @@ def test_the_string_none_in_options_means_python_none(tmp_path, monkeypatch):
 def test_category_scores_must_be_a_known_value(tmp_path):
     with pytest.raises(ConfigError, match="category_scores"):
         load_run_config(_write(tmp_path, '[run]\ncategory_scores = "some"\n' + MINIMAL))
+
+
+def test_a_default_engine_applies_to_classifiers_that_do_not_set_one(tmp_path):
+    text = """
+[defaults]
+engine = "transformer"
+cache_path = "c.db"
+provider = "openrouter"
+
+[[classifiers]]
+label = "a"
+
+[[classifiers]]
+label = "b"
+engine = "matcher"
+
+[[datasets]]
+name = "nslp"
+"""
+    config, _ = load_run_config(_write(tmp_path, text))
+    a, b = config.classifiers
+
+    assert (a.engine, a.cache_path, a.provider) == ("transformer", "c.db", None)  # llm-only defaults do not leak
+    assert (b.engine, b.cache_path) == ("matcher", None)
+    assert not is_paid(a)  # it used to become a paid LLM classifier

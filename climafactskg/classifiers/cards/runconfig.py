@@ -123,7 +123,7 @@ def _merge_defaults(raw: dict[str, Any]) -> dict[str, Any]:
         elif engine == "matcher":
             inherited = {}
         options = {**(inherited.pop("options", None) or {}), **(entry.get("options") or {})}
-        merged.append({**inherited, **entry, "options": options})
+        merged.append({**inherited, **entry, "engine": engine, "options": options})
     return {**raw, "classifiers": merged} if "classifiers" in raw else raw
 
 
