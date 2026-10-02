@@ -138,6 +138,7 @@ class CARDSLLMConfig:
         extra_body: Provider-specific request fields merged into every request, e.g.
             ``{"reasoning": {"effort": "low"}}`` to cap a reasoning model's thinking, or
             ``{"provider": {"ignore": ["SambaNova"]}}`` to route around a provider on OpenRouter.
+        request_timeout: Seconds to wait for one request before retrying it. ``None`` keeps the client default.
     """
 
     provider: str = dataclasses.field(default_factory=lambda: CARDS_LLM_DEFAULT_PROVIDER)
@@ -159,6 +160,7 @@ class CARDSLLMConfig:
     max_tokens: int | None = None
     output_mode: str = "tool"
     extra_body: dict | None = None
+    request_timeout: float | None = None
 
 
 # ---------------------------------------------------------------------------

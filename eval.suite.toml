@@ -22,6 +22,7 @@ concurrency = 32
 temperature = 0.0
 top_p = "none"
 max_tokens = "none"
+request_timeout = 150                    # seconds; a stalled provider call is cut off and retried, not waited on
 
 # ---- baseline first: every comparison in the report is against the first classifier -------------------------------
 [[classifiers]]

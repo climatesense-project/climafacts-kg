@@ -141,3 +141,74 @@ class TestExtraBody:
         )
 
         assert clf._model_settings["extra_body"] == {"a": 1}
+
+
+class TestRequestTimeoutAndRetries:
+    def _clf(self, **kw):
+        return CARDSLLMClassifier(provider="ollama", model="m", use_preclassifier=False, **kw)
+
+    def test_request_timeout_goes_to_the_model_settings_but_not_the_cache_key(self):
+        with_timeout = self._clf(request_timeout=90)
+
+        assert with_timeout._model_settings["timeout"] == 90
+        assert "timeout" not in self._clf()._model_settings
+        assert with_timeout._run_prefix == self._clf()._run_prefix  # a timeout does not change the answers
+
+    def test_presets_accept_it_as_an_override(self):
+        clf = CARDSLLMClassifier.from_preset(
+            "xplainnlp-nslp", provider="ollama", model="m", use_preclassifier=False, request_timeout=45
+        )
+
+        assert clf._model_settings["timeout"] == 45
+
+    def _with_fake_agent(self, monkeypatch, failures, error):
+        import asyncio
+
+        from climafactskg.classifiers.cards.llm import classifier as module
+        from climafactskg.classifiers.cards.llm.classifier import CARDSOutput
+
+        monkeypatch.setattr(module, "_DEFAULT_RETRY_BASE_DELAY", 0.0)
+        clf = self._clf()
+        calls = {"n": 0}
+
+        class _Result:
+            output = CARDSOutput(is_climate_related=True, cards_category="1_1", reasoning="r")
+
+        class _Agent:
+            async def run(self, *args, **kwargs):
+                calls["n"] += 1
+                if calls["n"] <= failures:
+                    raise error
+                return _Result()
+
+        clf._agent = _Agent()
+        return clf, calls, asyncio
+
+    def test_a_timeout_is_retried_and_then_succeeds(self, monkeypatch):
+        from pydantic_ai.exceptions import ModelAPIError
+
+        clf, calls, asyncio = self._with_fake_agent(monkeypatch, 2, ModelAPIError("m", "Request timed out."))
+
+        out = asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1)))
+
+        assert out.cards_category == "1_1" and calls["n"] == 3
+
+    def test_a_timeout_that_never_recovers_raises_after_the_retry_limit(self, monkeypatch):
+        import pytest
+        from pydantic_ai.exceptions import ModelAPIError
+
+        clf, calls, asyncio = self._with_fake_agent(monkeypatch, 99, ModelAPIError("m", "Request timed out."))
+
+        with pytest.raises(ModelAPIError):
+            asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1)))
+        assert calls["n"] == 4  # the first try plus three retries
+
+    def test_a_client_error_is_still_not_retried(self, monkeypatch):
+        import pytest
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        clf, calls, asyncio = self._with_fake_agent(monkeypatch, 99, ModelHTTPError(401, "m", "unauthorized"))
+
+        with pytest.raises(ModelHTTPError):
+            asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1)))
+        assert calls["n"] == 1

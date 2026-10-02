@@ -12,7 +12,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_ai import Agent, PromptedOutput
-from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 
 from climafactskg.utils import hash_string
 
@@ -235,6 +235,8 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             OpenRouter's proxied catalog — hence "prompted" as the fallback.)
         extra_body (dict | None): Provider-specific request fields sent with every request (e.g. reasoning effort,
             OpenRouter provider routing); part of the cache key.
+        request_timeout (float | None): Seconds to wait for one request; a request that exceeds it is retried (up to
+            three times). None uses the client default (minutes), so one stalled provider call can hold up a batch.
     """
 
     def __init__(
@@ -255,6 +257,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
         max_tokens: int | None = None,
         output_mode: str = "tool",
         extra_body: dict | None = None,
+        request_timeout: float | None = None,
     ):
         if output_mode not in ("tool", "prompted"):
             raise ValueError(f"output_mode must be 'tool' or 'prompted', got {output_mode!r}")
@@ -274,6 +277,9 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             self._model_settings["max_tokens"] = max_tokens
         if extra_body:
             self._model_settings["extra_body"] = extra_body
+        if request_timeout is not None:
+            # Seconds per request. Not part of the cache key: it changes how long we wait, not the answers.
+            self._model_settings["timeout"] = request_timeout
         settings_key = f"t={temperature}"
         if top_p is not None:
             settings_key += f"|p={top_p}"
@@ -374,6 +380,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             max_tokens=cfg.max_tokens,
             output_mode=cfg.output_mode,
             extra_body=cfg.extra_body,
+            request_timeout=cfg.request_timeout,
         )
 
     # ------------------------------------------------------------------
@@ -433,13 +440,16 @@ class CARDSLLMClassifier(CARDSClassifierBase):
                     else:
                         result = await self._agent.run(user_msg, model_settings=self._model_settings)
                 return result.output
-            except ModelHTTPError as exc:
-                if exc.status_code not in _RETRYABLE_STATUS_CODES or attempt == _DEFAULT_MAX_RETRIES:
+            except ModelAPIError as exc:
+                # An HTTP error is retried for transient status codes; an error without a status (a timeout or a
+                # dropped connection) is always transient.
+                status = exc.status_code if isinstance(exc, ModelHTTPError) else None
+                if (status is not None and status not in _RETRYABLE_STATUS_CODES) or attempt == _DEFAULT_MAX_RETRIES:
                     raise
                 delay = _DEFAULT_RETRY_BASE_DELAY * (2**attempt) + random.uniform(0, _DEFAULT_RETRY_BASE_DELAY)
                 logger.warning(
                     "Retryable error (status=%s) on attempt %d/%d, retrying in %.1fs: %s",
-                    exc.status_code,
+                    status,
                     attempt + 1,
                     _DEFAULT_MAX_RETRIES + 1,
                     delay,
