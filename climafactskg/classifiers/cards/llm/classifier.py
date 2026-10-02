@@ -197,8 +197,8 @@ class CARDSLLMClassifier(CARDSClassifierBase):
        pre-classifier is active.
 
     Results are cached in a ``preserve`` SQLite database keyed by
-    ``hash(provider|model|system_prompt_hash|text)`` so repeated calls with the
-    same configuration return immediately without hitting the LLM.
+    ``hash(provider|model|system_prompt_hash|settings|templates_hash|text[|context])`` so repeated calls with the
+    same configuration (all four prompt templates and the sampling settings) return immediately without hitting the LLM.
 
     Supports single classification via ``classify()`` and async-concurrent batch
     classification via ``classify_batch()``.
@@ -275,7 +275,10 @@ class CARDSLLMClassifier(CARDSClassifierBase):
             settings_key += f"|m={max_tokens}"
         if output_mode != "tool":
             settings_key += f"|out={output_mode}"
-        self._run_prefix = f"{provider}|{model}|{hash_string(system_prompt)}|{settings_key}"
+        # Every template that shapes the request is part of the key, so editing any of them cannot be answered from
+        # results produced by the old wording.
+        templates = hash_string("\x1f".join((user_prompt, system_prompt_with_context, user_prompt_with_context)))
+        self._run_prefix = f"{provider}|{model}|{hash_string(system_prompt)}|{settings_key}|tpl={templates[:12]}"
 
         if preclassifier is not None:
             self._preclassifier = preclassifier
@@ -491,7 +494,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
         pre-classifier is active.
 
         Cache: results are stored and retrieved by
-        ``hash(provider|model|system_prompt_hash|settings|text[|context])``.
+        ``hash(provider|model|system_prompt_hash|settings|templates_hash|text[|context])``.
 
         Args:
             text: The input text to classify.

@@ -35,3 +35,19 @@ class TestCountCached:
     def test_mismatched_contexts_length_raises(self, tmp_path):
         with pytest.raises(ValueError, match="contexts has"):
             self._classifier(tmp_path).count_cached(["a"], contexts=["x", "y"])
+
+
+class TestCacheKeyCoversEveryPrompt:
+    def _prefix(self, **overrides):
+        clf = CARDSLLMClassifier(provider="ollama", model="m", use_preclassifier=False, **overrides)
+        return clf._run_prefix
+
+    def test_identical_prompts_share_a_key(self):
+        assert self._prefix() == self._prefix()
+
+    @pytest.mark.parametrize(
+        "field", ["system_prompt", "user_prompt", "system_prompt_with_context", "user_prompt_with_context"]
+    )
+    def test_changing_any_prompt_template_changes_the_key(self, field):
+        # Editing a template must never be answered from results produced by the old wording.
+        assert self._prefix(**{field: "changed {text} {context}"}) != self._prefix()
