@@ -38,6 +38,14 @@ label = "local | xplainnlp"          # local providers (ollama, lmstudio) are no
 provider = "ollama"
 model = "llama3.1:8b"
 
+# Model size for the report's size plot is read from the model id when it has one (qwen3-235b-a22b, llama-3.3-70b).
+# Models that publish none can state it: size_b = billions of parameters, active_b = active per token (MoE).
+[[classifiers]]
+label = "llama-4-maverick"
+model = "meta-llama/llama-4-maverick"
+size_b = 400
+active_b = 17
+
 [[classifiers]]
 label = "transformer"                # free, needs the `transformer` extra
 engine = "transformer"

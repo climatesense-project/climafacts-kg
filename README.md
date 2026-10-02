@@ -357,6 +357,12 @@ label = "gpt-4o-mini"
 model = "openai/gpt-4o-mini"
 
 [[classifiers]]
+label = "llama-4-maverick"
+model = "meta-llama/llama-4-maverick"
+size_b = 400                     # not in the model id, so stated here for the size plot
+active_b = 17                    # mixture of experts: parameters active per token
+
+[[classifiers]]
 label = "transformer"
 engine = "transformer"           # also: "matcher"
 
@@ -379,7 +385,7 @@ A run that calls a hosted LLM provider (anything except `ollama` / `lmstudio`) f
 climafactskg eval report data/eval_runs/<run> [<other run> ...] --baseline "gpt-4o-mini"
 ```
 
-The report is a single self-contained HTML file (no JavaScript or external assets). It opens with an "At a glance" summary written from the data (best result, each model against the baseline, the effect of context, each with a plain-words verdict such as "within noise"), a collapsible "How to read this report" glossary, then the comparison table, charts, paired model comparison, context effect and the cases that changed. The main table also shows exact match on the cases that carry a category whenever a dataset holds `0_0` documents, the model comparison lists the baseline as its own row, and "At a glance" says so when a score is no better than always guessing the most common label (which on a mixed dataset is `0_0`). A dataset that repeats another dataset's results case for case (for example, with `category_scores = "narrative_only"`, the same data loaded with `climate_only = false`) is folded into the Narrative detection table instead of repeating rows.
+The report is a single self-contained HTML file (no JavaScript or external assets). It opens with an "At a glance" summary written from the data (best result, each model against the baseline, the effect of context, each with a plain-words verdict such as "within noise"), a collapsible "How to read this report" glossary, then the comparison table, charts, paired model comparison, context effect and the cases that changed. The main table also shows exact match on the cases that carry a category whenever a dataset holds `0_0` documents, the model comparison lists the baseline as its own row, and "At a glance" says so when a score is no better than always guessing the most common label (which on a mixed dataset is `0_0`). With many models the charts become a ranked bar chart per metric, so none is dropped. A "Size and result" section plots result against model size (log scale, with the 95% interval and the frontier of models no smaller model beats) once at least two models have a known size. Size is read from the model id when it carries one (`qwen3-235b-a22b` gives 235B with 22B active, `llama-3.3-70b` gives 70B); for models that publish none (closed models, `llama-4-maverick`, `mistral-nemo`) state it per classifier with `size_b` (and `active_b` for a mixture of experts) in the config, and it is saved with the run. Models without a size are listed under the plot, and a hollow marker means the model failed on more than 10% of claims, so its score understates it. A dataset that repeats another dataset's results case for case (for example, with `category_scores = "narrative_only"`, the same data loaded with `climate_only = false`) is folded into the Narrative detection table instead of repeating rows.
 
 ## ©️ Licenses
 

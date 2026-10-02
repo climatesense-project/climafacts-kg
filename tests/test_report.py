@@ -484,3 +484,95 @@ class TestReportWithAFailedConfig:
         html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
 
         assert "<b>A</b>" in html[html.index("<h2>Model comparison</h2>") :]
+
+
+def _sized_run(models, dataset="d", **extra):
+    """A run with one 'none' row per model: models maps label -> (size_b, active_b, exact)."""
+    summary = [
+        {**_summary_row(config=label, dataset=dataset, context="none", exact=exact), **extra}
+        for label, (_, _, exact) in models.items()
+    ]
+    configs = [
+        {"label": label, "provider": "p", "model": "m", "prompt": "x", "size_b": size, "active_b": active}
+        for label, (size, active, _) in models.items()
+    ]
+    run = _run(with_context=False)
+    run.summary = pd.DataFrame(summary)
+    run.cases = run.cases.iloc[0:0]
+    run.meta = {**run.meta, "configs": configs, "datasets": [{"name": dataset, "n_cases": 10, "n_with_context": 0}]}
+    return run
+
+
+class TestSizePlot:
+    def test_the_frontier_keeps_models_that_no_smaller_model_beats(self):
+        from climafactskg.classifiers.cards.report import _pareto_front
+
+        points = [(10, 0.4), (20, 0.35), (30, 0.5), (30, 0.45), (5, 0.2)]
+
+        assert [points[i] for i in _pareto_front(points)] == [(5, 0.2), (10, 0.4), (30, 0.5)]
+
+    def test_the_scatter_is_valid_svg_with_log_ticks_labels_and_a_moe_hover(self):
+        from climafactskg.classifiers.cards.report import size_scatter_svg
+
+        points = [
+            {"label": "small", "size": 8.0, "active": None, "value": 0.3, "lo": 0.2, "hi": 0.4, "flag": False},
+            {"label": "moe <b>", "size": 235.0, "active": 22.0, "value": 0.6, "lo": 0.5, "hi": 0.7, "flag": True},
+        ]
+        svg = size_scatter_svg("t", points)
+
+        ET.fromstring(svg)
+        assert "small" in svg and "moe &lt;b&gt;" in svg and "<b>" not in svg
+        assert "235B (22B active)" in svg
+        assert ">10B<" in svg and ">100B<" in svg
+
+    def test_the_section_appears_when_two_or_more_models_have_a_size(self, tmp_path):
+        run = _sized_run({"A": (8.0, None, 0.3), "B": (70.0, None, 0.5), "C": (None, None, 0.6)})
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+        section = html[html.index("<h2>Size and result</h2>") :].split("<h2>")[1]
+
+        assert "<svg" in section
+        assert "No published size" in section and "C" in section  # listed, not silently dropped
+
+    def test_one_sized_model_is_not_a_plot(self, tmp_path):
+        run = _sized_run({"A": (8.0, None, 0.3), "B": (None, None, 0.5)})
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "Size and result" not in html
+
+    def test_runs_saved_before_sizes_existed_have_no_section(self, tmp_path):
+        html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "Size and result" not in html
+
+    def test_heavily_failed_models_are_marked(self, tmp_path):
+        run = _sized_run({"A": (8.0, None, 0.3), "B": (70.0, None, 0.5)})
+        run.summary["n_failed"] = [0, 6]  # 6 of 10 failed
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "failed on more than 10%" in html
+
+
+class TestRankedBars:
+    def test_models_are_listed_best_first_with_escaped_labels_and_values(self):
+        from climafactskg.classifiers.cards.report import ranked_bars_svg
+
+        items = [("low <i>", 0.2, 0.1, 0.3), ("high", 0.8, 0.7, 0.9), ("mid", 0.5, float("nan"), float("nan"))]
+        svg = ranked_bars_svg("t", items)
+
+        ET.fromstring(svg)
+        assert "<i>" not in svg and "low &lt;i&gt;" in svg
+        assert svg.index(">high<") < svg.index(">mid<") < svg.index(">low &lt;i&gt;<")
+        assert "0.80" in svg
+
+    def test_many_models_get_a_ranked_chart_instead_of_dropping_series(self, tmp_path):
+        models = {f"M{i}": (None, None, 0.1 + 0.05 * i) for i in range(10)}
+        html = render_html([_sized_run(models)], tmp_path / "r.html").read_text(encoding="utf-8")
+        charts = html[html.index("<h2>Charts</h2>") :].split("<h2>")[1]
+
+        assert "further series are not drawn" not in html
+        assert all(f">M{i}<" in charts for i in range(10))  # every model is drawn, without a redundant suffix
+
+    def test_few_models_keep_the_grouped_bars(self, tmp_path):
+        html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert 'class="legend"' in html

@@ -65,10 +65,15 @@ td b {{ font-weight: 700; }}
 .legend li {{ display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }}
 .swatch {{ width: 12px; height: 12px; border-radius: 3px; display: inline-block; }}
 .chart {{ width: 100%; height: auto; max-width: 720px; display: block; }}
+.chart.wide {{ max-width: 960px; }}
 .chart text {{ fill: var(--text2); font-size: 11px; font-family: inherit; }}
 .chart .best {{ fill: var(--text); font-weight: 600; }}
 .chart .grid {{ stroke: var(--grid); stroke-width: 1; fill: none; }}
 .chart .err {{ stroke: var(--text2); stroke-width: 1.5; fill: none; }}
+.chart text.lbl {{ paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }}
+.chart .frontier {{ stroke: var(--text2); stroke-width: 1.5; stroke-dasharray: 4 3; fill: none; }}
+.chart .dot {{ fill: var(--s0); stroke: var(--surface); stroke-width: 2; }}
+.chart .dot.hollow {{ fill: var(--surface); stroke: var(--s0); }}
 {series_rules}
 details {{ margin: 8px 0; }}
 dl {{ display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 8px 0; }}
@@ -153,6 +158,213 @@ def bar_chart_svg(
     return "".join(parts)
 
 
+def ranked_bars_svg(title: str, items: Sequence[tuple[str, float, float, float]], width: int = 720) -> str:
+    """Horizontal bars, best first, for many models: ``items`` are ``(label, value, lo, hi)`` on a fixed 0..1 axis."""
+    ordered = sorted(items, key=lambda item: -item[1])
+    left, right, top, row = 200, 56, 8, 22
+    plot_w = width - left - right
+    height = top + row * len(ordered) + 30
+    baseline = top + row * len(ordered)
+
+    def x_of(value: float) -> float:
+        return left + plot_w * max(0.0, min(1.0, value))
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" class="chart" viewBox="0 0 {width} {height}" role="img" '
+        f'aria-label="{_esc(title)}"><title>{_esc(title)}</title>'
+    ]
+    for tick in (0, 0.25, 0.5, 0.75, 1):
+        x = x_of(tick)
+        parts.append(f'<path class="grid" d="M{x:.1f},{top} V{baseline}"/>')
+        parts.append(f'<text x="{x:.1f}" y="{baseline + 16}" text-anchor="middle">{tick:.2f}</text>')
+    for n, (label, value, lo, hi) in enumerate(ordered):
+        y = top + n * row
+        mid = y + row / 2
+        interval = "" if math.isnan(lo) or math.isnan(hi) else f" [{lo:.3f}–{hi:.3f}]"
+        parts.append(f'<text x="{left - 8}" y="{mid + 4:.1f}" text-anchor="end">{_esc(_shorten(label, 30))}</text>')
+        parts.append(
+            f"<g><title>{_esc(f'{label}: {value:.3f}{interval}')}</title>"
+            f'<rect class="s0" x="{left}" y="{y + 3}" width="{max(x_of(value) - left, 0.5):.1f}" '
+            f'height="{row - 8}" rx="3"/></g>'
+        )
+        if not (math.isnan(lo) or math.isnan(hi)):
+            parts.append(
+                f'<path class="err" d="M{x_of(lo):.1f},{mid:.1f} H{x_of(hi):.1f} M{x_of(lo):.1f},{mid - 3:.1f} '
+                f'V{mid + 3:.1f} M{x_of(hi):.1f},{mid - 3:.1f} V{mid + 3:.1f}"/>'
+            )
+        end = x_of(hi if not math.isnan(hi) else value)
+        parts.append(f'<text x="{end + 6:.1f}" y="{mid + 4:.1f}">{value:.2f}</text>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _pareto_front(points: Sequence[tuple[float, float]]) -> list[int]:
+    """Indexes of the ``(size, value)`` points that no smaller-or-equal-size point beats: the efficient frontier."""
+    kept: list[int] = []
+    best = -math.inf
+    for index in sorted(range(len(points)), key=lambda i: (points[i][0], -points[i][1])):
+        if points[index][1] > best:
+            kept.append(index)
+            best = points[index][1]
+    return kept
+
+
+def _fmt_size(size: float, active: float | None = None) -> str:
+    text = f"{size:g}B"
+    return f"{text} ({active:g}B active)" if active else text
+
+
+def size_scatter_svg(title: str, points: Sequence[dict], width: int = 900, height: int = 420) -> str:
+    """Result against model size as inline SVG: log x axis, 95% interval whiskers and the efficient frontier.
+
+    *points* are dicts with ``label``, ``size`` (billions of parameters), ``active`` (or ``None``), ``value`` (0..1),
+    ``lo``/``hi`` (NaN for no interval) and ``flag`` (a hollow marker: the score understates the model).
+    """
+    left, right, top, bottom = 44, 24, 18, 46
+    plot_w, plot_h = width - left - right, height - top - bottom
+    sizes = [p["size"] for p in points]
+    # The axis hugs the data (a little padding either side) so points are not squeezed into one corner.
+    lo_log = math.log10(min(sizes)) - 0.2
+    hi_log = math.log10(max(sizes)) + 0.2
+    if hi_log - lo_log < 0.8:
+        lo_log, hi_log = lo_log - 0.4, hi_log + 0.4
+
+    def x_of(size: float) -> float:
+        return left + plot_w * (math.log10(size) - lo_log) / (hi_log - lo_log)
+
+    def y_of(value: float) -> float:
+        return top + plot_h * (1 - max(0.0, min(1.0, value)))
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" class="chart wide" viewBox="0 0 {width} {height}" role="img" '
+        f'aria-label="{_esc(title)}"><title>{_esc(title)}</title>'
+    ]
+    for tick in (0, 0.25, 0.5, 0.75, 1):
+        y = y_of(tick)
+        parts.append(f'<path class="grid" d="M{left},{y:.1f} H{width - right}"/>')
+        parts.append(f'<text x="{left - 6}" y="{y + 4:.1f}" text-anchor="end">{tick:.2f}</text>')
+    for exp in range(math.floor(lo_log), math.ceil(hi_log) + 1):
+        for step in (1, 3):  # 1, 3, 10, 30, 100, 300 ...
+            tick_size = step * 10.0**exp
+            if lo_log <= math.log10(tick_size) <= hi_log:
+                x = x_of(tick_size)
+                parts.append(f'<path class="grid" d="M{x:.1f},{top} V{top + plot_h}"/>')
+                parts.append(f'<text x="{x:.1f}" y="{top + plot_h + 16}" text-anchor="middle">{tick_size:g}B</text>')
+    parts.append(
+        f'<text x="{left + plot_w / 2:.1f}" y="{height - 6}" text-anchor="middle">'
+        "Model size (parameters, log scale)</text>"
+    )
+
+    front = _pareto_front([(p["size"], p["value"]) for p in points])
+    if len(front) > 1:
+        path = " ".join(
+            f"{'M' if n == 0 else 'L'}{x_of(points[i]['size']):.1f},{y_of(points[i]['value']):.1f}"
+            for n, i in enumerate(front)
+        )
+        parts.append(f'<path class="frontier" d="{path}"/>')
+
+    # Boxes a label must not cover: every dot and whisker, then the labels already placed (x0, x1, y0, y1).
+    placed: list[tuple[float, float, float, float]] = []
+    for q in points:
+        qx, qy = x_of(q["size"]), y_of(q["value"])
+        placed.append((qx - 7, qx + 7, qy - 7, qy + 7))
+        if not (math.isnan(q["lo"]) or math.isnan(q["hi"])):
+            placed.append((qx - 3, qx + 3, y_of(q["hi"]), y_of(q["lo"])))
+    for p in sorted(points, key=lambda q: q["size"]):
+        cx, cy = x_of(p["size"]), y_of(p["value"])
+        has_interval = not (math.isnan(p["lo"]) or math.isnan(p["hi"]))
+        if has_interval:
+            lo_y, hi_y = y_of(p["lo"]), y_of(p["hi"])
+            parts.append(
+                f'<path class="err" d="M{cx:.1f},{lo_y:.1f} V{hi_y:.1f} M{cx - 3:.1f},{lo_y:.1f} H{cx + 3:.1f} '
+                f'M{cx - 3:.1f},{hi_y:.1f} H{cx + 3:.1f}"/>'
+            )
+        hover = f"{p['label']} · {_fmt_size(p['size'], p['active'])} · {p['value']:.3f}"
+        if has_interval:
+            hover += f" [{p['lo']:.3f}–{p['hi']:.3f}]"
+        if p["flag"]:
+            hover += " · failed on more than 10% of claims"
+        css = "dot hollow" if p["flag"] else "dot"
+        parts.append(f'<g><title>{_esc(hover)}</title><circle class="{css}" cx="{cx:.1f}" cy="{cy:.1f}" r="5"/></g>')
+
+        label = _shorten(str(p["label"]), 26)
+        text_w = 6.2 * len(label)
+        for dx, dy, anchor in (
+            (8, 4, "start"),
+            (8, -10, "start"),
+            (8, 18, "start"),
+            (-8, 4, "end"),
+            (-8, -10, "end"),
+            (-8, 18, "end"),
+            (8, -24, "start"),
+            (8, 32, "start"),
+        ):
+            x0 = cx + dx if anchor == "start" else cx + dx - text_w
+            box = (x0, x0 + text_w, cy + dy - 10, cy + dy + 3)
+            fits = left <= box[0] and box[1] <= width - right
+            if fits and not any(box[0] < b[1] and b[0] < box[1] and box[2] < b[3] and b[2] < box[3] for b in placed):
+                break
+        else:
+            dx, dy, anchor = 8, 4, "start"
+            x0 = cx + dx
+            box = (x0, x0 + text_w, cy + dy - 10, cy + dy + 3)
+        placed.append(box)
+        parts.append(
+            f'<text class="lbl" x="{cx + dx:.1f}" y="{cy + dy:.1f}" text-anchor="{anchor}">{_esc(label)}</text>'
+        )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _size_section(summary: pd.DataFrame) -> str:
+    """Result against model size per dataset; empty unless at least two configs of a dataset have a known size."""
+    if "size_b" not in summary.columns:
+        return ""
+    usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
+    blocks: list[str] = []
+    for dataset in dict.fromkeys(usable["dataset"].astype(str)):
+        group = usable[usable["dataset"].astype(str) == dataset]
+        mixed = _has_not_climate(group) and "exact_category" in group.columns and group["exact_category"].notna().any()
+        metric = "exact_category" if mixed else "exact_match"
+        points: list[dict] = []
+        unsized: list[str] = []
+        for config in dict.fromkeys(group["config"].astype(str)):
+            rows = group[group["config"].astype(str) == config]
+            row = rows[rows["context"] == "none"].iloc[0] if (rows["context"] == "none").any() else rows.iloc[0]
+            if pd.isna(row["size_b"]) or pd.isna(row[metric]):
+                unsized.append(config)
+                continue
+            n_failed = 0 if pd.isna(row.get("n_failed")) else float(row["n_failed"])
+            has_interval = (
+                metric == "exact_match" and not pd.isna(row.get("exact_lo")) and not pd.isna(row.get("exact_hi"))
+            )
+            points.append(
+                {
+                    "label": config,
+                    "size": float(row["size_b"]),
+                    "active": None if pd.isna(row.get("active_b")) else float(row["active_b"]),
+                    "value": float(row[metric]),
+                    "lo": float(row["exact_lo"]) if has_interval else float("nan"),
+                    "hi": float(row["exact_hi"]) if has_interval else float("nan"),
+                    "flag": n_failed / max(float(row["n_cases"]), 1) > 0.10,
+                }
+            )
+        if len(points) < 2:
+            continue
+        title = f"{dataset}: {'exact match on cases with a category' if mixed else 'exact match'} against model size"
+        block = f"<h3>{_esc(dataset)}</h3>" + size_scatter_svg(title, points)
+        notes = ["Dashed line: models that no smaller model beats."]
+        if any(p["flag"] for p in points):
+            notes.append("Hollow marker: failed on more than 10% of claims, so its score understates the model.")
+        if unsized:
+            notes.append(
+                f"No published size, so not plotted: {', '.join(_esc(name) for name in unsized)} "
+                "(state `size_b` for them in the config)."
+            )
+        blocks.append(block + f'<p class="muted">{" ".join(notes)}</p>')
+    return "<h2>Size and result</h2>" + "".join(blocks) if blocks else ""
+
+
 def _combine(runs: Sequence[BenchmarkRun]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Concatenates runs; with several runs the config label gets a run suffix so identical labels never collide."""
     summaries, cases = [], []
@@ -161,6 +373,9 @@ def _combine(runs: Sequence[BenchmarkRun]) -> tuple[pd.DataFrame, pd.DataFrame]:
         ids = [f"{run_id}#{i + 1}" for i, run_id in enumerate(ids)]
     for run, run_id in zip(runs, ids, strict=True):
         summary, run_cases = run.summary.copy(), run.cases.copy()
+        sizes = {str(c.get("label")): (c.get("size_b"), c.get("active_b")) for c in run.meta.get("configs", [])}
+        summary["size_b"] = [sizes.get(str(c), (None, None))[0] for c in summary["config"]]
+        summary["active_b"] = [sizes.get(str(c), (None, None))[1] for c in summary["config"]]
         if len(runs) > 1:
             suffix = f" ({run_id})"
             summary["config"] = summary["config"].astype(str) + suffix
@@ -323,6 +538,37 @@ def _narrative_detection(summary: pd.DataFrame) -> str:
     return "<h2>Narrative detection</h2>" + intro + _table(headers, rows)
 
 
+def _ranked_charts(usable: pd.DataFrame) -> str:
+    out = []
+    only_no_context = bool((usable["context"] == "none").all())  # then the suffix says nothing, so leave it out
+    datasets = list(dict.fromkeys(usable["dataset"].astype(str)))
+    for metric, title in _METRICS:
+        if metric not in usable.columns:
+            continue
+        lo_col, hi_col = _CI_COLUMNS.get(metric, (None, None))
+        for dataset in datasets:
+            rows = usable[(usable["dataset"].astype(str) == dataset) & usable[metric].notna()]
+            items = []
+            for _, r in rows.iterrows():
+                nan = float("nan")
+                has_interval = (
+                    bool(lo_col) and lo_col in rows.columns and not pd.isna(r[lo_col]) and not pd.isna(r[hi_col])
+                )
+                label = str(r["config"]) if only_no_context else f"{r['config']} · {r['context']} context"
+                items.append(
+                    (
+                        label,
+                        float(r[metric]),
+                        float(r[lo_col]) if has_interval else nan,
+                        float(r[hi_col]) if has_interval else nan,
+                    )
+                )
+            if items:
+                suffix = f" · {dataset}" if len(datasets) > 1 else ""
+                out.append(f"<h3>{_esc(title + suffix)}</h3>" + ranked_bars_svg(f"{title}, {dataset}", items))
+    return "".join(out)
+
+
 def _charts(summary: pd.DataFrame) -> str:
     usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
     if usable.empty:
@@ -334,6 +580,8 @@ def _charts(summary: pd.DataFrame) -> str:
             for c, m in zip(usable["config"], usable["context"], strict=True)
         )
     )
+    if len(labels) > MAX_SERIES:  # too many series for grouped bars: one ranked chart per dataset and metric
+        return _ranked_charts(usable)
     dropped = max(0, len(labels) - MAX_SERIES)
     labels = labels[:MAX_SERIES]
     legend = "".join(f'<li><span class="swatch k{i}"></span>{_esc(label)}</li>' for i, label in enumerate(labels))
@@ -675,7 +923,7 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
         f'<p class="muted">{len(runs)} run(s), {len(summary)} result row(s).</p>'
         f"{_glance(category, category_cases, model_rows)}{_glossary()}{caveat}"
         f"<h2>Comparison</h2>{_comparison(category)}{repeat_note}{_reliability(category)}"
-        f"{_narrative_detection(summary)}<h2>Charts</h2>{_charts(category)}"
+        f"{_narrative_detection(summary)}<h2>Charts</h2>{_charts(category)}{_size_section(category)}"
         f"{_model_comparison(model_rows) or _model_note(model_note)}{_context_sections(category_cases)}"
         f"{_details(runs)}</main></body></html>"
     )
