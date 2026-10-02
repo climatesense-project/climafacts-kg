@@ -292,5 +292,92 @@ def test_relatedness_section_appears_only_when_a_run_has_not_climate_documents(t
     }
     mixed = render_html([_run(extra_summary=[row])], tmp_path / "mixed.html").read_text(encoding="utf-8")
 
-    assert "Relatedness" not in plain
-    assert "Relatedness" in mixed and "0.850" in mixed and "0.200" in mixed
+    assert "Narrative detection" not in plain
+    assert "Narrative detection" in mixed and "0.850" in mixed and "0.200" in mixed
+
+
+_REPEAT = {
+    "n_not_climate": 6,
+    "rel_precision": 0.8,
+    "rel_recall": 0.9,
+    "rel_f1": 0.85,
+    "rel_fpr": 0.2,
+}
+
+
+class TestReadability:
+    def _html(self, tmp_path, run):
+        return render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+    def test_at_a_glance_comes_first_and_states_the_best_result_and_the_context_verdict(self, tmp_path):
+        html = self._html(tmp_path, _run())
+        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+
+        assert "gpt" in section and "0.600" in section  # best exact match, reached with context
+        assert "within noise" in section  # one case fixed, one broken: no real effect
+
+    def test_at_a_glance_summarises_each_model_against_the_baseline(self, tmp_path):
+        html = self._html(tmp_path, _two_config_run())
+        section = html[html.index("<h2>At a glance</h2>") : html.index("<h2>Comparison</h2>")]
+
+        assert "B" in section and "+0.400" in section
+
+    def test_a_collapsible_glossary_defines_the_metrics_without_javascript(self, tmp_path):
+        html = self._html(tmp_path, _run())
+        glossary = html[html.index("<details><summary>How to read this report") :]
+        glossary = glossary[: glossary.index("</details>")]
+
+        for term in ("Exact", "hF1", "D1 macro", "D2 macro", "Failed", "Baseline", "p-value"):
+            assert term in glossary
+        assert "<script" not in html
+
+    def test_the_main_table_keeps_the_core_columns_and_the_reliability_table_the_rest(self, tmp_path):
+        html = self._html(tmp_path, _run())
+        table = html[html.index("<h2>Comparison</h2>") : html.index("<h3>Reliability</h3>")]
+        rest = html[html.index("<h3>Reliability</h3>") : html.index("<h2>Charts</h2>")]
+
+        assert "Unambiguous" not in table and "Baseline" not in table and "With ctx" not in table
+        assert all(f'<th class="num">{h}</th>' in rest for h in ("Not related", "Unambiguous", "Baseline"))
+        assert "D2 macro" in table
+
+    def test_a_dataset_that_repeats_another_datasets_category_scores_is_shown_once(self, tmp_path):
+        repeat = {**_summary_row(dataset="mixed", context="none"), **_REPEAT}
+        html = self._html(tmp_path, _run(with_context=False, extra_summary=[repeat]))
+        category_part = html[html.index("<h2>Comparison</h2>") : html.index("<h2>Narrative detection</h2>")]
+        charts = html[html.index("<h2>Charts</h2>") :]
+
+        assert "<td>mixed</td>" not in category_part and "mixed" not in charts.split("<h2>Run details</h2>")[0]
+        assert "mixed" in html[html.index("<h2>Narrative detection</h2>") : html.index("<h2>Charts</h2>")]
+        assert "repeat" in category_part  # a note says which dataset was folded away
+
+    def test_narrative_detection_is_described_as_denial_narrative_versus_none(self, tmp_path):
+        row = {**_summary_row(dataset="mixed"), **_REPEAT}
+        html = self._html(tmp_path, _run(with_context=False, extra_summary=[row]))
+        section = html[html.index("<h2>Narrative detection</h2>") : html.index("<h2>Charts</h2>")]
+
+        assert "0_0" in section and "climate or not" not in section.lower()
+
+    def test_a_tiny_p_value_reads_as_less_than_not_equals_less_than(self):
+        from climafactskg.classifiers.cards.report import _p_relation
+
+        assert _p_relation(0.0001) == "< 0.001" and _p_relation(0.125) == "= 0.125"
+
+    def test_verdict_words(self):
+        from climafactskg.classifiers.cards.report import _verdict
+
+        assert _verdict(0.3, 0.1, 0.5, 0.001) == "significantly better"
+        assert _verdict(-0.3, -0.5, -0.1, 0.001) == "significantly worse"
+        assert _verdict(-0.03, -0.1, 0.04, 0.557) == "within noise"
+        assert _verdict(0.0, float("nan"), float("nan"), float("nan")) == "—"
+
+    def test_the_model_comparison_says_what_its_p_value_means(self, tmp_path):
+        html = self._html(tmp_path, _two_config_run())
+        section = html[html.index("<h2>Model comparison</h2>") :]
+
+        assert "<th>Verdict</th>" in section and "within noise" in section  # 4 better, 0 worse: p = 0.125
+
+    def test_the_context_effect_says_what_its_p_value_means(self, tmp_path):
+        html = self._html(tmp_path, _run())
+        section = html[html.index("<h2>Context effect</h2>") :]
+
+        assert "<th>Verdict</th>" in section and "within noise" in section

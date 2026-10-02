@@ -199,24 +199,21 @@ def _comparison(summary: pd.DataFrame) -> str:
                 if not values.empty:
                     best[(str(dataset), metric)] = float(values.max())
     headers = [("Config", False), ("Dataset", False), ("Context", False), ("N", True), ("Failed", True)]
-    headers += [("With ctx", True), ("Exact", True), ("hF1", True), ("D1 macro", True), ("D2 macro", True)]
-    headers += [("Not related", True), ("Unambiguous", True), ("Baseline", True), ("Note", False)]
+    headers += [("Exact", True), ("hF1", True), ("D1 macro", True), ("D2 macro", True), ("Note", False)]
     rows = []
     for _, r in summary.iterrows():
         failed = bool(str(r.get("error", "")).strip()) or int(r["n_cases"]) == 0  # nothing evaluated: show dashes
+        n_ctx = r.get("n_with_context")
+        context = str(r["context"])
+        if context == "with" and n_ctx is not None and not pd.isna(n_ctx):
+            context = f"with ({int(n_ctx)} cases)"
         cells = [
             _td(str(r["config"])),
             _td(str(r["dataset"])),
-            _td(str(r["context"])),
+            _td(context),
             _td(str(int(r["n_cases"])), num=True),
             _td(_count(r.get("n_failed")), num=True),
         ]
-        cells.append(
-            _td(
-                str(int(r["n_with_context"])) if "n_with_context" in r and not pd.isna(r["n_with_context"]) else "—",
-                num=True,
-            )
-        )
         for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
             value = r.get(metric)
             is_best = not failed and (str(r["dataset"]), metric) in best and value == best[(str(r["dataset"]), metric)]
@@ -225,15 +222,6 @@ def _comparison(summary: pd.DataFrame) -> str:
             if lo and lo in r and not failed and not pd.isna(r[lo]) and not pd.isna(r[hi]):
                 text += f' <span class="ci">[{_fmt(r[lo], 2)}–{_fmt(r[hi], 2)}]</span>'
             cells.append(_td(text, num=True, best=is_best, raw=True))
-        cells.append(
-            _td("—" if failed or pd.isna(r.get("not_related_rate")) else f"{r['not_related_rate']:.0%}", num=True)
-        )
-        unambiguous = r.get("exact_unambiguous")
-        has_unambiguous = not failed and unambiguous is not None and not pd.isna(unambiguous)
-        cells.append(
-            _td(f"{_fmt(unambiguous)} (n={_count(r.get('n_unambiguous'))})" if has_unambiguous else "—", num=True)
-        )
-        cells.append(_td("—" if failed else _fmt(r.get("baseline_exact")), num=True))
         error = str(r.get("error", "")).strip()
         n_failed = r.get("n_failed")
         if error:
@@ -249,11 +237,52 @@ def _comparison(summary: pd.DataFrame) -> str:
     return _table(headers, rows)
 
 
-def _relatedness(summary: pd.DataFrame) -> str:
-    """The "is it climate at all?" scores; empty unless a run included not-climate documents."""
+def _reliability(summary: pd.DataFrame) -> str:
+    """The numbers that put the headline scores in perspective (secondary, so the main table stays narrow)."""
+    headers = [("Config", False), ("Dataset", False), ("Context", False), ("Not related", True)]
+    headers += [("Unambiguous", True), ("Baseline", True)]
+    rows = []
+    for _, r in summary.iterrows():
+        failed = bool(str(r.get("error", "")).strip()) or int(r["n_cases"]) == 0
+        unambiguous = r.get("exact_unambiguous")
+        has_unambiguous = not failed and unambiguous is not None and not pd.isna(unambiguous)
+        rows.append(
+            [
+                _td(str(r["config"])),
+                _td(str(r["dataset"])),
+                _td(str(r["context"])),
+                _td("—" if failed or pd.isna(r.get("not_related_rate")) else f"{r['not_related_rate']:.0%}", num=True),
+                _td(f"{_fmt(unambiguous)} (n={_count(r.get('n_unambiguous'))})" if has_unambiguous else "—", num=True),
+                _td("—" if failed else _fmt(r.get("baseline_exact")), num=True),
+            ]
+        )
+    return "<h3>Reliability</h3>" + _table(headers, rows)
+
+
+def _repeat_datasets(summary: pd.DataFrame) -> list[str]:
+    """Datasets whose every category row repeats an earlier dataset's (same classifications on the same cases)."""
+    metrics = [m for m in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1") if m in summary.columns]
+    seen: set[tuple] = set()
+    repeats: list[str] = []
+    for dataset in dict.fromkeys(summary["dataset"].astype(str)):
+        rows = summary[summary["dataset"].astype(str) == dataset]
+        keys = [
+            (str(r["config"]), str(r["context"]), int(r["n_cases"]), *(round(float(r[m]), 6) for m in metrics))
+            for _, r in rows.iterrows()
+            if int(r["n_cases"]) > 0 and not any(pd.isna(r[m]) for m in metrics)
+        ]
+        if keys and all(key in seen for key in keys):
+            repeats.append(dataset)
+        else:
+            seen.update(keys)
+    return repeats
+
+
+def _narrative_detection(summary: pd.DataFrame) -> str:
+    """Denial narrative vs none; empty unless a run included documents annotated as code 0_0."""
     if "rel_f1" not in summary.columns or summary["rel_f1"].isna().all():
         return ""
-    headers = [("Config", False), ("Dataset", False), ("Context", False), ("Not climate", True)]
+    headers = [("Config", False), ("Dataset", False), ("Context", False), ("0_0 documents", True)]
     headers += [("Precision", True), ("Recall", True), ("F1", True), ("False alarms", True)]
     rows = [
         [
@@ -267,11 +296,12 @@ def _relatedness(summary: pd.DataFrame) -> str:
         if not pd.isna(r["rel_f1"])
     ]
     intro = (
-        '<p class="note">Whether a claim is about climate at all, scored on every document including those annotated '
-        'as not climate. "False alarms" is the share of not-climate documents called climate. The category scores '
-        "above cover the climate documents only.</p>"
+        '<p class="note">Does the classifier find a denial narrative at all? Any CARDS category counts as "narrative", '
+        "code 0_0 as none. Scored on every document, including those annotated 0_0 (no climate-misinformation "
+        'narrative, whether or not the text is about climate). "False alarms" is the share of 0_0 documents given a '
+        "category. The category scores above cover the documents annotated with a category only.</p>"
     )
-    return "<h2>Relatedness</h2>" + intro + _table(headers, rows)
+    return "<h2>Narrative detection</h2>" + intro + _table(headers, rows)
 
 
 def _charts(summary: pd.DataFrame) -> str:
@@ -318,27 +348,48 @@ def _p(p) -> str:
     return "—" if p is None or pd.isna(p) else ("<0.001" if p < 0.001 else f"{p:.3f}")
 
 
+def _p_relation(p) -> str:
+    """``= 0.125`` or ``< 0.001``, for running text."""
+    text = _p(p)
+    return f"< {text[1:]}" if text.startswith("<") else f"= {text}"
+
+
 def _interval(lo, hi) -> str:
     return "—" if pd.isna(lo) or pd.isna(hi) else f"[{lo:+.3f}, {hi:+.3f}]"
 
 
-def _model_comparison(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str | None) -> str:
-    """Each config against *baseline* (default: the first config) on the cases both answered, in one context mode."""
+def _verdict(delta, lo, hi, p) -> str:
+    """Plain-words reading of a paired difference: significant at 0.05 (with direction), or within noise."""
+    if p is None or pd.isna(p) or delta is None or pd.isna(delta):
+        return "—"
+    if p < 0.05:
+        return "significantly better" if delta > 0 else "significantly worse"
+    return "within noise"
+
+
+def _model_rows(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str | None):
+    """``(comparison, baseline, mode)`` of each config against *baseline* in one context mode, or ``None``."""
     configs = list(dict.fromkeys(summary["config"].astype(str)))
     if baseline is not None and baseline not in configs:
         raise ValueError(f"unknown baseline {baseline!r}; choose one of: {', '.join(configs)}")
     if len(configs) < 2:
-        return ""
+        return None
     baseline = baseline or configs[0]
     modes = list(dict.fromkeys(cases["context"])) if not cases.empty else []
     if not modes:
-        return ""
+        return None
     mode = "none" if "none" in modes else modes[0]
     comparison = compare_configs(cases, baseline, context=mode)
-    if comparison.empty:
+    return None if comparison.empty else (comparison, baseline, mode)
+
+
+def _model_comparison(model_rows) -> str:
+    """Each config against the baseline on the cases both answered, in one context mode."""
+    if model_rows is None:
         return ""
+    comparison, baseline, mode = model_rows
     headers = [("Dataset", False), ("Config", False), ("Paired", True), ("Baseline", True), ("Config exact", True)]
-    headers += [("Δ", True), ("Δ 95% CI", True), ("Better", True), ("Worse", True), ("p", True)]
+    headers += [("Δ", True), ("Δ 95% CI", True), ("Better", True), ("Worse", True), ("p", True), ("Verdict", False)]
     rows = [
         [
             _td(str(r["dataset"])),
@@ -351,6 +402,7 @@ def _model_comparison(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str 
             _td(str(int(r["better"])), num=True),
             _td(str(int(r["worse"])), num=True),
             _td(_p(r["p_value"]), num=True),
+            _td(_verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])),
         ]
         for _, r in comparison.iterrows()
     ]
@@ -358,7 +410,7 @@ def _model_comparison(cases: pd.DataFrame, summary: pd.DataFrame, baseline: str 
         f'<p class="muted">Each config against <b>{_esc(baseline)}</b> on the cases both answered '
         f"(context: {_esc(mode)}). Δ is exact match, config minus baseline; the interval is a 95% bootstrap over the "
         "pairs; p is an exact two-sided McNemar test on the cases where they differ, not corrected for the number of "
-        "comparisons.</p>"
+        'comparisons. "Within noise" means p is 0.05 or more.</p>'
     )
     return "<h2>Model comparison</h2>" + intro + _table(headers, rows)
 
@@ -368,7 +420,7 @@ def _context_sections(cases: pd.DataFrame) -> str:
     if effect.empty:
         return ""
     headers = [("Config", False), ("Dataset", False), ("Paired", True), ("None", True), ("With", True), ("Δ", True)]
-    headers += [("Δ 95% CI", True), ("Fixed", True), ("Broken", True), ("Same", True), ("p", True)]
+    headers += [("Δ 95% CI", True), ("Fixed", True), ("Broken", True), ("Same", True), ("p", True), ("Verdict", False)]
     rows = [
         [
             _td(str(r["config"])),
@@ -382,6 +434,7 @@ def _context_sections(cases: pd.DataFrame) -> str:
             _td(str(int(r["broken"])), num=True),
             _td(str(int(r["unchanged"])), num=True),
             _td(_p(r["p_value"]), num=True),
+            _td(_verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])),
         ]
         for _, r in effect.iterrows()
     ]
@@ -453,6 +506,64 @@ def _details(runs: Sequence[BenchmarkRun]) -> str:
     return "".join(out)
 
 
+def _glance(summary: pd.DataFrame, cases: pd.DataFrame, model_rows) -> str:
+    """A few plain sentences with the headline results, generated from the data."""
+    items: list[str] = []
+    usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
+    for dataset in dict.fromkeys(usable["dataset"].astype(str)):
+        group = usable[usable["dataset"].astype(str) == dataset]
+        top = group.loc[group["exact_match"].idxmax()]
+        text = f"Best exact match on {_esc(dataset)}: <b>{_esc(str(top['config']))}</b>"
+        text += f" ({'with' if top['context'] == 'with' else 'no'} context) at {top['exact_match']:.3f}"
+        if "exact_lo" in top and not pd.isna(top["exact_lo"]) and not pd.isna(top["exact_hi"]):
+            text += f" [{top['exact_lo']:.2f}–{top['exact_hi']:.2f}]"
+        base = top.get("baseline_exact")
+        if base is not None and not pd.isna(base):
+            text += f"; always guessing the most common label scores {base:.3f}"
+        items.append(text + ".")
+    if model_rows is not None:
+        comparison, baseline, mode = model_rows
+        for _, r in comparison.iterrows():
+            verdict = _verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])
+            items.append(
+                f"<b>{_esc(str(r['config']))}</b> against {_esc(baseline)} on {_esc(str(r['dataset']))}: "
+                f"{r['delta']:+.3f} exact match ({verdict}, p {_p_relation(r['p_value'])})."
+            )
+    effect = context_effect(cases)
+    for _, r in effect.iterrows():
+        verdict = _verdict(r["delta"], r["delta_lo"], r["delta_hi"], r["p_value"])
+        items.append(
+            f"Adding context to <b>{_esc(str(r['config']))}</b> on {_esc(str(r['dataset']))}: {r['delta']:+.3f} exact "
+            f"match ({verdict}; {int(r['fixed'])} cases fixed, {int(r['broken'])} broken)."
+        )
+    if not items:
+        return ""
+    return "<h2>At a glance</h2><ul>" + "".join(f"<li>{item}</li>" for item in items) + "</ul>"
+
+
+_GLOSSARY = (
+    ("Exact", "Share of claims where the prediction is one of the acceptable human labels (some claims have a tie)."),
+    ("hF1", "Exact match with partial credit through the taxonomy: a near miss (2_1 for 2_3) scores above a far one."),
+    ("D1 macro, D2 macro", "F1 averaged over categories at depth 1 (5 main categories) and depth 2 (subcategories)."),
+    ("Failed", "Predictions that errored out. They count as wrong and stay in every denominator."),
+    ("Not related", "Share of answered claims predicted as code 0_0 (no denial narrative)."),
+    ("Unambiguous", "Exact match on claims with a single acceptable label, where there is no tie to be lenient about."),
+    ("Baseline", "Exact match from always guessing the most common label; a score near it means little."),
+    ("[a–b]", "95% bootstrap interval over cases. Differences smaller than the interval are noise."),
+    ("Δ", "Difference in exact match on the same cases, config minus baseline (or with minus without context)."),
+    (
+        "p-value",
+        "Chance of a difference this large if there were no real one (exact McNemar test on the cases that differ).",
+    ),
+    ("Fixed / Broken", "Cases wrong without context and right with it, and the reverse."),
+)
+
+
+def _glossary() -> str:
+    items = "".join(f"<dt>{_esc(term)}</dt><dd>{_esc(text)}</dd>" for term, text in _GLOSSARY)
+    return f"<details><summary>How to read this report</summary><dl>{items}</dl></details>"
+
+
 def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: str | None = None) -> Path:
     """Renders *runs* as one self-contained HTML report at *out_path* and returns the path.
 
@@ -472,13 +583,26 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
             "with claim-only labels, not accuracy against a context-informed truth. Intervals are 95% bootstrap over "
             "cases; differences inside them are noise.</p>"
         )
+    repeats = _repeat_datasets(summary)
+    category = summary[~summary["dataset"].astype(str).isin(repeats)] if repeats else summary
+    category_cases = cases[~cases["dataset"].astype(str).isin(repeats)] if repeats and not cases.empty else cases
+    model_rows = _model_rows(category_cases, category, baseline)
+    repeat_note = ""
+    if repeats:
+        names = ", ".join(_esc(name) for name in repeats)
+        repeat_note = (
+            f'<p class="note">{names}: repeats the category scores of an earlier dataset (the same classifications '
+            "on the same cases), so it is shown only under Narrative detection.</p>"
+        )
     document = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1"><title>CARDS evaluation report</title>'
         f"<style>{_css()}</style></head><body><main><h1>CARDS evaluation report</h1>"
-        f'<p class="muted">{len(runs)} run(s), {len(summary)} result row(s).</p>{caveat}'
-        f"<h2>Comparison</h2>{_comparison(summary)}{_relatedness(summary)}<h2>Charts</h2>{_charts(summary)}"
-        f"{_model_comparison(cases, summary, baseline)}{_context_sections(cases)}{_details(runs)}</main></body></html>"
+        f'<p class="muted">{len(runs)} run(s), {len(summary)} result row(s).</p>'
+        f"{_glance(category, category_cases, model_rows)}{_glossary()}{caveat}"
+        f"<h2>Comparison</h2>{_comparison(category)}{repeat_note}{_reliability(category)}"
+        f"{_narrative_detection(summary)}<h2>Charts</h2>{_charts(category)}"
+        f"{_model_comparison(model_rows)}{_context_sections(category_cases)}{_details(runs)}</main></body></html>"
     )
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)

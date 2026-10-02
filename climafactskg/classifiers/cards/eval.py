@@ -569,10 +569,12 @@ def print_benchmark(df: pd.DataFrame, title: str = "Benchmark Results", wide: bo
 
 
 def _print_relatedness(df: pd.DataFrame) -> None:
-    """A second table with the climate-or-not scores; only printed when a dataset had not-climate documents."""
+    """A second table with the narrative-detection scores; only printed when a dataset had 0_0 documents."""
     if "rel_f1" not in df.columns or df["rel_f1"].isna().all():
         return
-    table = Table(title="Relatedness (climate or not)", box=box.SIMPLE, collapse_padding=True, pad_edge=False)
+    table = Table(
+        title="Narrative detection (denial narrative vs 0_0)", box=box.SIMPLE, collapse_padding=True, pad_edge=False
+    )
     for header, justify in (("Config", "left"), ("Dataset", "left"), ("Ctx", "left"), ("Not clim.", "right")):
         table.add_column(header, justify=cast(Literal["left", "right"], justify), no_wrap=True, max_width=14)
     for header in ("Prec", "Recall", "F1", "False alarm"):
