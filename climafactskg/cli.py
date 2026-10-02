@@ -400,6 +400,7 @@ def eval_run(
         datasets,
         context_modes=spec.run.context_modes,
         min_context_coverage=spec.run.min_context_coverage,
+        category_scores=spec.run.category_scores,
         save_dir=spec.run.save_dir,
     )
     cards_eval.print_benchmark(df)

@@ -203,6 +203,7 @@ def benchmark_configs(
     context_modes: Sequence[Literal["none", "with"]] = ("none", "with"),
     min_context_coverage: float = 0.5,
     save_dir: str | None = None,
+    category_scores: Literal["all", "narrative_only"] = "all",
 ) -> pd.DataFrame:
     """Evaluate multiple classifier configs across multiple datasets.
 
@@ -222,6 +223,10 @@ def benchmark_configs(
         save_dir: When set, the run (metadata, tidy per-case rows and the summary) is saved to a new timestamped
             directory under it (see :mod:`.runs`) and its path is attached as ``df.attrs["run_dir"]``. A failed
             save logs a warning and never loses the returned DataFrame.
+        category_scores: Which cases the category scores (exact, hF1, F1, and the saved case rows) cover. ``"all"``
+            (default) scores every case, including those whose gold is exactly ``0_0``. ``"narrative_only"`` scores
+            only the cases that carry a category, so ``n_cases`` counts those alone. The narrative-detection columns
+            (``n_not_climate``, ``rel_*``) are filled in either way whenever a dataset has ``0_0`` cases.
 
     Returns:
         DataFrame with one row per (config, dataset, context mode):
@@ -251,6 +256,8 @@ def benchmark_configs(
     """
     from rich.progress import track
 
+    if category_scores not in ("all", "narrative_only"):
+        raise ValueError(f"category_scores must be 'all' or 'narrative_only', got {category_scores!r}")
     rows = []
     case_rows: list[dict[str, Any]] = []
     combos = [
@@ -335,8 +342,8 @@ def benchmark_configs(
         # Cases without a gold label cannot be scored. A failed prediction (None) is a wrong answer, not a missing one.
         scored = [i for i, case in enumerate(cases) if normalize_gold(case.expected_output)]
         relation = relatedness([preds[i] for i in scored], [cases[i].expected_output for i in scored])
-        # The category scores belong to the climate cases; documents whose gold is "not climate" only feed relatedness.
-        scored = [i for i in scored if not is_not_climate_gold(cases[i].expected_output)]
+        if category_scores == "narrative_only":
+            scored = [i for i in scored if not is_not_climate_gold(cases[i].expected_output)]
         s_preds = [preds[i] for i in scored]
         s_golds = [cases[i].expected_output for i in scored]
         metrics = compute_metrics(s_preds, s_golds)
@@ -425,7 +432,7 @@ def benchmark_configs(
                 for name, clf in configs.items()
             ]
             run = BenchmarkRun(
-                meta=collect_meta(datasets, context_modes, min_context_coverage, configs_meta),
+                meta=collect_meta(datasets, context_modes, min_context_coverage, configs_meta, category_scores),
                 summary=df,
                 cases=pd.DataFrame(case_rows, columns=list(CASE_COLUMNS)),
             )

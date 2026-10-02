@@ -35,6 +35,7 @@ class RunSettings(_Strict):
     save_dir: str = "data/eval_runs"
     context_modes: list[Literal["none", "with"]] = Field(default_factory=lambda: ["none", "with"], min_length=1)
     min_context_coverage: float = Field(0.5, ge=0, le=1)
+    category_scores: Literal["all", "narrative_only"] = "all"
 
 
 class ClassifierSpec(_Strict):

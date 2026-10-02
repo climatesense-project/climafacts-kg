@@ -27,6 +27,7 @@ class TestLoading:
         assert text == MINIMAL
         assert config.run.save_dir == "data/eval_runs"
         assert config.run.context_modes == ["none", "with"]
+        assert config.run.category_scores == "all"
         assert config.classifiers[0].engine == "llm" and config.classifiers[0].model == "openai/gpt-4o-mini"
         assert config.datasets[0].label == "climatesense_v2"  # the label defaults to the dataset name
 
@@ -236,3 +237,8 @@ def test_the_string_none_in_options_means_python_none(tmp_path, monkeypatch):
     runconfig.build_classifier(config.classifiers[0])
 
     assert seen["top_p"] is None and seen["temperature"] == 0.0
+
+
+def test_category_scores_must_be_a_known_value(tmp_path):
+    with pytest.raises(ConfigError, match="category_scores"):
+        load_run_config(_write(tmp_path, '[run]\ncategory_scores = "some"\n' + MINIMAL))

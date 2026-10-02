@@ -301,6 +301,7 @@ def collect_meta(
     context_modes: Sequence[str],
     min_context_coverage: float,
     configs: list[dict[str, str]],
+    category_scores: str = "all",
 ) -> dict[str, Any]:
     """Run metadata: git commit, package version, dataset sizes (with context counts), configs and options."""
 
@@ -316,4 +317,5 @@ def collect_meta(
         "configs": configs,
         "context_modes": list(context_modes),
         "min_context_coverage": min_context_coverage,
+        "category_scores": category_scores,
     }

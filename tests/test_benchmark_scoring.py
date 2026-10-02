@@ -104,18 +104,39 @@ def test_a_case_without_any_gold_label_is_skipped_not_fatal():
     assert row["n_cases"] == 1 and row["exact_match"] == 1.0
 
 
-def test_not_climate_gold_cases_are_scored_for_relatedness_not_category(tmp_path):
+_MIXED_GOLDS = [["1_1"], ["1_1"], ["0_0"], ["0_0"]]
+_MIXED_PREDS = ["1_1", "2_2", "0", "1_1"]
+
+
+def test_by_default_category_scores_cover_every_case_and_narrative_detection_is_added(tmp_path):
+    df = benchmark_configs({"x": _Fixed(_MIXED_PREDS)}, {"d": _dataset(_MIXED_GOLDS)}, save_dir=str(tmp_path))
+    row = df.iloc[0]
+
+    assert row["n_cases"] == 4 and row["n_not_climate"] == 2
+    assert row["exact_match"] == 0.5  # hit, miss, correct "0", false alarm: the same as before narrative detection
+    assert abs(row["rel_precision"] - 2 / 3) < 1e-3 and row["rel_recall"] == 1.0 and row["rel_fpr"] == 0.5
+    assert len(load_run(df.attrs["run_dir"]).cases) == 4
+
+
+def test_narrative_only_keeps_the_category_scores_on_cases_with_a_category(tmp_path):
     df = benchmark_configs(
-        {"x": _Fixed(["1_1", "2_2", "0", "1_1"])},
-        {"d": _dataset([["1_1"], ["1_1"], ["0_0"], ["0_0"]])},
+        {"x": _Fixed(_MIXED_PREDS)},
+        {"d": _dataset(_MIXED_GOLDS)},
         save_dir=str(tmp_path),
+        category_scores="narrative_only",
     )
     row = df.iloc[0]
 
-    assert (row["n_cases"], row["n_not_climate"]) == (2, 2)  # category scores stay on the climate cases
-    assert row["exact_match"] == 0.5
-    assert abs(row["rel_precision"] - 2 / 3) < 1e-3 and row["rel_recall"] == 1.0 and row["rel_fpr"] == 0.5
+    assert (row["n_cases"], row["n_not_climate"]) == (2, 2)
+    assert row["exact_match"] == 0.5 and row["rel_recall"] == 1.0
     assert len(load_run(df.attrs["run_dir"]).cases) == 2  # saved case rows are the category table
+
+
+def test_an_unknown_category_scores_value_is_rejected():
+    import pytest
+
+    with pytest.raises(ValueError, match="category_scores"):
+        benchmark_configs({"x": _Fixed(["1_1"])}, {"d": _dataset([["1_1"]])}, category_scores="some")
 
 
 def test_without_not_climate_gold_the_relatedness_columns_are_empty_and_nothing_else_changes():
@@ -125,7 +146,11 @@ def test_without_not_climate_gold_the_relatedness_columns_are_empty_and_nothing_
     assert np.isnan(row["rel_f1"]) and np.isnan(row["rel_recall"])
 
 
-def test_a_dataset_of_only_not_climate_cases_does_not_crash():
-    row = _row(["0", "1_1"], [["0_0"], ["0_0"]])
+def test_a_dataset_of_only_not_climate_cases_does_not_crash_in_either_mode():
+    default = _row(["0", "1_1"], [["0_0"], ["0_0"]])
+    narrative = benchmark_configs(
+        {"x": _Fixed(["0", "1_1"])}, {"d": _dataset([["0_0"], ["0_0"]])}, category_scores="narrative_only"
+    ).iloc[0]
 
-    assert row["n_cases"] == 0 and row["n_not_climate"] == 2 and row["rel_fpr"] == 0.5
+    assert default["n_cases"] == 2 and default["exact_match"] == 0.5
+    assert narrative["n_cases"] == 0 and narrative["n_not_climate"] == 2 and narrative["rel_fpr"] == 0.5

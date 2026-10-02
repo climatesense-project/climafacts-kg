@@ -88,6 +88,7 @@ def test_a_confirmed_paid_run_executes_and_saves_the_config(stubs, tmp_path):
     ((configs, datasets, kwargs),) = stubs["benchmark"]
     assert configs == {"gpt": "clf:gpt"} and list(datasets) == ["climatesense_v2"]
     assert kwargs["context_modes"] == ["none", "with"] and kwargs["save_dir"] == str(tmp_path / "runs")
+    assert kwargs["category_scores"] == "all"
     assert (stubs["run_dir"] / "config.toml").read_text(encoding="utf-8").startswith("\n[run]")
 
 

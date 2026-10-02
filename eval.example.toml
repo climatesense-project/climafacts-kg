@@ -5,6 +5,8 @@
 save_dir = "data/eval_runs"          # each run gets its own timestamped directory
 context_modes = ["none", "with"]     # claim only, and claim + review context (paired comparison in the report)
 min_context_coverage = 0.5           # warn when "with" runs on a dataset where fewer cases have context
+category_scores = "all"              # "all": category scores cover every case, as always.
+                                     # "narrative_only": only cases that carry a category (leaves out 0_0 gold)
 
 # Applied to every LLM classifier below; a classifier's own settings win, and `options` merge key by key.
 [defaults]
@@ -55,9 +57,9 @@ label = "climatesense_v2 (context only)"
 with_context = true
 only_with_context = true
 
-# Also score "is it a climate claim at all?": include the documents annotated as not climate. The category scores keep
-# covering the climate documents only; the extra documents feed the separate relatedness table (precision, recall, F1,
-# false alarms). Costs about 2.6x (v1) / 1.9x (v2) more classifications than climate-only.
+# Include the documents annotated 0_0 (no denial narrative). They also feed the Narrative detection table (precision,
+# recall, F1, false alarms). With category_scores = "all" they count in the category scores too; set "narrative_only"
+# to keep those on the cases with a category. Costs about 2.6x (v1) / 1.9x (v2) more classifications.
 [[datasets]]
 name = "climatesense_v2"
 label = "climatesense_v2 (incl. not climate)"
