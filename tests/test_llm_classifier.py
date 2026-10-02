@@ -276,3 +276,47 @@ def _always_stall(calls):
         await asyncio.sleep(5)
 
     return run
+
+
+class TestInvalidProviderResponse:
+    """OpenRouter sometimes relays a provider's malformed reply (choices: null); that is transient, so it is retried."""
+
+    def _run(self, monkeypatch, error, failures):
+        import asyncio
+
+        from climafactskg.classifiers.cards.llm import classifier as module
+        from climafactskg.classifiers.cards.llm.classifier import CARDSOutput
+
+        monkeypatch.setattr(module, "_DEFAULT_RETRY_BASE_DELAY", 0.0)
+        clf = CARDSLLMClassifier(provider="ollama", model="m", use_preclassifier=False)
+        calls = {"n": 0}
+
+        class _Result:
+            output = CARDSOutput(is_climate_related=True, cards_category="1_1", reasoning="r")
+
+        class _Agent:
+            async def run(self, *args, **kwargs):
+                calls["n"] += 1
+                if calls["n"] <= failures:
+                    raise error
+                return _Result()
+
+        clf._agent = _Agent()
+        return asyncio.run(clf._call_llm_async("claim", asyncio.Semaphore(1))), calls
+
+    def test_an_invalid_provider_response_is_retried(self, monkeypatch):
+        from pydantic_ai.exceptions import UnexpectedModelBehavior
+
+        error = UnexpectedModelBehavior(
+            "Invalid response from openrouter chat completions endpoint: 3 validation errors for ChatCompletion"
+        )
+        out, calls = self._run(monkeypatch, error, failures=2)
+
+        assert out.cards_category == "1_1" and calls["n"] == 3
+
+    def test_a_model_that_cannot_produce_valid_output_is_not_retried(self, monkeypatch):
+        import pytest
+        from pydantic_ai.exceptions import UnexpectedModelBehavior
+
+        with pytest.raises(UnexpectedModelBehavior):
+            self._run(monkeypatch, UnexpectedModelBehavior("Exceeded maximum output retries (3)"), failures=99)

@@ -12,7 +12,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_ai import Agent, PromptedOutput
-from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError, UnexpectedModelBehavior
 
 from climafactskg.utils import hash_string
 
@@ -450,6 +450,14 @@ class CARDSLLMClassifier(CARDSClassifierBase):
                     else:
                         result = await self._run_with_deadline(user_msg)
                 return result.output
+            except UnexpectedModelBehavior as exc:
+                # A malformed reply relayed from the provider (e.g. ``choices: null``) is transient; a model that
+                # cannot produce valid output ("Exceeded maximum output retries") is not, so it is not retried.
+                if not str(exc).startswith("Invalid response from") or attempt == _DEFAULT_MAX_RETRIES:
+                    raise
+                logger.warning(
+                    "Invalid provider response on attempt %d/%d, retrying", attempt + 1, _DEFAULT_MAX_RETRIES + 1
+                )
             except asyncio.TimeoutError:
                 # The whole call exceeded the deadline (a stalled provider); retry like any transient failure.
                 if attempt == _DEFAULT_MAX_RETRIES:
