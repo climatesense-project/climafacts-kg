@@ -178,3 +178,31 @@ def test_the_plan_falls_back_to_an_upper_bound_when_the_classifier_cannot_be_bui
     result = runner.invoke(app, ["eval", "run", _config(tmp_path, PAID), "--dry-run"])
 
     assert result.exit_code == 0 and "up to 8" in result.output
+
+
+def test_a_failed_combination_makes_the_command_exit_non_zero_after_saving(stubs, tmp_path, monkeypatch):
+    def failing(configs, datasets, **kwargs):
+        stubs["benchmark"].append((configs, datasets, kwargs))
+        df = pd.DataFrame(
+            [{"config": "gpt", "dataset": "climatesense_v2", "context": "none", "n_cases": 0, "error": "boom"}]
+        )
+        df.attrs["run_dir"] = str(stubs["run_dir"])
+        return df
+
+    monkeypatch.setattr(cards_eval, "benchmark_configs", failing)
+
+    result = runner.invoke(app, ["eval", "run", _config(tmp_path, FREE)])
+
+    assert result.exit_code == 1
+    assert (stubs["run_dir"] / "config.toml").exists()  # the run was still saved and documented
+
+
+def test_a_clean_run_exits_zero_even_though_the_error_column_exists(stubs, tmp_path, monkeypatch):
+    def clean(configs, datasets, **kwargs):
+        df = pd.DataFrame([{"config": "gpt", "dataset": "d", "context": "none", "n_cases": 4, "error": ""}])
+        df.attrs["run_dir"] = str(stubs["run_dir"])
+        return df
+
+    monkeypatch.setattr(cards_eval, "benchmark_configs", clean)
+
+    assert runner.invoke(app, ["eval", "run", _config(tmp_path, FREE)]).exit_code == 0

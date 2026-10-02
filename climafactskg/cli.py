@@ -430,15 +430,21 @@ def eval_run(
     )
     cards_eval.print_benchmark(df)
     run_dir = df.attrs.get("run_dir")
-    if not run_dir:
-        logger.warning("The run was not saved, so no config copy or report was written")
-        return
-    (Path(run_dir) / "config.toml").write_text(text, encoding="utf-8")
-    if report:
-        from climafactskg.classifiers.cards.report import render_html
-        from climafactskg.classifiers.cards.runs import load_run
+    if run_dir:
+        (Path(run_dir) / "config.toml").write_text(text, encoding="utf-8")
+        if report:
+            from climafactskg.classifiers.cards.report import render_html
+            from climafactskg.classifiers.cards.runs import load_run
 
-        logger.info("Wrote %s", render_html([load_run(run_dir)], str(Path(run_dir) / "report.html")))
+            logger.info("Wrote %s", render_html([load_run(run_dir)], str(Path(run_dir) / "report.html")))
+    else:
+        logger.warning("The run was not saved, so no config copy or report was written")
+    # Exit non-zero after saving, so scripts and CI notice a benchmark in which a combination failed outright.
+    errors = df["error"].fillna("").astype(str).str.strip() if "error" in df.columns else []
+    failed = int((errors != "").sum()) if len(errors) else 0
+    if failed:
+        logger.error("%d of %d benchmark combination(s) failed; see the failed lines above.", failed, len(df))
+        raise typer.Exit(code=1)
 
 
 @app.command(name="eval-report", hidden=True)  # kept for scripts written against 2.2.0
