@@ -378,23 +378,48 @@ def eval_run(
         raise typer.Exit(code=1) from exc
 
     datasets = {d.label: runconfig.build_dataset(d) for d in spec.datasets}
-    paid = [c.label for c in spec.classifiers if runconfig.is_paid(c)]
-    calls = 0
+    paid = [c for c in spec.classifiers if runconfig.is_paid(c)]
+    # Paid classifiers are built early so their cache can be consulted: counting hits is free.
+    built: dict[str, object] = {}
+    for classifier_spec in paid:
+        try:
+            built[classifier_spec.label] = runconfig.build_classifier(classifier_spec)
+        except Exception as exc:
+            logger.warning("Could not build %s to check its cache: %s", classifier_spec.label, exc)
+    calls = cached = 0
+    cache_checked = len(built) == len(paid)
     typer.echo(f"Classifiers: {', '.join(c.label for c in spec.classifiers)}")
     for label, dataset in datasets.items():
         total = len(dataset.cases)
         with_context = sum(1 for case in dataset.cases if getattr(case.inputs, "context", None))
         modes = [m for m in spec.run.context_modes if m == "none" or with_context]
         calls += total * len(modes) * len(paid)
+        for mode in modes:
+            texts = [getattr(case.inputs, "text", str(case.inputs)) for case in dataset.cases]
+            contexts = [getattr(case.inputs, "context", None) if mode == "with" else None for case in dataset.cases]
+            for classifier in built.values():
+                counter = getattr(classifier, "count_cached", None)
+                if counter is None:
+                    cache_checked = False
+                else:
+                    cached += counter(texts, contexts if any(contexts) else None)
         typer.echo(f"Dataset {label}: {total} cases, {with_context} with context; modes: {', '.join(modes)}")
     typer.echo(f"Saving to: {spec.run.save_dir}")
-    typer.echo(f"Paid classifiers: {', '.join(paid) or 'none'}; up to {calls} paid calls (fewer when cached)")
+    paid_names = ", ".join(c.label for c in paid) or "none"
+    if not paid:
+        typer.echo("Paid classifiers: none")
+    elif cache_checked:
+        typer.echo(
+            f"Paid classifiers: {paid_names}; {calls} calls planned, {cached} already cached, {calls - cached} new"
+        )
+    else:
+        typer.echo(f"Paid classifiers: {paid_names}; up to {calls} paid calls (cache not checked)")
     if dry_run:
         return
     if paid and not yes and not typer.confirm("Run and spend on the paid APIs?", default=False):
         raise typer.Exit(code=1)
 
-    configs = {c.label: runconfig.build_classifier(c) for c in spec.classifiers}
+    configs = {c.label: built[c.label] if c.label in built else runconfig.build_classifier(c) for c in spec.classifiers}
     df = cards_eval.benchmark_configs(
         configs,
         datasets,

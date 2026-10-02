@@ -514,6 +514,23 @@ class CARDSLLMClassifier(CARDSClassifierBase):
         )[0]
         return self._label_from_output(output)
 
+    @staticmethod
+    def _output_key(pair: tuple[str, str | None]) -> str:
+        """Cache-key material of one ``(text, context)`` item; the same text with and without context differs."""
+        text, context = pair
+        return f"{text}|{context}" if context else text
+
+    def count_cached(self, texts: list[str], contexts: list[str | None] | None = None) -> int:
+        """How many of *texts* (with their *contexts*) already have an answer in the result cache.
+
+        Counts only; nothing is computed or written, so it is free. The pre-classifier gate is not consulted, so with
+        ``use_preclassifier`` the figure is an upper bound on the calls avoided.
+        """
+        if contexts is not None and len(contexts) != len(texts):
+            raise ValueError(f"contexts has {len(contexts)} items but texts has {len(texts)}")
+        effective: list[str | None] = contexts if contexts is not None else [None] * len(texts)
+        return self._output_cache.count_cached(list(zip(texts, effective, strict=True)), key_fn=self._output_key)
+
     def classify_batch(
         self,
         texts: list[str],
@@ -619,7 +636,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
 
             outputs = self._output_cache.get_or_compute(
                 pending_pairs,
-                key_fn=lambda pair: f"{pair[0]}|{pair[1]}" if pair[1] else pair[0],
+                key_fn=self._output_key,
                 compute_fn=_compute_llm,
                 should_cache=lambda output: not isinstance(output, Exception),
                 on_hit=_advance_output_hit,

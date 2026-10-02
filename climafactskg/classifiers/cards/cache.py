@@ -54,6 +54,14 @@ class ClassificationCache:
     def _key(self, key_material: str) -> str:
         return hash_string(f"{self.fingerprint}|{key_material}")
 
+    def count_cached(self, items: list[Item], key_fn: Callable[[Item], str]) -> int:
+        """How many *items* :meth:`get_or_compute` would find in the cache. Computes and writes nothing."""
+        if self.cache_path is None or not items:
+            return 0
+        keys = [self._key(key_fn(item)) for item in items]
+        with preserve.open(format="sqlite", filename=self.cache_path) as db:
+            return sum(1 for key in keys if key in db)
+
     def get_or_compute(
         self,
         items: list[Item],

@@ -40,9 +40,19 @@ def stubs(monkeypatch, tmp_path):
 
     monkeypatch.setattr(runconfig, "build_dataset", lambda spec: _dataset(["ctx", "ctx", None, None]))
 
+    class _Clf:
+        def __init__(self, label):
+            self.label = label
+
+        def count_cached(self, texts, contexts=None):
+            return calls.get("cached", 0)
+
+        def __eq__(self, other):
+            return other == f"clf:{self.label}"
+
     def build_classifier(spec):
         calls["classifiers"].append(spec.label)
-        return f"clf:{spec.label}"
+        return _Clf(spec.label)
 
     def benchmark(configs, datasets, **kwargs):
         calls["benchmark"].append((configs, datasets, kwargs))
@@ -71,7 +81,7 @@ def test_dry_run_prints_the_plan_and_builds_nothing(stubs, tmp_path):
     assert result.exit_code == 0
     assert "gpt" in result.output and "climatesense_v2" in result.output
     assert "8" in result.output  # 4 cases x 2 context modes x 1 paid classifier
-    assert stubs["classifiers"] == [] and stubs["benchmark"] == []
+    assert stubs["benchmark"] == []
 
 
 def test_a_paid_run_needs_confirmation(stubs, tmp_path):
@@ -147,3 +157,24 @@ def test_a_missing_eval_extra_gives_an_install_hint(stubs, tmp_path, monkeypatch
 
     assert result.exit_code == 1
     assert "climafactskg[eval]" in caplog.text
+
+
+def test_the_plan_separates_cached_from_new_paid_calls(stubs, tmp_path):
+    stubs["cached"] = 3  # of the 4 cases per mode; counted for the "none" and the "with" mode
+
+    result = runner.invoke(app, ["eval", "run", _config(tmp_path, PAID), "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "6 already cached" in result.output and "2 new" in result.output
+    assert stubs["benchmark"] == []
+
+
+def test_the_plan_falls_back_to_an_upper_bound_when_the_classifier_cannot_be_built(stubs, tmp_path, monkeypatch):
+    def broken(spec):
+        raise RuntimeError("no API key")
+
+    monkeypatch.setattr(runconfig, "build_classifier", broken)
+
+    result = runner.invoke(app, ["eval", "run", _config(tmp_path, PAID), "--dry-run"])
+
+    assert result.exit_code == 0 and "up to 8" in result.output

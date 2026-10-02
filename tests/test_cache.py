@@ -115,3 +115,12 @@ def test_entries_written_before_the_shared_cache_still_hit(tmp_path):
     )
 
     assert result == ["OLD"] and calls == []
+
+
+def test_count_cached_counts_hits_without_computing_or_writing(tmp_path):
+    cache = ClassificationCache(str(tmp_path / "cache.db"), fingerprint="fp")
+    cache.get_or_compute(["a", "b"], key_fn=lambda t: t, compute_fn=lambda pending: [t.upper() for t in pending])
+
+    assert cache.count_cached(["a", "b", "c"], key_fn=lambda t: t) == 2
+    assert cache.count_cached(["c"], key_fn=lambda t: t) == 0  # still a miss: counting did not write anything
+    assert ClassificationCache(None, fingerprint="fp").count_cached(["a"], key_fn=lambda t: t) == 0
