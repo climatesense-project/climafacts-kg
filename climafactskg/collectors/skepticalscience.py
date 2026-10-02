@@ -3,6 +3,7 @@ from typing import Optional
 from urllib.parse import urljoin
 
 import preserve
+import requests
 from bs4 import BeautifulSoup
 
 from climafactskg.collectors.utils import batch_classify_cards_category
@@ -15,6 +16,16 @@ from climafactskg.parsers.skepticalscience import (
 from climafactskg.utils import fetch_url_content
 
 logger = logging.getLogger(__name__)
+
+
+# A page that cannot be fetched (error status, timeout, connection failure) is skipped so it cannot block the pages
+# after it; it stays unprocessed, so the next run retries it, and the step still fails at the end.
+_FETCH_ERRORS = (ValueError, requests.RequestException)
+
+
+def _raise_if_failed(failed: list[str], total: int) -> None:
+    if failed:
+        raise RuntimeError(f"{len(failed)} of {total} URL(s) could not be processed: {', '.join(failed)}")
 
 
 def fetch_misinformers_urls(ignore_urls: Optional[list] = None) -> list:
@@ -73,6 +84,7 @@ def process_misinformers_urls(db: preserve.Connector, urls: list[str], ignore_ur
     urls = [url for url in urls if url not in ignore_urls]
 
     logger.info(f"Processing {len(urls)} URLs.")
+    failed: list[str] = []
 
     for i, main_url in enumerate(urls, start=1):
         logger.info(f"Processing URL {i}/{len(urls)}: {main_url}")
@@ -80,12 +92,18 @@ def process_misinformers_urls(db: preserve.Connector, urls: list[str], ignore_ur
         if main_url in db:
             logger.info(f"Skipping already processed URL: {main_url}")
         else:
-            content = fetch_url_content(main_url)
-            article = parse_misinformer_article(main_url, content)
+            try:
+                content = fetch_url_content(main_url)
+                article = parse_misinformer_article(main_url, content)
+            except _FETCH_ERRORS as exc:
+                logger.error(f"Could not process {main_url}: {exc}")
+                failed.append(main_url)
+                continue
 
             # Store the article in the db
             db[main_url] = article
             logger.info(f"Stored article for URL: {main_url}")
+    _raise_if_failed(failed, len(urls))
 
 
 def fetch_arguments_urls(ignore_urls: Optional[list] = None) -> list:
@@ -170,6 +188,7 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
     urls = [url for url in urls if url not in ignore_urls]
 
     logger.info(f"Processing {len(urls)} URLs.")
+    failed: list[str] = []
 
     for i, main_url in enumerate(urls, start=1):
         logger.info(f"Processing URL {i}/{len(urls)}: {main_url}")
@@ -177,44 +196,51 @@ def process_urls(db: preserve.Connector, urls: list[str], ignore_urls: Optional[
         if main_url in db and "lang" in db[main_url]:
             logger.info(f"Skipping already processed URL: {main_url}")
         else:
-            content = fetch_url_content(main_url)
-            article = parse_main_article(main_url, content)
+            try:
+                content = fetch_url_content(main_url)
+                article = parse_main_article(main_url, content)
 
-            # Store the article in the db
-            db[main_url] = article
-            logger.info(f"Stored article for URL: {main_url}")
+                # Store the article in the db
+                db[main_url] = article
+                logger.info(f"Stored article for URL: {main_url}")
 
-            # Process the article levels:
-            logger.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
-            if "levels" in article:
-                for level in article["levels"]:
-                    logger.info(f"Processing level: {level['level']}")
+                # Process the article levels:
+                logger.info(f"Processing levels for URL {i}/{len(urls)}: {main_url}")
+                if "levels" in article:
+                    for level in article["levels"]:
+                        logger.info(f"Processing level: {level['level']}")
 
-                    for level_url in level["urls"]:
-                        logger.info(f"Processing level URL: {level_url}")
-                        # Parse the main article for each level URL
-                        level_article = parse_main_article(level_url)
+                        for level_url in level["urls"]:
+                            logger.info(f"Processing level URL: {level_url}")
+                            # Parse the main article for each level URL
+                            level_article = parse_main_article(level_url)
 
-                        # Store the article in the db
-                        db[level_url] = level_article
-                        logger.info(f"Stored level article for URL: {level_url}")
+                            # Store the article in the db
+                            db[level_url] = level_article
+                            logger.info(f"Stored level article for URL: {level_url}")
 
-                    logger.info(f"Finished level: {level['level']}")
+                        logger.info(f"Finished level: {level['level']}")
 
-            if "languages" in article:
-                for lang in article["languages"]:
-                    logger.info(f"Processing language : {lang['lang']}")
+                if "languages" in article:
+                    for lang in article["languages"]:
+                        logger.info(f"Processing language : {lang['lang']}")
 
-                    logger.info(f"Processing language URL: {lang['url']}")
-                    lang_article = parse_translated_article(lang["url"], language_code=lang["code"])
+                        logger.info(f"Processing language URL: {lang['url']}")
+                        lang_article = parse_translated_article(lang["url"], language_code=lang["code"])
 
-                    # Store the  article in the db
-                    db[lang["url"]] = lang_article
-                    logger.info(f"Stored translated article for language URL: {lang['url']}")
+                        # Store the  article in the db
+                        db[lang["url"]] = lang_article
+                        logger.info(f"Stored translated article for language URL: {lang['url']}")
 
-                    logger.info(f"Finished language: {lang['lang']}")
+                        logger.info(f"Finished language: {lang['lang']}")
+
+            except _FETCH_ERRORS as exc:
+                logger.error(f"Could not process {main_url}: {exc}")
+                failed.append(main_url)
+                continue
 
         logger.info(f"Finished processing URL {i}/{len(urls)}: {main_url}")
+    _raise_if_failed(failed, len(urls))
 
 
 def classify_urls(
