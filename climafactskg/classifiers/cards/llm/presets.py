@@ -262,6 +262,9 @@ class XplaiNLPNSLPTunedCARDSLLMConfig(XplaiNLPNSLPCARDSLLMConfig):
     * With ``deepseek/deepseek-v4-flash`` (v2 held-out and NSLP test only, 299 cases) exact match went from 0.763 to
       0.783, +2.0 points, not significant (p = 0.39), with the same pattern: fewer false alarms on v2 (34.5% to 22.4%),
       lower detection recall (0.931 to 0.862) and lower category accuracy on detected claims (0.623 to 0.580).
+    * On the balanced score of docs/model-selection.md (75% category accuracy, 25% false alarms) it never helped
+      across gemma-4-31b, glm-5.3-flash, qwen3.8-flash, ministral-14b-2512 and deepseek-v4-flash, and clearly hurt
+      ministral-14b-2512 (-0.07 with the wrapper, -0.04 without). The default prompt is the one to use.
     * It was tuned for claims alone: with review context the preset uses the unchanged ``xplainnlp-nslp`` prompt.
     * Its examples come from the annotated datasets (for instance "hide the decline"), so it may be fitted to them.
 
