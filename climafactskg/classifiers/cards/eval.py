@@ -55,6 +55,7 @@ from .scoring import (
     case_scores,
     charged_gold,
     compute_metrics,
+    detected_category_hf1,
     detected_category_scores,
     is_not_climate_gold,
     normalize_gold,
@@ -257,6 +258,9 @@ def benchmark_configs(
                     "exact_detected": float("nan"),
                     "exact_detected_lo": float("nan"),
                     "exact_detected_hi": float("nan"),
+                    "hf1_detected": float("nan"),
+                    "hf1_detected_lo": float("nan"),
+                    "hf1_detected_hi": float("nan"),
                     "n_category": float("nan"),
                     "exact_category": float("nan"),
                     "n_not_climate": float("nan"),
@@ -291,6 +295,8 @@ def benchmark_configs(
         has_negatives = relation.n_not_related > 0
         detected_scores = detected_category_scores(s_preds, s_golds)  # the CARDS category, apart from relatedness
         detected_lo, detected_hi = bootstrap_ci(detected_scores)
+        detected_hf1 = detected_category_hf1(s_preds, s_golds)
+        detected_hf1_lo, detected_hf1_hi = bootstrap_ci(detected_hf1)
         with_category = [
             score[0] for score, gold in zip(per_case, s_golds, strict=True) if not is_not_climate_gold(gold)
         ]
@@ -344,6 +350,9 @@ def benchmark_configs(
                 else float("nan"),
                 "exact_detected_lo": detected_lo,
                 "exact_detected_hi": detected_hi,
+                "hf1_detected": round(sum(detected_hf1) / len(detected_hf1), 4) if detected_hf1 else float("nan"),
+                "hf1_detected_lo": detected_hf1_lo,
+                "hf1_detected_hi": detected_hf1_hi,
                 "n_category": len(with_category),
                 "exact_category": round(sum(with_category) / len(with_category), 4) if with_category else float("nan"),
                 "n_not_climate": relation.n_not_related,

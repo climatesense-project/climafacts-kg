@@ -188,3 +188,11 @@ def test_without_any_detection_the_category_score_is_empty_not_zero():
     row = _row(["0", "0_0"], [["1_1"], ["2_1"]])
 
     assert row["n_detected"] == 0 and np.isnan(row["exact_detected"])
+
+
+def test_hierarchical_f1_is_reported_for_the_detected_category_cases_too():
+    # Detected cases: a hit (hF1 1.0) and a near miss in the same branch (hF1 0.5); the third is a missed narrative.
+    row = benchmark_configs({"x": _Fixed(["2_1", "2_2", "0"])}, {"d": _dataset([["2_1"], ["2_1"], ["2_1"]])}).iloc[0]
+
+    assert row["n_detected"] == 2 and abs(row["hf1_detected"] - 0.75) < 1e-3
+    assert row["hf1_detected_lo"] <= row["hf1_detected"] <= row["hf1_detected_hi"]
