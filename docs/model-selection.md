@@ -54,6 +54,8 @@ The top ten models span 0.616 to 0.654, with intervals about ±0.04 wide, so the
 | minimax-m2.7 | 0.618 | 0.538 | 14.1% | 0 |
 | ministral-14b-2512 | 0.616 | 0.544 | 17.1% | 0 |
 
+**Mistral family.** `mistral-small-3.2-24b` (balanced 0.619) is tied with `gemma-4-31b`, needs less memory (about 14 GB at 4-bit) and hosted costs about the same, but has more false alarms (23.5%); `ministral-14b-2512` (0.616) is the best small model. `mistral-small-2603` (0.567), `mistral-nemo` (0.401) and `mistral-large-2512` (0.574, with failed items from rate limits) are not worth using.
+
 ### The trade-off
 
 ![Category accuracy against false-alarm rate](model-selection/tradeoff.svg)
@@ -81,7 +83,7 @@ Measured as the change in the OpenRouter account's usage over 24 real claims per
 | gemma-4-31b | $0.00039 | 5 s | about $8 | about $103 |
 | deepseek-v4-flash | $0.0017 | 34 s | about $36 | about $450 |
 
-The graph totals multiply the per-call cost by the number of calls and are estimates, not a full run. Latencies are from a burst of 24 concurrent calls and vary with provider load.
+The graph totals multiply the per-call cost by the number of calls and are estimates, not a full run. Latencies are from a burst of 24 concurrent calls and vary with provider load. Time for the whole graph with the gate on (about 21,000 calls): about 2 hours for `gemma-4-31b` and `ministral-14b-2512` hosted at concurrency 24, about 18 hours for `deepseek-v4-flash` (it reasons for about 18 s per call; concurrency 6), and an estimated 2 to 3 hours for `gemma-4-31b` or `mistral-small-3.2-24b` on a Colab L4 with vLLM (not measured). A run is resumable: successful answers are cached and failed items are asked again next time.
 
 ## Weighting and the base rate
 
