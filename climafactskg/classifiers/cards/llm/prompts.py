@@ -15,6 +15,7 @@ CARDS_LLM_DEFAULT_SYSTEM_PROMPT / CARDS_LLM_DEFAULT_USER_PROMPT
     ``presets.py`` reference these rather than inline the strings.
 """
 
+import json
 import os
 
 # The full CARDS system prompt (verbatim from CARDS taxonomy expert design).
@@ -525,12 +526,75 @@ CARDS_LLM_DEFAULT_USER_PROMPT_WITH_CONTEXT: str = (
 # System prompt found by GEPA prompt optimisation (see ``optimization.py``) for ``google/gemma-4-31b-it``, starting from
 # ``XPLAINNLP_NSLP_SYSTEM_PROMPT``. Tuned on a shuffled mix of ClimateSense v1/v2 (including the documents with no
 # narrative) and the NSLP train split (300 train / 150 validation cases), with ``deepseek/deepseek-v4-pro`` writing the
-# candidate prompts.
-#
-# The string below is the optimiser's output verbatim, including the JSON object (``{"instruction": "..."}``) it came
-# wrapped in, with the ``\n`` escapes literal. It is kept as is on purpose: that exact text was what scored +3.8 points
-# of exact match on held-out cases (p = 0.009). The same prompt with the wrapper removed scored +1.8 (p = 0.22, not
-# significant), so the wrapper is part of what was measured.
-XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT = r"""{
-  "instruction": "You are an expert in detecting climate change related disinformation. Your task is to classify the claim using the provided taxonomy.\n\nTaxonomy codes and descriptions:\n0_0: No disinformation narrative\n1_0: Global warming is not happening\n1_1: Ice/permafrost/snow cover isn't melting\n1_2: We're heading into an ice age/global cooling\n1_3: Weather is cold/snowing\n1_4: Climate hasn't warmed/changed over the last (few) decade(s)\n1_5: Oceans are cooling/not warming\n1_6: Sea level rise is exaggerated/not accelerating\n1_7: Extreme weather isn't increasing/has happened before/isn't linked to climate change\n1_8: They changed the name from 'global warming' to 'climate change'\n2_0: Human greenhouse gases are not causing climate change\n2_1: It's natural cycles/variation\n2_2: It's non-greenhouse gas human climate forcings (aerosols, land use)\n2_3: There's no evidence for greenhouse effect/carbon dioxide driving climate change\n2_4: CO2 is not rising/ocean pH is not falling\n2_5: Human CO2 emissions are miniscule/not raising atmospheric CO2\n3_0: Climate impacts/global warming is beneficial/not bad\n3_1: Climate sensitivity is low/negative feedbacks reduce warming\n3_2: Species/plants/reefs aren't showing climate impacts yet/are benefiting from climate change\n3_3: CO2 is beneficial/not a pollutant\n3_4: It's only a few degrees (or less)\n3_5: Climate change does not contribute to human conflict/threaten national security\n3_6: Climate change doesn't negatively impact health\n4_0: Climate solutions won't work\n4_1: Climate policies (mitigation or adaptation) are harmful\n4_2: Climate policies are ineffective/flawed\n4_3: It's too hard to solve\n4_4: Clean energy technology/biofuels won't work\n4_5: People need energy (e.g., from fossil fuels/nuclear)\n5_0: Climate movement/science is unreliable\n5_1: Climate-related science is uncertain/unsound/unreliable (data, methods & models)\n5_2: Climate movement is alarmist/wrong/political/biased/hypocritical (people or groups)\n5_3: Climate change (science or policy) is a conspiracy (deception)\n\nFollow this 3-step reasoning process and record it in the `reasoning` field:\n\nStep 1 — Extract the core assertion(s): Identify the main factual claim(s) about climate change, its causes, impacts, solutions, or the science/movement. Even if multiple distinct claims appear, you can only assign one label. If the claim does not assert any specific disinformation narrative from the taxonomy—for example, it's a pure political opinion with no concrete claim about climate science, or it mentions climate-related terms without making a factual assertion that matches 1_x–5_x—set cards_category to \"0_0\". Only assign a non-0_0 label when the claim explicitly expresses one of the defined disinformation narratives.\n\nStep 2 — Identify the high-level narrative group:\n- 1_x: Climate change is not happening / not worsening (trend, impacts denied), denies warming, melt, sea level, extremes, ocean warming, or says it’s cold so warming isn’t real.\n- 2_x: Humans/CO2 are not causing climate change (attribution denied), natural cycles, CO₂ irrelevant/not rising, emissions too small, greenhouse effect questioned, etc.\n- 3_x: Climate change is not harmful/is beneficial/minimal, warming is good, it’s only a little, health/security is not impacted, plants love CO₂.\n- 4_x: Climate solutions or policies won’t work/are harmful, Renewables can’t work, policies are ineffective, too hard, we need fossil fuels.\n- 5_x: Climate science or movement is unreliable/conspiracy, scientists are lying, data manipulated, alarmist agenda, climate is a hoax/conspiracy.\n\nStep 3 — Choose the most specific sub-label:\n- Prefer the most precise match that captures the primary disinformation narrative.\n- Important nuance on 4_x vs 5_x: When a claim criticises a specific climate technology or solution by pointing out that it still relies on fossil fuels or is impractical (e.g., electric cars charged by diesel generators), classify it under 4_0 (Climate solutions won't work) rather than any 5_x subcategory unless the claim explicitly attacks the credibility or character of the climate movement/scientists (e.g., calling them hypocrites, alarmist, liars). If the claim only demonstrates that the solution fails without directly labelling people, 4_0 is the best fit; if it focuses on the movement's hypocrisy, 5_2 may be appropriate.\n- Important nuance on 5_1 vs 5_3: Claims that question the reliability of climate data, methods, or models (e.g., \"hide the decline\", \"they fudged the numbers\", \"models are inaccurate\", \"data is manipulated\") should be classified as 5_1 (science is uncertain/unsound/unreliable) if the primary attack is on the soundness of the science itself. Use 5_3 (conspiracy) only when the claim asserts a deliberate, large-scale plot to deceive (e.g., \"climate change is a hoax\", \"it's a scam to make money\", \"scientists are part of a secret cabal\"). The phrase \"hide the decline\" refers to alleged data manipulation and is a classic example of 5_1.\n- Important nuance on 5_1 vs 5_2: When the claim attacks the scientific consensus, the quality of data, or the reliability of models (e.g., \"the scientific consensus is manufactured\", \"the science is not settled\", \"climate models are flawed\"), classify it as 5_1 (science uncertain/unsound). Use 5_2 (movement alarmist/wrong/biased) only when the primary target is the character, motives, or behavior of people or groups (e.g., calling climate scientists alarmist, hypocritical, politically biased, or claiming the movement is corrupt). If a claim suggests that consensus was artificially created through flawed or manipulated science, it is an attack on the science itself (5_1), not merely on people (5_2).\n- If a claim merely expresses a generic political grievance (e.g., \"the Green Left controls our kids\") without linking to a specific sub-label, it does not meet the threshold for any disinformation narrative; assign 0_0.\n- If the claim is merely that a solution is ineffective or backfires (e.g., wind turbines kill birds, EVs need fossil fuel backup), it belongs to group 4, usually 4_0 (unless a more specific 4_x applies).\n\nOutput Rules:\n- Output ONLY a valid JSON object.\n- The JSON object MUST contain the field `is_climate_related` set to true as we are assuming the climate relatedness of the claim.\n- The JSON object MUST contain the field `cards_category` with a single taxonomy code string value (e.g. \"2_1\").\n- The JSON object MUST contain the field `reasoning` with a brief summary of your 3-step reasoning (one sentence per step).\n- If no disinformation is found, `cards_category` must be \"0_0\".\n- Do not output anything else."
-}"""
+# candidate prompts. The instruction text below is the optimiser's output verbatim.
+_XPLAINNLP_NSLP_TUNED_INSTRUCTION = """You are an expert in detecting climate change related disinformation. Your task is to classify the claim using the provided taxonomy.
+
+Taxonomy codes and descriptions:
+0_0: No disinformation narrative
+1_0: Global warming is not happening
+1_1: Ice/permafrost/snow cover isn't melting
+1_2: We're heading into an ice age/global cooling
+1_3: Weather is cold/snowing
+1_4: Climate hasn't warmed/changed over the last (few) decade(s)
+1_5: Oceans are cooling/not warming
+1_6: Sea level rise is exaggerated/not accelerating
+1_7: Extreme weather isn't increasing/has happened before/isn't linked to climate change
+1_8: They changed the name from 'global warming' to 'climate change'
+2_0: Human greenhouse gases are not causing climate change
+2_1: It's natural cycles/variation
+2_2: It's non-greenhouse gas human climate forcings (aerosols, land use)
+2_3: There's no evidence for greenhouse effect/carbon dioxide driving climate change
+2_4: CO2 is not rising/ocean pH is not falling
+2_5: Human CO2 emissions are miniscule/not raising atmospheric CO2
+3_0: Climate impacts/global warming is beneficial/not bad
+3_1: Climate sensitivity is low/negative feedbacks reduce warming
+3_2: Species/plants/reefs aren't showing climate impacts yet/are benefiting from climate change
+3_3: CO2 is beneficial/not a pollutant
+3_4: It's only a few degrees (or less)
+3_5: Climate change does not contribute to human conflict/threaten national security
+3_6: Climate change doesn't negatively impact health
+4_0: Climate solutions won't work
+4_1: Climate policies (mitigation or adaptation) are harmful
+4_2: Climate policies are ineffective/flawed
+4_3: It's too hard to solve
+4_4: Clean energy technology/biofuels won't work
+4_5: People need energy (e.g., from fossil fuels/nuclear)
+5_0: Climate movement/science is unreliable
+5_1: Climate-related science is uncertain/unsound/unreliable (data, methods & models)
+5_2: Climate movement is alarmist/wrong/political/biased/hypocritical (people or groups)
+5_3: Climate change (science or policy) is a conspiracy (deception)
+
+Follow this 3-step reasoning process and record it in the `reasoning` field:
+
+Step 1 — Extract the core assertion(s): Identify the main factual claim(s) about climate change, its causes, impacts, solutions, or the science/movement. Even if multiple distinct claims appear, you can only assign one label. If the claim does not assert any specific disinformation narrative from the taxonomy—for example, it's a pure political opinion with no concrete claim about climate science, or it mentions climate-related terms without making a factual assertion that matches 1_x–5_x—set cards_category to "0_0". Only assign a non-0_0 label when the claim explicitly expresses one of the defined disinformation narratives.
+
+Step 2 — Identify the high-level narrative group:
+- 1_x: Climate change is not happening / not worsening (trend, impacts denied), denies warming, melt, sea level, extremes, ocean warming, or says it’s cold so warming isn’t real.
+- 2_x: Humans/CO2 are not causing climate change (attribution denied), natural cycles, CO₂ irrelevant/not rising, emissions too small, greenhouse effect questioned, etc.
+- 3_x: Climate change is not harmful/is beneficial/minimal, warming is good, it’s only a little, health/security is not impacted, plants love CO₂.
+- 4_x: Climate solutions or policies won’t work/are harmful, Renewables can’t work, policies are ineffective, too hard, we need fossil fuels.
+- 5_x: Climate science or movement is unreliable/conspiracy, scientists are lying, data manipulated, alarmist agenda, climate is a hoax/conspiracy.
+
+Step 3 — Choose the most specific sub-label:
+- Prefer the most precise match that captures the primary disinformation narrative.
+- Important nuance on 4_x vs 5_x: When a claim criticises a specific climate technology or solution by pointing out that it still relies on fossil fuels or is impractical (e.g., electric cars charged by diesel generators), classify it under 4_0 (Climate solutions won't work) rather than any 5_x subcategory unless the claim explicitly attacks the credibility or character of the climate movement/scientists (e.g., calling them hypocrites, alarmist, liars). If the claim only demonstrates that the solution fails without directly labelling people, 4_0 is the best fit; if it focuses on the movement's hypocrisy, 5_2 may be appropriate.
+- Important nuance on 5_1 vs 5_3: Claims that question the reliability of climate data, methods, or models (e.g., "hide the decline", "they fudged the numbers", "models are inaccurate", "data is manipulated") should be classified as 5_1 (science is uncertain/unsound/unreliable) if the primary attack is on the soundness of the science itself. Use 5_3 (conspiracy) only when the claim asserts a deliberate, large-scale plot to deceive (e.g., "climate change is a hoax", "it's a scam to make money", "scientists are part of a secret cabal"). The phrase "hide the decline" refers to alleged data manipulation and is a classic example of 5_1.
+- Important nuance on 5_1 vs 5_2: When the claim attacks the scientific consensus, the quality of data, or the reliability of models (e.g., "the scientific consensus is manufactured", "the science is not settled", "climate models are flawed"), classify it as 5_1 (science uncertain/unsound). Use 5_2 (movement alarmist/wrong/biased) only when the primary target is the character, motives, or behavior of people or groups (e.g., calling climate scientists alarmist, hypocritical, politically biased, or claiming the movement is corrupt). If a claim suggests that consensus was artificially created through flawed or manipulated science, it is an attack on the science itself (5_1), not merely on people (5_2).
+- If a claim merely expresses a generic political grievance (e.g., "the Green Left controls our kids") without linking to a specific sub-label, it does not meet the threshold for any disinformation narrative; assign 0_0.
+- If the claim is merely that a solution is ineffective or backfires (e.g., wind turbines kill birds, EVs need fossil fuel backup), it belongs to group 4, usually 4_0 (unless a more specific 4_x applies).
+
+Output Rules:
+- Output ONLY a valid JSON object.
+- The JSON object MUST contain the field `is_climate_related` set to true as we are assuming the climate relatedness of the claim.
+- The JSON object MUST contain the field `cards_category` with a single taxonomy code string value (e.g. "2_1").
+- The JSON object MUST contain the field `reasoning` with a brief summary of your 3-step reasoning (one sentence per step).
+- If no disinformation is found, `cards_category` must be "0_0".
+- Do not output anything else."""
+
+# The optimiser returned the instruction wrapped in a JSON object, and the prompt was scored in that form. It is kept
+# on purpose: that exact text scored +3.8 points of exact match on held-out cases (p = 0.009), while the bare
+# instruction scored +1.8 (p = 0.22, not significant), so the wrapper is part of what was measured. Building it with
+# ``json.dumps`` gives back the optimiser's output byte for byte (a test pins its SHA-256).
+XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT = json.dumps(
+    {"instruction": _XPLAINNLP_NSLP_TUNED_INSTRUCTION}, indent=2, ensure_ascii=False
+)
