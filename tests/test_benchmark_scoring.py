@@ -171,3 +171,20 @@ def test_exact_category_equals_exact_match_without_not_climate_gold():
     row = _row(["1_1", "2_2"], [["1_1"], ["1_1"]])
 
     assert row["n_category"] == 2 and row["exact_category"] == row["exact_match"] == 0.5
+
+
+def test_category_accuracy_is_reported_separately_from_narrative_detection():
+    # Two category cases are detected (one right, one wrong), one is missed (the model says "0"), one has no category.
+    row = benchmark_configs(
+        {"x": _Fixed(["1_1", "2_2", "0", "1_1"])}, {"d": _dataset([["1_1"], ["1_1"], ["1_1"], ["0_0"]])}
+    ).iloc[0]
+
+    assert row["n_detected"] == 2 and row["exact_detected"] == 0.5  # pure CARDS classification, given a detection
+    assert abs(row["exact_category"] - 1 / 3) < 1e-3  # the combined score also pays for the missed narrative
+    assert "exact_detected_lo" in row.index and row["exact_detected_lo"] <= 0.5 <= row["exact_detected_hi"]
+
+
+def test_without_any_detection_the_category_score_is_empty_not_zero():
+    row = _row(["0", "0_0"], [["1_1"], ["2_1"]])
+
+    assert row["n_detected"] == 0 and np.isnan(row["exact_detected"])

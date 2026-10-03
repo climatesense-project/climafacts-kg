@@ -742,3 +742,69 @@ class TestSameShapeEverywhere:
 
         d2_plot = _sub(_benchmark(html, "d2"), "Size and result")
         assert ">300B<" in d2_plot  # d2 has only A and B (8B and 70B) yet shows the axis of the whole report
+
+
+def _separated_run():
+    """Benchmarks d1 and d2 with both scores: category accuracy when detected, and narrative detection F1."""
+    run = _two_benchmarks_run()
+    scores = {  # (category when detected, detection F1)
+        ("A", "d1"): (0.50, 0.80),
+        ("B", "d1"): (0.70, 0.60),
+        ("C", "d1"): (0.30, 0.90),
+        ("A", "d2"): (0.40, 0.70),
+        ("B", "d2"): (0.65, 0.55),
+    }
+    for (config, dataset), (cat, f1) in scores.items():
+        mask = (run.summary["config"] == config) & (run.summary["dataset"] == dataset)
+        run.summary.loc[mask, "exact_detected"] = cat
+        run.summary.loc[mask, "exact_detected_lo"] = cat - 0.1
+        run.summary.loc[mask, "exact_detected_hi"] = cat + 0.1
+        run.summary.loc[mask, "n_detected"] = 40
+        run.summary.loc[mask, "rel_f1"] = f1
+        run.summary.loc[mask, "rel_precision"] = f1
+        run.summary.loc[mask, "rel_recall"] = f1
+        run.summary.loc[mask, "rel_fpr"] = 0.1
+        run.summary.loc[mask, "n_not_climate"] = 20
+    run.meta = {
+        **run.meta,
+        "configs": [
+            {"label": "A", "size_b": 8.0, "active_b": None},
+            {"label": "B", "size_b": 70.0, "active_b": None},
+            {"label": "C", "size_b": 30.0, "active_b": None},
+        ],
+    }
+    return run
+
+
+class TestRelatednessAndCategorySeparated:
+    def _html(self, tmp_path):
+        return render_html([_separated_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+    def test_the_overview_has_one_matrix_for_the_category_and_one_for_detection(self, tmp_path):
+        html = self._html(tmp_path)
+        overview = html[html.index("<h2>Overview</h2>") : html.index('<section class="benchmark">')]
+        category, detection = overview.split("Narrative detection", 1)
+
+        assert "category" in category.lower() and "<b>0.700</b>" in category and "<b>0.650</b>" in category
+        assert "<b>0.900</b>" in detection and "0.550" in detection  # F1 matrix, best bold per benchmark
+
+    def test_the_comparison_table_has_a_separate_column_for_the_category_when_detected(self, tmp_path):
+        html = self._html(tmp_path)
+        table = _sub(_benchmark(html, "d1"), "Comparison")
+
+        assert "Category when detected" in table and "0.700" in table
+
+    def test_the_size_section_plots_the_two_questions_separately(self, tmp_path):
+        html = self._html(tmp_path)
+        size = _sub(_benchmark(html, "d1"), "Size and result")
+        labels = re.findall(r'aria-label="([^"]*)"', size)
+
+        assert any("category" in label.lower() for label in labels)
+        assert any("detection" in label.lower() for label in labels)
+        assert len(labels) == 2
+
+    def test_the_charts_include_both_scores(self, tmp_path):
+        html = self._html(tmp_path)
+        charts = _sub(_benchmark(html, "d1"), "Charts")
+
+        assert "Category when detected" in charts and "Narrative detection F1" in charts
