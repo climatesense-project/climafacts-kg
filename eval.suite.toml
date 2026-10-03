@@ -154,11 +154,10 @@ output_mode = "prompted"
 ignore = ["SambaNova"]
 
 # ---- added: more Qwen, Mistral and other open-weight models -------------------------------------------------------
-# Qwen. 3.8-27b is the small open-weight 3.8; the free tier costs nothing but is rate limited, so it runs slowly.
+# Qwen. 3.8-27b is the small open-weight 3.8 (the :free tier is rate limited and far too slow for the suite).
 [[classifiers]]
 label = "qwen3.8-27b"
-model = "qwen/qwen3.8-27b:free"
-concurrency = 4
+model = "qwen/qwen3.8-27b"
 [classifiers.options]
 max_tokens = 8000
 
