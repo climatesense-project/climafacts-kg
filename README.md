@@ -357,22 +357,7 @@ class MyCARDSLLMConfig(CARDSLLMConfig):
 
 ### 📏 Evaluation and benchmarking
 
-The `eval` extra adds a pipeline that scores the classifiers against annotated ground truth (the ClimateCheck NSLP data and the ClimateSense annotation rounds `climatesense_v1` / `climatesense_v2`) and writes a self-contained HTML report. Everything that is benchmarked lives in one TOML file; see [eval.example.toml](eval.example.toml), and [eval.suite.toml](eval.suite.toml) for the standard 32-classifier suite.
-
-```bash
-climafactskg eval run eval.toml --dry-run   # planned, already cached and new paid calls; nothing is spent
-climafactskg eval run eval.toml --report    # run, save under data/eval_runs/, and write report.html there
-climafactskg eval report data/eval_runs/<run> [<run> ...] --out report.html   # re-render saved runs
-climafactskg eval context v2                # build the opt-in review-context sidecar (v1 or v2)
-```
-
-In short:
-- **Metrics:** exact match, hierarchical F1 and macro/weighted F1, with 95% bootstrap intervals. A failed prediction counts as wrong, and narrative detection (is there a denial narrative, code `0_0` or not) is scored apart from the category.
-- **Review context is opt-in** and by default each classifier runs both with and without it; the report pairs the two.
-- **Paid runs are guarded:** a run that calls a hosted LLM first prints how many calls are planned, cached and new, and asks for confirmation unless `--yes` is given. Answers are cached, so a rerun only asks for what is missing.
-- **Reports** are one HTML file with an overview, per-benchmark sections, charts, model-size plots and paired model comparisons.
-
-The full guide, with every option, the scoring rules and the report layout, is in [docs/evaluation.md](docs/evaluation.md). What the results show, with charts, is in [docs/model-selection.md](docs/model-selection.md).
+The optional `eval` extra scores the classifiers against annotated data and writes an HTML report (`climafactskg eval run eval.toml --report`). See [docs/evaluation.md](docs/evaluation.md) for how to use it and [docs/model-selection.md](docs/model-selection.md) for the results.
 
 ### 🧭 Which model to use
 
