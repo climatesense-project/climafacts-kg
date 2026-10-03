@@ -406,8 +406,20 @@ What the full results show:
 - **Open weights match closed models.** The best open model beats or ties the best closed one on every score, and `gpt-4o-mini` ranks 15th of 32 (exact category 0.548).
 - **Paying more does not help.** The models priced at $0.30 per million tokens or more reach about 0.61, below the cheapest group (about 0.65). Reasoning models cost more than their list price suggests, because they spend many more output tokens per claim.
 - **Size matters below about 10B.** Under 10B the scores fall clearly (`qwen3.5-9b` 0.506, `llama-3.1-8b` 0.377). Between 14B and 35B the differences are within noise.
+- **Mistral family.** `mistral-small-3.2-24b` (0.607) is effectively tied with `gemma-4-31b` and costs about the same hosted; it needs less memory (about 14 GB at 4-bit), so it suits 16 to 24 GB hardware, but its narrative detection is a little lower (F1 0.828 against 0.843). `ministral-14b-2512` (0.598) is the best small model. `mistral-small-2603` (0.497), `mistral-nemo` (0.431) and `mistral-large-2512` (0.422, with failed items) are not worth using.
 - **Review context does not help on v2.** It lowered exact match for 24 of 32 models, by 3.5 points on average, against gold labels that were annotated from the claim alone.
 - **Check the failure count.** A model that cannot follow the output format scores badly without the score saying why. In this run `ling-3.0-flash` answered "no narrative" for almost every claim and `mistral-large-2512` was rate-limited upstream (failed items count as wrong), so neither is a fair comparison. The report shows `n_failed` for every model.
+
+Classifying the whole graph (about 263,000 texts: 261,858 from ClimateSenseKG and 1,589 from Skeptical Science) with the gate on sends only the texts it passes to the model, about 8% or roughly 21,000 on the sample we checked. These are estimates, from a 24-claim timing test and prompt sizes, not a full run:
+
+| Setup | Cost | Time |
+| :---- | :--- | :--- |
+| `deepseek/deepseek-v4-flash` hosted, concurrency 6 | about $1.3 | about 18 hours (it reasons for about 18 s per call; a lower reasoning effort or a higher concurrency could cut this, neither was tested on the graph) |
+| `google/gemma-4-31b-it` hosted, concurrency 24 | about $3.4 | about 2 hours |
+| `gemma-4-31b` or `mistral-small-3.2-24b` on a Colab L4 with vLLM | Colab compute units | about 2 to 3 hours, not measured |
+| Any model with the gate off | about 12 times more | far too long for a reasoning model (about 9 days for deepseek-v4-flash) |
+
+A run is resumable: successful answers are cached and failed items are asked again next time. If you want to start now, `gemma-4-31b` hosted is the practical choice (best category accuracy under 120B, fast, no failures in the timing test); `deepseek-v4-flash` scores about 3 points higher and costs less, but is slow unless its reasoning effort is lowered. The ClimateSenseKG endpoint tags about 13,000 claims with `schema:mentions dbpedia:Climate_change`, which could pre-filter the query, but that silently drops every climate claim without that tag, and how many that is has not been measured, so the collector does not use it.
 
 Running it yourself (sizes and memory arithmetic, not measured on this hardware):
 
