@@ -24,6 +24,9 @@ OUT = Path(__file__).parent
 # Sizes (total, active, in billions) published after the saved run, which has none for these models.
 PUBLISHED_SIZES = {"glm-5.3-flash": (320.0, 18.0)}
 NO_NARRATIVE = {"0", "0_0"}
+# Weight of category accuracy in the balanced score; false alarms get the rest. Most documents in the benchmarks are
+# annotations of known misinformation, so missing a real narrative counts three times as much as a false alarm.
+WEIGHT = 0.75
 # Models left out of the charts: ling-3.0-flash answers "no narrative" for nearly every claim and mistral-large-2512
 # still had failed items (rate limits), so neither score is a fair measure of the model.
 EXCLUDED = {"ling-3.0-flash", "mistral-large-2512"}
@@ -60,7 +63,7 @@ def gold(value: str) -> set[str]:
 
 
 def scores(run: Path) -> dict[str, dict]:
-    """Pooled category accuracy, false-alarm rate and their equally weighted balanced score, with 95% intervals."""
+    """Pooled category accuracy, false-alarm rate and their weighted balanced score, with 95% intervals."""
     categories: dict[str, list[float]] = defaultdict(list)
     alarms: dict[str, list[float]] = defaultdict(list)
     with open(run / "cases.csv", encoding="utf-8", newline="") as handle:
@@ -77,13 +80,14 @@ def scores(run: Path) -> dict[str, dict]:
         cat, alarm = categories[config], alarms[config]
         rng = random.Random(3)
         boot = sorted(
-            (statistics.mean(rng.choices(cat, k=len(cat))) + 1 - statistics.mean(rng.choices(alarm, k=len(alarm)))) / 2
+            WEIGHT * statistics.mean(rng.choices(cat, k=len(cat)))
+            + (1 - WEIGHT) * (1 - statistics.mean(rng.choices(alarm, k=len(alarm))))
             for _ in range(1000)
         )
         out[config] = {
             "category_accuracy": statistics.mean(cat),
             "false_alarm_rate": statistics.mean(alarm),
-            "balanced": (statistics.mean(cat) + 1 - statistics.mean(alarm)) / 2,
+            "balanced": WEIGHT * statistics.mean(cat) + (1 - WEIGHT) * (1 - statistics.mean(alarm)),
             "balanced_lo": boot[25],
             "balanced_hi": boot[974],
             "n_narrative": len(cat),
@@ -294,7 +298,7 @@ def main(run: Path) -> None:
                 "Balanced score",
                 True,
                 [(v, f"${v:g}") for v in (0.0001, 0.0003, 0.001, 0.003)],
-                y_range=(0.6, 0.76),
+                y_range=(0.55, 0.7),
             )
         ),
         encoding="utf-8",

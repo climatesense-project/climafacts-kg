@@ -399,7 +399,7 @@ These recommendations come from the standard suite ([eval.suite.toml](eval.suite
 
 | You want | Use | Exact category | Narrative-detection F1 | Notes |
 | :------- | :-- | :------------- | :--------------------- | :---- |
-| Lowest cost among the top group | `z-ai/glm-5.3-flash` | 0.628 | 0.864 | Statistically tied with the best on a balanced score of category accuracy and false alarms; measured about $0.00009 per call, no failures; open weights under the MIT licence, but 320B total (18B active), so not for small hardware |
+| Lowest cost among the top group | `z-ai/glm-5.3-flash` | 0.628 | 0.864 | Statistically tied with the best on a balanced score (75% category accuracy, 25% false alarms); measured about $0.00009 per call, no failures; open weights under the MIT licence, but 320B total (18B active), so not for small hardware |
 | Fastest | `google/gemma-4-31b-it` | 0.614 | 0.843 | Measured about $0.0004 per call and about 5 s per call, no failures; `mistralai/ministral-14b-2512` (0.598) is about as fast at about $0.0001 per call |
 | Best category accuracy | `deepseek/deepseek-v4-flash` | 0.646 | 0.835 | Open weights (284B, 13B active), but a reasoning model: measured about $0.0017 per call (about 4 times gemma) and about 18 s per call, despite a catalog list price of $0.028 per million input tokens |
 | Best at spotting narratives | `nvidia/nemotron-3-super-120b-a12b` | 0.612 | 0.865 | First of all models on narrative detection, about five times the price of deepseek-v4-flash |

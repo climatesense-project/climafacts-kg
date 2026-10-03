@@ -12,11 +12,11 @@ This report records how 32 classifiers were compared for labelling claims with t
 
 | If you want | Take | Why |
 | :---------- | :--- | :-- |
-| Lowest cost among the top group | `glm-5.3-flash` | Balanced score 0.709 (top three), about $0.00009 per call, no failures. Open weights, MIT licence, 320B total and 18B active parameters (model card), so hosted only for most people. |
-| Highest balanced score | `qwen3.8-flash` | 0.719, but a closed API model at about $0.00033 per call |
+| Lowest cost among the top group | `glm-5.3-flash` | Balanced score 0.645 (third), about $0.00009 per call, no failures. Open weights, MIT licence, 320B total and 18B active parameters (model card), so hosted only for most people. |
+| Highest balanced score | `qwen3.8-flash` | 0.654 (tied with `deepseek-v4-flash`), about $0.00033 per call; open weights not confirmed |
 | Highest category accuracy | `deepseek-v4-flash` | 0.604 on documents with a narrative, but the most false alarms of the finalists (19.9%) and about $0.0017 per call |
 | Fastest | `gemma-4-31b` or `ministral-14b-2512` | About 5 s per call; gemma has 19% false alarms, ministral 17% |
-| Smallest that still holds up | `ministral-14b-2512` | 14B, balanced 0.687, fits a 16 GB GPU or Mac at 4-bit |
+| Smallest that still holds up | `ministral-14b-2512` | 14B, balanced 0.616, fits a 16 GB GPU or Mac at 4-bit |
 
 These are tie-breaks, not wins: pick by the column that matters to you.
 
@@ -31,26 +31,26 @@ These are tie-breaks, not wins: pick by the column that matters to you.
 1. *Is there a narrative at all?* Measured on the documents with no narrative as the **false-alarm rate**: the share given a category.
 2. *Which category, when there is one?* Measured as **category accuracy** on the documents that carry a category: the answer is an accepted gold label. A missed narrative counts as wrong here.
 
-The **balanced score** used for ranking is the mean of category accuracy and (1 − false-alarm rate), pooled over all 847 documents, with a bootstrap 95% interval. The equal weighting is a choice made for this report, not a standard. Plain exact match over all documents is a poor ranking here, because 59% of documents have no narrative, so a model that says "no narrative" often looks good (`gpt-oss-20b` tops it while scoring 0.39 category accuracy). The full benchmark tables (exact match, hierarchical F1, narrative-detection precision and recall, per-benchmark results) are in the HTML report that `climafactskg eval report` writes.
+The **balanced score** used for ranking is `0.75 × category accuracy + 0.25 × (1 − false-alarm rate)`, pooled over all 847 documents, with a bootstrap 95% interval. The weights are a judgement: the texts to be labelled are mostly claims already known to be misinformation, so a missed narrative is treated as three times as costly as a false alarm. [Weighting and the base rate](#weighting-and-the-base-rate) shows how the ranking moves with other weights. Plain exact match over all documents is a poor ranking here, because 59% of documents have no narrative, so a model that says "no narrative" often looks good (`gpt-oss-20b` tops it while scoring 0.39 category accuracy). The full benchmark tables (exact match, hierarchical F1, narrative-detection precision and recall, per-benchmark results) are in the HTML report that `climafactskg eval report` writes.
 
 ## Results
 
 ![Balanced score by model](model-selection/balanced_ranking.svg)
 
-The top ten models span 0.687 to 0.719, with intervals about ±0.03 wide, so their order is not established. The ranking then falls steadily below about 0.68, and the free baselines (`transformer`, `matcher`) are at 0.50.
+The top ten models span 0.616 to 0.654, with intervals about ±0.04 wide, so their order is not established. The ranking then falls steadily, and the free baselines (`transformer`, `matcher`) are at 0.27 and 0.27.
 
 | Model | Balanced | Category accuracy | False alarms | Failed items |
 | :---- | :------- | :---------------- | :----------- | :----------- |
-| qwen3.8-flash | 0.719 | 0.589 | 15.1% | 0 |
-| deepseek-v4-pro | 0.710 | 0.567 | 14.7% | 0 |
-| glm-5.3-flash | 0.709 | 0.582 | 16.5% | 0 |
-| deepseek-v4-flash | 0.703 | 0.604 | 19.9% | 0 |
-| glm-4.7-flash | 0.701 | 0.503 | 10.1% | 0 |
-| qwen3.6-35b | 0.700 | 0.538 | 13.7% | 0 |
-| nemotron-3-super-120b | 0.700 | 0.560 | 16.1% | 0 |
-| minimax-m2.7 | 0.698 | 0.538 | 14.1% | 0 |
-| ministral-14b-2512 | 0.687 | 0.544 | 17.1% | 0 |
-| gemma-4-31b | 0.683 | 0.557 | 19.1% | 0 |
+| qwen3.8-flash | 0.654 | 0.589 | 15.1% | 0 |
+| deepseek-v4-flash | 0.654 | 0.604 | 19.9% | 0 |
+| glm-5.3-flash | 0.645 | 0.582 | 16.5% | 0 |
+| deepseek-v4-pro | 0.638 | 0.567 | 14.7% | 0 |
+| nemotron-3-super-120b | 0.630 | 0.560 | 16.1% | 0 |
+| gemma-4-31b | 0.620 | 0.557 | 19.1% | 0 |
+| qwen3.6-35b | 0.619 | 0.538 | 13.7% | 0 |
+| mistral-small-3.2-24b | 0.619 | 0.570 | 23.5% | 1 |
+| minimax-m2.7 | 0.618 | 0.538 | 14.1% | 0 |
+| ministral-14b-2512 | 0.616 | 0.544 | 17.1% | 0 |
 
 ### The trade-off
 
@@ -85,15 +85,15 @@ The graph totals multiply the per-call cost by the number of calls and are estim
 
 59% of the benchmark documents carry no narrative, so a model that answers "no narrative" by default would look good on plain exact match. The balanced score avoids that on purpose: category accuracy is measured only on documents that have a category and the false-alarm rate only on those that do not, so each class counts equally whatever its share of the data. Models that lean on the default show up as low category accuracy, not as a high score. `gpt-oss-20b` says `0_0` for 70% of documents and flags only 73% of the real narratives (category accuracy 0.39); `glm-5.3-flash` says `0_0` for 54%, below the gold share of 59%, and flags 94% of the real narratives.
 
-The equal weighting is still a choice. Weighting category accuracy by `w` and (1 − false alarms) by `1 − w`:
+The weighting is still a choice. Weighting category accuracy by `w` and (1 − false alarms) by `1 − w`:
 
 | Weight on category accuracy | Top of the ranking |
 | :-------------------------- | :----------------- |
 | 0.3 (false alarms matter more) | gpt-oss-20b 0.790, glm-4.7-flash 0.780, qwen3.8-flash 0.771, mistral-small-2603 0.767, deepseek-v4-pro 0.767 |
-| 0.5 (used above) | qwen3.8-flash 0.719, deepseek-v4-pro 0.710, glm-5.3-flash 0.709, deepseek-v4-flash 0.703, glm-4.7-flash 0.701 |
-| 0.7 (missed narratives matter more) | qwen3.8-flash 0.667, deepseek-v4-flash 0.663, glm-5.3-flash 0.658, deepseek-v4-pro 0.652, nemotron-3-super-120b 0.644 |
+| 0.5 (equal) | qwen3.8-flash 0.719, deepseek-v4-pro 0.710, glm-5.3-flash 0.709, deepseek-v4-flash 0.703, glm-4.7-flash 0.701 |
+| 0.75 (used above) | qwen3.8-flash 0.654, deepseek-v4-flash 0.654, glm-5.3-flash 0.645, deepseek-v4-pro 0.638, nemotron-3-super-120b 0.630 |
 
-`qwen3.8-flash` and `glm-5.3-flash` stay near the top under every weighting. The conservative models (`gpt-oss-20b`, `glm-4.7-flash`) lead only when false alarms dominate, and `deepseek-v4-flash` rises as category accuracy gains weight. The right weight depends on how many of the texts you classify carry a narrative, and on how costly a wrong link is compared with a missed one. The graph's own share is not known; measuring it on a labelled sample of gate-passed texts would settle the weighting.
+`qwen3.8-flash` stays at or near the top under every weighting and `glm-5.3-flash` in the top four at 0.5 and 0.75 (it is not in the top five at 0.3). The conservative models (`gpt-oss-20b`, `glm-4.7-flash`) lead only when false alarms dominate, and `deepseek-v4-flash` rises as category accuracy gains weight. The right weight depends on how many of the texts you classify carry a narrative, and on how costly a wrong link is compared with a missed one. The 0.75 used here is a judgement that most texts are known misinformation; the graph's own share is not known, and measuring it on a labelled sample of gate-passed texts would settle the weighting.
 
 ## The ClimateBERT gate
 
@@ -103,7 +103,7 @@ The LLM classifier can skip texts that a small local model (`climatebert/distilr
 - lowered recall by 3.5 points for every model, because it drops about 3% of the claims that do carry a narrative (5 of 153);
 - left narrative-detection F1 within noise and lowered exact category by 2 to 2.6 points.
 
-On v2 and NSLP it removes nothing: all their no-narrative documents (258) are climate-related, and so are 52 of v1's 245, so these hard negatives stay behind the gate and keep producing false alarms. Simulating the gate on every model (its answer depends only on the text; gated documents become `0_0`) lowers false alarms only a little (`deepseek-v4-flash` 19.9% to 18.3%, `gemma-4-31b` 19.1% to 16.9%, `qwen3.8-flash` 15.1% to 14.1%) and leaves the ranking essentially unchanged (`qwen3.8-flash` 0.719, `glm-5.3-flash` 0.713, `deepseek-v4-pro` 0.712, `deepseek-v4-flash` 0.706); [model-selection/gate_and_weights.py](model-selection/gate_and_weights.py) reproduces it. Its value is cost on the full graph; whether the 3.5-point recall loss is acceptable is a decision, not a finding. (An earlier version of the classifier compared against the wrong label and the gate never filtered anything; that is fixed.)
+On v2 and NSLP it removes nothing: all their no-narrative documents (258) are climate-related, and so are 52 of v1's 245, so these hard negatives stay behind the gate and keep producing false alarms. Simulating the gate on every model (its answer depends only on the text; gated documents become `0_0`) lowers false alarms only a little (`deepseek-v4-flash` 19.9% to 18.3%, `gemma-4-31b` 19.1% to 16.9%, `qwen3.8-flash` 15.1% to 14.1%) and leaves the order of the top group essentially unchanged (at the 0.75 weighting `deepseek-v4-flash` 0.650, `qwen3.8-flash` 0.649, `glm-5.3-flash` 0.643, `deepseek-v4-pro` 0.634); [model-selection/gate_and_weights.py](model-selection/gate_and_weights.py) reproduces it. Its value is cost on the full graph; whether the 3.5-point recall loss is acceptable is a decision, not a finding. (An earlier version of the classifier compared against the wrong label and the gate never filtered anything; that is fixed.)
 
 ## Prompts and prompt optimisation
 

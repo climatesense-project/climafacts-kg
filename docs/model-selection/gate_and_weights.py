@@ -66,7 +66,7 @@ def main(run: Path) -> None:
     for label, applied in (("gate off", None), ("gate on (simulated)", gate)):
         print(f"\n{label}")
         results = {config: metrics(rows, config, applied) for config in configs}
-        for weight in (0.3, 0.5, 0.7):
+        for weight in (0.3, 0.5, 0.75):
             ranked = sorted(results, key=lambda c: -(weight * results[c][0] + (1 - weight) * (1 - results[c][1])))
             top = ", ".join(
                 f"{c} {weight * results[c][0] + (1 - weight) * (1 - results[c][1]):.3f}" for c in ranked[:6]
