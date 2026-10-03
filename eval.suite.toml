@@ -42,6 +42,8 @@ engine = "matcher"
 [[classifiers]]
 label = "deepseek-v4-flash"
 model = "deepseek/deepseek-v4-flash"
+size_b = 284
+active_b = 13  # 284B total, 13B active, per the OpenRouter model card
 concurrency = 6
 
 [[classifiers]]
@@ -107,6 +109,7 @@ max_tokens = 8000
 [[classifiers]]
 label = "glm-4.7-flash"                  # thinks until the default token limit otherwise
 model = "z-ai/glm-4.7-flash"
+size_b = 30  # "30B-class" per the OpenRouter model card
 [classifiers.options]
 max_tokens = 8000
 
@@ -122,6 +125,8 @@ output_mode = "prompted"
 [[classifiers]]
 label = "deepseek-v4-pro"
 model = "deepseek/deepseek-v4-pro"
+size_b = 1600
+active_b = 49  # 1.6T total, 49B active, per the OpenRouter model card
 [classifiers.options]
 max_tokens = 8000
 
@@ -196,6 +201,8 @@ max_tokens = 1500
 [[classifiers]]
 label = "mistral-large-2512"
 model = "mistralai/mistral-large-2512"
+size_b = 675
+active_b = 41  # 675B total, 41B active, per the OpenRouter model card
 concurrency = 2  # upstream 429s at higher rates
 [classifiers.options]
 max_tokens = 1500
@@ -238,6 +245,8 @@ max_tokens = 8000
 [[classifiers]]
 label = "mimo-v2.6-flash"
 model = "xiaomi/mimo-v2.6-flash"
+size_b = 309
+active_b = 15  # 309B total, 15B active, per the OpenRouter model card
 [classifiers.options]
 max_tokens = 8000
 
