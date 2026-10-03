@@ -157,6 +157,8 @@ ClimaFactsKG has a simple CLI interface accessible via the `climafactskg` comman
 
 `collect` and `process` run their steps independently: a failed step is logged and the others still run, but the command then exits 1, so scripts notice. Page and SPARQL requests time out (`CLIMAFACTSKG_FETCH_TIMEOUT`, 30 s; `CLIMAFACTSKG_SPARQL_TIMEOUT`, 300 s), and an error response is never cached or parsed. `process` classifies with the local transformer engine by default (`--classifier transformer`, requires the `transformer` extra — see Installation above); pass `--classifier llm` to use the LLM-based path instead (core install, see provider table below). `build` merges SkepticalScience, CimpleKG, and ClimateSenseKG data plus the CARDS taxonomy into one `data/climafacts_kg.ttl`.
 
+`process --classifier llm` runs the `xplainnlp-nslp` preset as defined (a local LM Studio model, ClimateBERT gate off) unless told otherwise: `--preset`, `--provider` and `--model` choose another preset, provider and model, and `--preclassifier` / `--no-preclassifier` turn the gate on or off (all four need `--classifier llm`; without them nothing changes). The provenance tag stored with each classified entry then names the provider and model, for example `xplainnlp-nslp|openrouter/google/gemma-4-31b-it`. Example: `climafactskg process --classifier llm --provider openrouter --model google/gemma-4-31b-it --preclassifier --concurrency 24`.
+
 `process --cache-path` (default: `data/cards_classification_cache.db`) is a Preserve SQLite cache shared across all sources below it in the pipeline (CimpleKG, ClimateSenseKG, SkepticalScience arguments), so identical claim/argument text is classified once instead of once per source. Pass an empty string to disable caching.
 
 #### `classify` — CARDS taxonomy classification
@@ -301,7 +303,7 @@ clf = CARDSLLMClassifier.from_preset("climatesense-nslp", cache_path="/tmp/cards
 
 # List registered presets
 from climafactskg.classifiers.cards import registered_presets
-print(registered_presets())  # → ('climatesense-nslp', 'xplainnlp-nslp')
+print(registered_presets())  # → ('climatesense-nslp', 'xplainnlp-nslp', 'xplainnlp-nslp-tuned', 'cards-narrative')
 
 # Batch classification (concurrent LLM calls)
 labels = clf.classify_batch(["text one", "text two", "text three"], concurrency=4)
@@ -312,7 +314,9 @@ labels = clf.classify_batch(["text one", "text two", "text three"], concurrency=
 | Preset name | Provider | Model |
 | :---------- | :------- | :---- |
 | `climatesense-nslp` | `openrouter` | `openai/gpt-5.2` |
-| `xplainnlp-nslp` | `lmstudio` | `qwen/qwen3-8b` |
+| `xplainnlp-nslp` | `lmstudio` | `qwen/qwen3-8b-mlx` |
+| `xplainnlp-nslp-tuned` | `lmstudio` | `qwen/qwen3-8b-mlx` (experimental: `xplainnlp-nslp` with a GEPA-tuned system prompt, see the results under "Which model to use") |
+| `cards-narrative` | `CARDS_LLM_PROVIDER` (default `openai`) | `CARDS_LLM_MODEL` (default `gpt-4o-mini`); classifies the narrative a claim promotes, not its surface wording |
 
 Custom presets can be registered with the `@register_preset` decorator:
 
