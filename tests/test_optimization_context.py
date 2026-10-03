@@ -93,3 +93,63 @@ def test_heldout_is_exactly_what_train_and_val_leave_out(monkeypatch):
     left = [c.name for c in heldout.cases]
     assert not set(used) & set(left)
     assert sorted(used + left) == sorted([f"cs_v1-{i}" for i in range(10)] + [f"nslp-{i}" for i in range(10)])
+
+
+class _StubAgent:
+    """Answers "1_1" for every claim except one that raises, to exercise GEPA's per-case failure handling."""
+
+    def __init__(self, failing_claim):
+        self.failing_claim = failing_claim
+
+    def override(self, **_kwargs):
+        from contextlib import nullcontext
+
+        return nullcontext()
+
+    async def run(self, message, model_settings=None):
+        from types import SimpleNamespace
+
+        if self.failing_claim in message:
+            raise RuntimeError("provider error")
+        return SimpleNamespace(output=SimpleNamespace(is_climate_related=True, cards_category="1_1"))
+
+
+def _stub_classifier(failing_claim):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        _agent=_StubAgent(failing_claim),
+        _user_prompt="{text}",
+        _user_prompt_with_context="{text} {context}",
+        _model_settings=None,
+        _default_concurrency=2,
+    )
+
+
+def test_a_failed_call_stays_a_wrong_answer_in_its_own_slot():
+    from climafactskg.classifiers.cards.optimization import CARDSDataInst, CARDSEvalsAdapter
+
+    batch = [
+        CARDSDataInst(claim="claim a", expected=["1_1"]),
+        CARDSDataInst(claim="claim b", expected=["1_1"]),
+        CARDSDataInst(claim="claim c", expected=["1_1"]),
+    ]
+    adapter = CARDSEvalsAdapter(_stub_classifier("claim b"))
+
+    result = adapter.evaluate(batch, {"instructions": "prompt"}, capture_traces=True)
+
+    assert result.scores == [1.0, 0.0, 1.0]  # not [1.0, 1.0]: the failure keeps its slot
+    assert len(result.outputs) == 3
+    assert [t.claim for t in result.trajectories] == ["claim a", "claim b", "claim c"]
+
+
+def test_a_failed_call_is_not_fed_back_to_the_reflection_model_as_a_wrong_prediction():
+    from climafactskg.classifiers.cards.optimization import CARDSDataInst, CARDSEvalsAdapter
+
+    batch = [CARDSDataInst(claim="claim a", expected=["2_1"]), CARDSDataInst(claim="claim b", expected=["1_1"])]
+    adapter = CARDSEvalsAdapter(_stub_classifier("claim b"))
+    result = adapter.evaluate(batch, {"instructions": "prompt"}, capture_traces=True)
+
+    records = adapter.make_reflective_dataset({"instructions": "prompt"}, result, ["instructions"])["instructions"]
+
+    assert [r["Inputs"]["claim"] for r in records] == ["claim a"]  # a wrong answer; the failure is left out

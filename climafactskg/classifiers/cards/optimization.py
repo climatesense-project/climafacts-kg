@@ -52,6 +52,10 @@ _SELF_CONTAINED_REFLECTION_PROMPT_TEMPLATE = (
 logger = logging.getLogger(__name__)
 
 
+# Output recorded for a case whose model call raised; scored as wrong and kept out of the reflection feedback.
+_FAILED_CALL = "(call failed)"
+
+
 @dataclasses.dataclass
 class CARDSDataInst:
     """One evaluation example: a claim, its acceptable gold labels, and optional context."""
@@ -129,25 +133,36 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
         with self._agent.override(instructions=candidate["instructions"]):
             report = asyncio.run(temp_dataset.evaluate(task, max_concurrency=self._concurrency))
 
-        outputs = [str(c.output) for c in report.cases]
+        # pydantic-evals drops a case whose call raised from report.cases, so read results back by case name:
+        # a failed call must stay a wrong answer in its own slot, or every later score shifts onto the wrong claim.
+        done = {c.name: c for c in report.cases}
 
         def _blended_score(c: Any) -> float:
             exact = c.scores["CARDSOneOfMatch"].value if "CARDSOneOfMatch" in c.scores else 0.0
             hier = c.scores["CARDSHierarchicalMatch"].value if "CARDSHierarchicalMatch" in c.scores else 0.0
             return 0.5 * exact + 0.5 * hier
 
-        scores = [_blended_score(c) for c in report.cases]
+        outputs: list[str] = []
+        scores: list[float] = []
+        for i in range(len(batch)):
+            case = done.get(str(i))
+            outputs.append(str(case.output) if case is not None else _FAILED_CALL)
+            scores.append(_blended_score(case) if case is not None else 0.0)
+        if report.failures:
+            logger.warning(
+                "%d of %d GEPA evaluation calls failed and were scored as wrong.", len(report.failures), len(batch)
+            )
         trajectories = None
         if capture_traces:
             trajectories = [
                 CARDSTrajectory(
-                    claim=c.inputs[1],
-                    predicted=str(c.output),
-                    expected=c.expected_output if isinstance(c.expected_output, list) else [str(c.expected_output)],
-                    score=s,
-                    context=batch[c.inputs[0]].context,
+                    claim=item.claim,
+                    predicted=output,
+                    expected=item.expected,
+                    score=score,
+                    context=item.context,
                 )
-                for c, s in zip(report.cases, scores, strict=True)
+                for item, output, score in zip(batch, outputs, scores, strict=True)
             ]
         return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
 
@@ -159,7 +174,7 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
     ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
         records = []
         for traj in eval_batch.trajectories or []:
-            if traj.score < 1.0:
+            if traj.score < 1.0 and traj.predicted != _FAILED_CALL:
                 records.append(
                     {
                         "Inputs": {"claim": traj.claim},
