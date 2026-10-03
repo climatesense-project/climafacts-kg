@@ -397,7 +397,8 @@ These recommendations come from the standard suite ([eval.suite.toml](eval.suite
 | Best at spotting narratives | `nvidia/nemotron-3-super-120b-a12b` | 0.612 | 0.865 | First of all models on narrative detection, about five times the price of deepseek-v4-flash |
 | Best closed model | `qwen/qwen3.8-flash` | 0.637 | 0.859 | Needs `output_mode = "prompted"`, see the suite config |
 | Best small model (14B) | `mistralai/ministral-14b-2512` | 0.598 | 0.830 | Best model under 15B; fits a 16 GB GPU (T4) or a 16 GB Mac at 4-bit |
-| Best on a 32 GB Mac | `google/gemma-4-31b-it` | 0.614 | 0.843 | About 18 GB at 4-bit; `mistral-small-3.2-24b` (0.607) leaves more headroom |
+| Best under 120B | `google/gemma-4-31b-it` | 0.614 | 0.843 | About $0.15 per million tokens and fast; `qwen3.6-35b` is better at detection (narrative F1 0.863) but slower, dearer and prone to token-limit failures |
+| Best on a 32 GB Mac | `google/gemma-4-31b-it` | 0.614 | 0.843 | About 18 GB at 4-bit; `mistral-small-3.2-24b` (0.607, about 14 GB) leaves more headroom |
 | Free, no API | transformer engine (`process` default) | 0.104 | 0.684 | Far behind every LLM on category accuracy; the matcher is behind as well (0.103, narrative F1 0.236) |
 
 What the full results show:
@@ -408,7 +409,20 @@ What the full results show:
 - **Review context does not help on v2.** It lowered exact match for 24 of 32 models, by 3.5 points on average, against gold labels that were annotated from the claim alone.
 - **Check the failure count.** A model that cannot follow the output format scores badly without the score saying why. In this run `ling-3.0-flash` answered "no narrative" for almost every claim and `mistral-large-2512` was rate-limited upstream (failed items count as wrong), so neither is a fair comparison. The report shows `n_failed` for every model.
 
-Caveats. The local figures (T4, Mac) are sizes and memory arithmetic: the scores were measured on hosted models, not on quantised local copies, and local speed was not benchmarked, so run a sample on your hardware before relying on it. Prices are the list prices OpenRouter showed at the time of the run and change. The ClimateBERT pre-classifier gate is off in the benchmarks. It matters for the knowledge graph rather than the benchmarks: on a sample of the graph's texts it set aside about 92% as not about climate, so with `--classifier llm` it cuts the number of paid calls sharply (`--no-preclassifier` turns it off), at the cost of dropping about 3% of claims that do carry a narrative (measured on `climatesense_v1`).
+Running it yourself (sizes and memory arithmetic, not measured on this hardware):
+
+| Hardware | Memory | Model |
+| :------- | :----- | :---- |
+| T4 (Colab) | 16 GB | `ministral-14b-2512` at 4-bit (about 9 GB). The T4 has no bf16 and no FlashAttention 2, so use fp16 with an AWQ or GGUF model |
+| L4 (Colab) | 24 GB | `gemma-4-31b` at 4-bit (about 18 GB), or `mistral-small-3.2-24b` (about 14 GB) for more room for context |
+| A100 40 GB (Colab) | 40 GB | `gemma-4-31b` at 8-bit or `qwen3.6-35b` at 4-bit; `nemotron-3-super-120b` needs about 65 GB and does not fit |
+| Mac, 32 GB | 32 GB | `gemma-4-31b` or `mistral-small-3.2-24b` at 4-bit |
+| Mac or GPU, 16 GB | 16 GB | `ministral-14b-2512` at 4-bit |
+| 8 GB | 8 GB | Nothing good fits; `qwen3.5-9b` (0.506) is the best model under 10B, with a large drop in accuracy |
+
+On a GPU, serve the model with vLLM or Ollama and let the classifier batch concurrent requests; on a Mac with LM Studio, send one request at a time. Both vLLM and Ollama expose an OpenAI-compatible API, so point the `ollama` or `lmstudio` provider's base URL at the server (this path is untested here). For the whole graph a hosted `deepseek/deepseek-v4-flash` with the gate on is likely cheaper than the compute units a Colab session spends, and it scores higher (0.646 against 0.598).
+
+Caveats. The local figures (T4, Mac) are sizes and memory arithmetic: the scores were measured on hosted models, not on quantised local copies, and local speed was not benchmarked, so run a sample on your hardware before relying on it. Prices are the list prices OpenRouter showed at the time of the run and change. The ClimateBERT pre-classifier gate is off in the benchmarks. Measured on `climatesense_v1` (398 cases) with `deepseek-v4-flash`, `qwen3.8-flash` and `ministral-14b-2512`, turning it on removed about a third of the false alarms (precision up 3 to 6 points, `0_0` documents given a category down from 6 to 11% to 4 to 7%) but also dropped about 3.5 points of recall, because it sets aside about 3% of the claims that do carry a narrative (5 of 153). Narrative-detection F1 stayed within noise (-0.002 to +0.015), exact category fell by 2 to 2.6 points (that score covers only the claims that have a category), and category accuracy on detected claims did not change. On v2 and the NSLP test split it removes nothing. Its value is cost: on a sample of the graph's texts it set aside about 92% as not about climate, so with `--classifier llm` it cuts the number of paid calls by about that share (`--no-preclassifier` turns it off).
 
 ## ©️ Licenses
 
