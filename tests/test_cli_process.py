@@ -4,12 +4,24 @@
 ClimateBERT gate off) with no way to choose another preset, model or provider or to turn the gate on.
 """
 
+import re
 from unittest.mock import patch
 
 from climafactskg.cli import app
 from typer.testing import CliRunner
 
 runner = CliRunner()
+
+
+def _plain(output: str) -> str:
+    """Return the CLI's text without colour codes, box-drawing characters or line breaks.
+
+    A CI runner that renders errors in colour (rich, when ``GITHUB_ACTIONS`` or ``FORCE_COLOR`` is set) then reads the
+    same as a plain terminal.
+    """
+    text = re.sub(r"\x1b\[[0-9;]*m", "", output)
+    return " ".join(re.sub(r"[│╭╮╰╯─]", " ", text).split())
+
 
 _PATCHES = (
     "climafactskg.collectors.cimplekg.fetch_claims",
@@ -84,6 +96,6 @@ def test_llm_options_with_the_transformer_engine_are_rejected():
     result, mocks = _invoke(["--provider", "openrouter"])
 
     assert result.exit_code == 2
-    assert "--classifier llm" in result.output
+    assert "--classifier llm" in _plain(result.output)
     for mock in mocks:
         assert not mock.called
