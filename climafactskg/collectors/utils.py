@@ -1,5 +1,6 @@
 import logging
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 
 import pandas as pd
 import preserve
@@ -32,6 +33,7 @@ def batch_classify_cards_category(
     classifier_engine: str = "transformer",
     cards_classifier_name: str = "xplainnlp-nslp",
     cache_path: Optional[str] = None,
+    llm_options: Optional[Mapping[str, Any]] = None,
     collect_description: str = "Collecting items to classify",
     save_description: str = "Saving classifications",
     empty_message: str = "No items to classify.",
@@ -67,6 +69,10 @@ def batch_classify_cards_category(
             when the same path is passed by multiple collector sources, across
             sources too — identical claim text classified once instead of once
             per source. ``None`` (default) disables caching.
+        llm_options: Options for ``classifier_engine="llm"`` only. ``"preset"`` names the
+            preset (default *cards_classifier_name*); every other key (``provider``, ``model``,
+            ``use_preclassifier``, ...) overrides that preset's field of the same name. ``None``
+            runs the preset exactly as defined.
         collect_description: Progress-bar label for the collection pass.
         save_description: Progress-bar label for the save pass.
         empty_message: Log message when there are no pending entries.
@@ -89,9 +95,15 @@ def batch_classify_cards_category(
     elif classifier_engine == "llm":
         from climafactskg.classifiers.cards.llm import CARDSLLMClassifier
 
+        options = dict(llm_options or {})
+        preset = options.pop("preset", None) or cards_classifier_name
         overrides = {"cache_path": cache_path} if cache_path is not None else {}
-        classifier = CARDSLLMClassifier.from_preset(cards_classifier_name, **overrides)
-        classifier_id = cards_classifier_name
+        overrides.update(options)
+        classifier = CARDSLLMClassifier.from_preset(preset, **overrides)
+        # Presence of the tag marks an entry as classified, so naming the model in it costs nothing
+        # and shows afterwards which model produced the labels.
+        named = [str(options[k]) for k in ("provider", "model") if options.get(k)]
+        classifier_id = f"{preset}|{'/'.join(named)}" if named else preset
     else:
         raise ValueError(f"Unknown classifier_engine {classifier_engine!r}; expected 'transformer' or 'llm'")
 
@@ -196,6 +208,7 @@ def classify_claim_reviews(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
     cache_path: Optional[str] = None,
+    llm_options: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Classifies stored ClaimReview entries using CARDS classification (batch mode).
 
@@ -211,6 +224,7 @@ def classify_claim_reviews(
         concurrency=concurrency,
         classifier_engine=classifier_engine,
         cache_path=cache_path,
+        llm_options=llm_options,
         collect_description="Collecting claims to classify",
         save_description="Saving classifications",
         empty_message="No claims to classify.",
@@ -226,6 +240,7 @@ def process_all_claim_reviews(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
     cache_path: Optional[str] = None,
+    llm_options: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Store then classify a ClaimReview DataFrame.
 
@@ -242,4 +257,5 @@ def process_all_claim_reviews(
         concurrency=concurrency,
         classifier_engine=classifier_engine,
         cache_path=cache_path,
+        llm_options=llm_options,
     )

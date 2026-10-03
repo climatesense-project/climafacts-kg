@@ -151,6 +151,21 @@ def process(
         "--classifier",
         help="CARDS classifier engine: 'transformer' (default — matches the legacy classifier, no API cost) or 'llm'.",
     ),
+    preset: Optional[str] = typer.Option(
+        None, "--preset", help="LLM preset to run (default: the xplainnlp-nslp preset). Only with --classifier llm."
+    ),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="LLM provider, overriding the preset's (e.g. openrouter). Only with --classifier llm."
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", help="LLM model id, overriding the preset's. Only with --classifier llm."
+    ),
+    preclassifier: Optional[bool] = typer.Option(
+        None,
+        "--preclassifier/--no-preclassifier",
+        help="Turn the ClimateBERT gate on or off, overriding the preset's (the default preset has it off). "
+        "Only with --classifier llm.",
+    ),
     cache_path: Optional[str] = typer.Option(
         "data/cards_classification_cache.db",
         "--cache-path",
@@ -168,6 +183,19 @@ def process(
 
     load_dotenv()
 
+    llm_options = {
+        key: value
+        for key, value in (
+            ("preset", preset),
+            ("provider", provider),
+            ("model", model),
+            ("use_preclassifier", preclassifier),
+        )
+        if value is not None
+    }
+    if llm_options and classifier != "llm":
+        raise typer.BadParameter("--preset, --provider, --model and --preclassifier need --classifier llm.")
+
     ignore_urls = ["https://skepticalscience.com/wigley-santer-2012-attribution.html"]
     effective_cache_path = cache_path or None
 
@@ -182,6 +210,7 @@ def process(
                 concurrency=concurrency,
                 classifier_engine=classifier,
                 cache_path=effective_cache_path,
+                llm_options=llm_options or None,
             ),
         ),
         (
@@ -194,6 +223,7 @@ def process(
                 concurrency=concurrency,
                 classifier_engine=classifier,
                 cache_path=effective_cache_path,
+                llm_options=llm_options or None,
             ),
         ),
         (
@@ -215,6 +245,7 @@ def process(
                 concurrency=concurrency,
                 classifier_engine=classifier,
                 cache_path=effective_cache_path,
+                llm_options=llm_options or None,
             ),
         ),
         (

@@ -1,5 +1,6 @@
 import logging
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 
 import pandas as pd
 import preserve
@@ -55,6 +56,7 @@ def classify_claims(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
     cache_path: Optional[str] = None,
+    llm_options: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Classify stored CimpleKG claims.
 
@@ -67,6 +69,7 @@ def classify_claims(
         concurrency=concurrency,
         classifier_engine=classifier_engine,
         cache_path=cache_path,
+        llm_options=llm_options,
     )
 
 
@@ -78,6 +81,7 @@ def process_all(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
     cache_path: Optional[str] = None,
+    llm_options: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Store then classify a CimpleKG claims DataFrame.
 
@@ -91,6 +95,7 @@ def process_all(
         concurrency=concurrency,
         classifier_engine=classifier_engine,
         cache_path=cache_path,
+        llm_options=llm_options,
     )
 
 

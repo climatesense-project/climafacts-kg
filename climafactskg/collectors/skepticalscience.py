@@ -1,5 +1,6 @@
 import logging
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import preserve
@@ -249,6 +250,7 @@ def classify_urls(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
     cache_path: Optional[str] = None,
+    llm_options: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Classify URLs in the database using CARDS classification (batch mode).
 
@@ -270,6 +272,8 @@ def classify_urls(
         cache_path (str, optional): Preserve SQLite cache path, shared across
             sources to avoid reclassifying identical text. Defaults to None
             (no caching).
+        llm_options (Mapping, optional): Preset, provider, model and gate overrides for
+            ``classifier_engine="llm"``. See :func:`climafactskg.collectors.utils.batch_classify_cards_category`.
 
     Returns:
         None
@@ -282,6 +286,7 @@ def classify_urls(
         concurrency=concurrency,
         classifier_engine=classifier_engine,
         cache_path=cache_path,
+        llm_options=llm_options,
         collect_description="Collecting arguments to classify",
         save_description="Saving classifications",
         empty_message="No arguments to classify.",
@@ -298,6 +303,7 @@ def process_all(
     concurrency: Optional[int] = None,
     classifier_engine: str = "transformer",
     cache_path: Optional[str] = None,
+    llm_options: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Process all URLs for skeptical science data collection and classification.
 
@@ -320,6 +326,8 @@ def process_all(
         cache_path (str, optional): Preserve SQLite cache path, shared across
             sources to avoid reclassifying identical text. Defaults to None
             (no caching).
+        llm_options (Mapping, optional): Preset, provider, model and gate overrides for
+            ``classifier_engine="llm"``. See :func:`climafactskg.collectors.utils.batch_classify_cards_category`.
 
     Returns:
         None: This function performs operations but does not return a value.
@@ -327,7 +335,14 @@ def process_all(
     if urls is None:
         urls = []
     process_urls(db, urls, ignore_urls=ignore_urls)
-    classify_urls(db, force=force, concurrency=concurrency, classifier_engine=classifier_engine, cache_path=cache_path)
+    classify_urls(
+        db,
+        force=force,
+        concurrency=concurrency,
+        classifier_engine=classifier_engine,
+        cache_path=cache_path,
+        llm_options=llm_options,
+    )
 
 
 def fetch_skstiptionary(
