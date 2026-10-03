@@ -178,6 +178,7 @@ label = "qwen3.8-flash"                  # closed (Alibaba), a cheap reference
 model = "qwen/qwen3.8-flash"
 [classifiers.options]
 max_tokens = 8000
+output_mode = "prompted"  # tool_choice=required is rejected in thinking mode
 
 # Mistral: the new generation (Small 4, Ministral 3, Large 3).
 [[classifiers]]
@@ -195,6 +196,7 @@ max_tokens = 1500
 [[classifiers]]
 label = "mistral-large-2512"
 model = "mistralai/mistral-large-2512"
+concurrency = 2  # upstream 429s at higher rates
 [classifiers.options]
 max_tokens = 1500
 
