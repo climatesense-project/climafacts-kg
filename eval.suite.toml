@@ -211,6 +211,8 @@ max_tokens = 1500
 [[classifiers]]
 label = "glm-5.3-flash"
 model = "z-ai/glm-5.3-flash"
+size_b = 320
+active_b = 18  # 320B total, 18B active, MIT licence, per the Hugging Face model card (zai-org/GLM-5.3-Flash)
 [classifiers.options]
 max_tokens = 8000
 

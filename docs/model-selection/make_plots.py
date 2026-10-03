@@ -21,6 +21,8 @@ from pathlib import Path
 from climafactskg.classifiers.cards.report import _SERIES_LIGHT, ranked_bars_svg, size_scatter_svg
 
 OUT = Path(__file__).parent
+# Sizes (total, active, in billions) published after the saved run, which has none for these models.
+PUBLISHED_SIZES = {"glm-5.3-flash": (320.0, 18.0)}
 NO_NARRATIVE = {"0", "0_0"}
 # Models left out of the charts: ling-3.0-flash answers "no narrative" for nearly every claim and mistral-large-2512
 # still had failed items (rate limits), so neither score is a fair measure of the model.
@@ -192,6 +194,9 @@ def main(run: Path) -> None:
     meta = json.loads((run / "run.json").read_text(encoding="utf-8"))["configs"]
     for config in meta if isinstance(meta, list) else [{"label": k, **v} for k, v in meta.items()]:
         sizes[config.get("label") or config.get("config")] = (config.get("size_b"), config.get("active_b"))
+    for config, size in PUBLISHED_SIZES.items():
+        if not sizes.get(config, (None, None))[0]:
+            sizes[config] = size
 
     fields = [
         "model",

@@ -12,7 +12,7 @@ This report records how 32 classifiers were compared for labelling claims with t
 
 | If you want | Take | Why |
 | :---------- | :--- | :-- |
-| Lowest cost among the top group | `glm-5.3-flash` | Balanced score 0.709 (top three), about $0.00009 per call, no failures. Licence and size not checked. |
+| Lowest cost among the top group | `glm-5.3-flash` | Balanced score 0.709 (top three), about $0.00009 per call, no failures. Open weights, MIT licence, 320B total and 18B active parameters (model card), so hosted only for most people. |
 | Highest balanced score | `qwen3.8-flash` | 0.719, but a closed API model at about $0.00033 per call |
 | Highest category accuracy | `deepseek-v4-flash` | 0.604 on documents with a narrative, but the most false alarms of the finalists (19.9%) and about $0.0017 per call |
 | Fastest | `gemma-4-31b` or `ministral-14b-2512` | About 5 s per call; gemma has 19% false alarms, ministral 17% |
@@ -62,7 +62,7 @@ Models sit along a front: those with the fewest false alarms (`gpt-oss-20b`, `gl
 
 ![Balanced score against model size](model-selection/balanced_vs_size.svg)
 
-Past about 14B the frontier is flat. Larger models are not better at this task, and the 1.6T `deepseek-v4-pro` is within noise of the 14B `ministral-14b-2512` on exact category accuracy. Several models have no published size (for example `gpt-4o-mini`, `qwen3.8-flash`, `glm-5.3-flash`) and are not on this plot.
+Past about 14B the frontier is flat. Larger models are not better at this task, and the 1.6T `deepseek-v4-pro` is within noise of the 14B `ministral-14b-2512` on exact category accuracy. A few models have no published size (for example `gpt-4o-mini`, `qwen3.8-flash`, `mistral-small-2603`) and are not on this plot. `glm-5.3-flash` sits at 320B (18B active), added from its model card after the run.
 
 ### Cost
 
@@ -140,7 +140,7 @@ Sizes and memory arithmetic, not measured on this hardware: 4-bit `ministral-14b
 - **Benchmarks are not the graph.** They are mostly climate text; the graph is mostly not. The gate matters there and was measured on benchmark data for its recall loss and on a graph sample only for how much it removes.
 - **Costs and latencies** come from 24-call samples on one day and change with providers and load. List prices are not used.
 - **Not measured:** quantised local models, Colab speed, `qwen3.8-27b` (skipped, paid), `mistral-small-3.2-24b` cost (usage not booked in the test window).
-- **Open weights** were assumed from OpenRouter's listing for some models (`glm-5.3-flash`, `minimax-m2.7`) and not checked against the licences.
+- **Open weights.** `glm-5.3-flash` was checked against its Hugging Face card (MIT licence, weights downloadable). For `qwen3.8-flash` and `minimax-m2.7` only OpenRouter's listing of a Hugging Face repository was seen, and licences were not checked.
 
 ## Reproducing
 
