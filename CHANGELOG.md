@@ -2,6 +2,220 @@
 
 <!-- version list -->
 
+## v2.4.0 (2026-10-03)
+
+### Bug Fixes
+
+- **classifiers**: Act on the ClimateBERT gate's real labels
+  ([`be0515c`](https://github.com/climatesense-project/climafacts-kg/commit/be0515ca6b1afe1b7b5aba125cd91bd7b2140b96))
+
+- **classifiers**: Ask again when a model's output fails validation
+  ([`12092c6`](https://github.com/climatesense-project/climafacts-kg/commit/12092c6bb5c60e5928cdd5555f09a69dd6ab343e))
+
+- **classifiers**: Counting cached answers no longer creates or needs the cache file
+  ([`6b525f6`](https://github.com/climatesense-project/climafacts-kg/commit/6b525f63130d9574831689685e62614e22cdf82b))
+
+- **classifiers**: Enforce the request timeout around the whole LLM call
+  ([`8680229`](https://github.com/climatesense-project/climafacts-kg/commit/8680229335af6a5ec6510b0f3264bc0ab6af47c1))
+
+- **classifiers**: Include every prompt template in the LLM cache key
+  ([`0acdc26`](https://github.com/climatesense-project/climafacts-kg/commit/0acdc2647c055fd1f900e3a599a778f509a4f60b))
+
+- **classifiers**: Include the context length limit in the LLM cache key
+  ([`7f6059c`](https://github.com/climatesense-project/climafacts-kg/commit/7f6059c9e52244276616a2532044483fa4b7e504))
+
+- **classifiers**: Retry a malformed reply relayed from the provider
+  ([`8aa4862`](https://github.com/climatesense-project/climafacts-kg/commit/8aa4862a9a6f888533215bdb2f4c8241d683f857))
+
+- **cli**: Collect and process exit non-zero when a step failed
+  ([`50e9313`](https://github.com/climatesense-project/climafacts-kg/commit/50e9313d12242e67acff8c98f50851903934cc9c))
+
+- **collectors**: Collect the Skeptical Science misinformers page again
+  ([`7d998e4`](https://github.com/climatesense-project/climafacts-kg/commit/7d998e41648443cade11d951a1ac466eb6dd73c1))
+
+- **collectors**: Give SPARQL queries a default timeout
+  ([`451156b`](https://github.com/climatesense-project/climafacts-kg/commit/451156b3d413422e4808f15041f1dc8704bc7db0))
+
+- **collectors**: Skip a URL that cannot be fetched instead of aborting the step
+  ([`9082bbb`](https://github.com/climatesense-project/climafacts-kg/commit/9082bbb4a51a285bedd1ebfcf5532d32b0f6664a))
+
+- **collectors**: Time out page fetches and never cache an error response
+  ([`4856334`](https://github.com/climatesense-project/climafacts-kg/commit/485633470645be0999aaaa5185e2bdbf4a54fbc6))
+
+- **eval**: Apply [defaults] engine to classifiers that do not set one
+  ([`c9a7983`](https://github.com/climatesense-project/climafacts-kg/commit/c9a79836edc6920f1d159cdc5a3347fc15d920b9))
+
+- **eval**: Cap the generated tokens per model in the suite
+  ([`3266f1d`](https://github.com/climatesense-project/climafacts-kg/commit/3266f1d4ba755b281127c37b58394f6e7c12f37c))
+
+- **eval**: Exit non-zero when a benchmark combination failed
+  ([`9f5d558`](https://github.com/climatesense-project/climafacts-kg/commit/9f5d558009f2a6a7d24dae3e34f48a654a4c6e29))
+
+- **eval**: Keep --dry-run from loading local models
+  ([`3195793`](https://github.com/climatesense-project/climafacts-kg/commit/319579386ca27b70fe81bef62d4eb79954e748b3))
+
+- **eval**: Keep a failed call in its own slot when the prompt optimizer scores a batch
+  ([`ba76575`](https://github.com/climatesense-project/climafacts-kg/commit/ba76575a30a6a1528c1ce7d65365044fe6a29334))
+
+- **eval**: Keep At a glance short when many models are compared
+  ([`24917b8`](https://github.com/climatesense-project/climafacts-kg/commit/24917b818dbaf8af2b3b85e8a7e1bd6966a8ca62))
+
+- **eval**: Keep category scores over every case unless asked otherwise
+  ([`4aef5f1`](https://github.com/climatesense-project/climafacts-kg/commit/4aef5f11ca85e5e2dffc3c95f231123f0ba5264d))
+
+- **eval**: Only fold a dataset in the report when it repeats another's cases
+  ([`b005096`](https://github.com/climatesense-project/climafacts-kg/commit/b0050962404b2ed91be1098420802a4aa0e4861d))
+
+- **eval**: Render the report when a config failed outright
+  ([`e9c711d`](https://github.com/climatesense-project/climafacts-kg/commit/e9c711d4e0000e993ecbeed1371d23292e3670de))
+
+- **eval**: Run qwen3.8-27b on the paid tier
+  ([`4aaf024`](https://github.com/climatesense-project/climafacts-kg/commit/4aaf02464861c624b1d08f6390b25ddbeb6024c4))
+
+- **eval**: Run the rate-limited suite models at lower concurrency
+  ([`d3e3d14`](https://github.com/climatesense-project/climafacts-kg/commit/d3e3d14c9055c3f8aa80a4a7d1c7c3179f7462a3))
+
+- **eval**: Suite settings for qwen3.8-flash and mistral-large-2512
+  ([`057276d`](https://github.com/climatesense-project/climafacts-kg/commit/057276d8462929e4648a9c7101e57fa9de6a8207))
+
+### Documentation
+
+- Add hardware guidance and measured gate effect to the model recommendations
+  ([`42d055e`](https://github.com/climatesense-project/climafacts-kg/commit/42d055e599533840e841cfe58a370026edd0bef1))
+
+- Add model recommendations from the standard eval suite
+  ([`fa467c4`](https://github.com/climatesense-project/climafacts-kg/commit/fa467c42608763197a8dd805cf625a6e17d255f7))
+
+- Add review context and local hardware results to the report and the README
+  ([`605e7e3`](https://github.com/climatesense-project/climafacts-kg/commit/605e7e37cd57624c54073a5241de4388610bb5a3))
+
+- Add the model selection report with charts and link it from the README
+  ([`769e2b4`](https://github.com/climatesense-project/climafacts-kg/commit/769e2b42395ea6395e951d80310e1c825a6a53d8))
+
+- Add the prompt comparison to the model recommendations
+  ([`8af2184`](https://github.com/climatesense-project/climafacts-kg/commit/8af2184674bacf71f8c6828d660f5561c720ee4d))
+
+- Add the tuned prompt's balanced-score results for five models
+  ([`0e9343e`](https://github.com/climatesense-project/climafacts-kg/commit/0e9343e066d02f1b1eee337d189855ec716c213a))
+
+- Add the weighting sensitivity and the simulated gate to the model selection report
+  ([`cf7af74`](https://github.com/climatesense-project/climafacts-kg/commit/cf7af74a095b43aa12a7991459dc395c1155ae3b))
+
+- Add whole-graph cost and time estimates and Mistral guidance
+  ([`587c511`](https://github.com/climatesense-project/climafacts-kg/commit/587c5110c00f440661bc1d45a5108200ba78721e))
+
+- Bring the README in line with the eval plan, cache and command names
+  ([`56527ba`](https://github.com/climatesense-project/climafacts-kg/commit/56527bac2d4d424e9179b1c9c967e32a3a0187e0))
+
+- Correct what process --classifier llm runs and where the gate applies
+  ([`5ef22d2`](https://github.com/climatesense-project/climafacts-kg/commit/5ef22d26dcfc85efb11d305f475ffc3b8211bc64))
+
+- Fix stale wording found in review; small cleanups
+  ([`10fd465`](https://github.com/climatesense-project/climafacts-kg/commit/10fd465ab158d3e042ec3aafdd2c1635c3592016))
+
+- Point the README and the tuned preset at the balanced-score results
+  ([`74ccf7c`](https://github.com/climatesense-project/climafacts-kg/commit/74ccf7c26c85944497b0f4a0a85094679913d5af))
+
+- Record GLM-5.3-Flash's licence and size from its model card
+  ([`4d530c7`](https://github.com/climatesense-project/climafacts-kg/commit/4d530c70db156f4832d666907a3d979dea54724a))
+
+- Record the prompt optimisation experiment and the tuned preset's results
+  ([`8dff395`](https://github.com/climatesense-project/climafacts-kg/commit/8dff3952744288403384b879ef7d74a974aeaecb))
+
+- Replace estimated costs with measured per-call costs
+  ([`e0d6a11`](https://github.com/climatesense-project/climafacts-kg/commit/e0d6a11114813b7d9648062a97774f76a187c44e))
+
+- Split the eval paragraph in CLAUDE.md into headed bullets
+  ([`3976a1a`](https://github.com/climatesense-project/climafacts-kg/commit/3976a1a8943276cd41d71085535273a5017f343b))
+
+- Sync the README with the presets and the process options
+  ([`e5fc0c5`](https://github.com/climatesense-project/climafacts-kg/commit/e5fc0c52e2215da0f02d695e92c4d302f47e8512))
+
+- Weight category accuracy 75% and false alarms 25% in the balanced score
+  ([`d266627`](https://github.com/climatesense-project/climafacts-kg/commit/d2666277e30926bb8046a088ddfdf9cdcb9a3bba))
+
+- **eval**: State published sizes for five suite models
+  ([`325c214`](https://github.com/climatesense-project/climafacts-kg/commit/325c214ffd4ac500eb6098aad56d30f5af748059))
+
+### Features
+
+- **builders**: Describe the classifier that produced each CARDS label
+  ([`d46dcb2`](https://github.com/climatesense-project/climafacts-kg/commit/d46dcb23718d401ce83357bc47acb7c71bedcd20))
+
+- **classifiers**: Add the experimental xplainnlp-nslp-tuned preset
+  ([`d4a6493`](https://github.com/climatesense-project/climafacts-kg/commit/d4a6493559eae9f9133781aed3e11e1a57131978))
+
+- **classifiers**: Pass provider-specific request fields to the LLM
+  ([`74c2466`](https://github.com/climatesense-project/climafacts-kg/commit/74c24666fbbfc21f12b05918197b164e3a8a39b8))
+
+- **classifiers**: Time out slow LLM requests and retry them
+  ([`70d4830`](https://github.com/climatesense-project/climafacts-kg/commit/70d483001a22d5ddf10d666bdefbe16522f9abe8))
+
+- **cli**: Choose the LLM preset, model, provider and ClimateBERT gate in process
+  ([`d67ff88`](https://github.com/climatesense-project/climafacts-kg/commit/d67ff880ea59a416b60e24fe85f12fac3f5df2af))
+
+- **data**: Describe the classifier behind each CARDS label
+  ([`067bc28`](https://github.com/climatesense-project/climafacts-kg/commit/067bc281ae26a99967130cac1c7871f0d6b671b8))
+
+- **eval**: Averages across benchmarks in the report
+  ([`a55cf5e`](https://github.com/climatesense-project/climafacts-kg/commit/a55cf5e06aa1760379271a79262854bd4b101001))
+
+- **eval**: Hierarchical F1 on the detected category cases, plotted against size
+  ([`40bd05b`](https://github.com/climatesense-project/climafacts-kg/commit/40bd05bcb84a6218a0eb667d5ebccbbeba3a6db6))
+
+- **eval**: Keep narrative detection and the CARDS category apart
+  ([`b5e3a52`](https://github.com/climatesense-project/climafacts-kg/commit/b5e3a525df9a6442ffa3abce80a882f1d271e057))
+
+- **eval**: Let the prompt optimizer train on no-narrative documents and score on held-out cases
+  ([`4de390c`](https://github.com/climatesense-project/climafacts-kg/commit/4de390ce56009ff50b7f3f21b16d024174fea10f))
+
+- **eval**: Make the HTML report easier to read
+  ([`7e90615`](https://github.com/climatesense-project/climafacts-kg/commit/7e90615e106d99db92a0716f953dc85402c93acc))
+
+- **eval**: More concurrency for the suite
+  ([`50672af`](https://github.com/climatesense-project/climafacts-kg/commit/50672af3fb118fef2fddc9ea5e3e8be418b6417d))
+
+- **eval**: More Qwen, Mistral and open-weight models in the suite
+  ([`f190332`](https://github.com/climatesense-project/climafacts-kg/commit/f1903325715de9580ef3dad643454c644653463f))
+
+- **eval**: Plot result against model size and rank many models
+  ([`0217a91`](https://github.com/climatesense-project/climafacts-kg/commit/0217a91b675274f252dece44bef0b6c1d88f85b7))
+
+- **eval**: Record model size with a saved run
+  ([`5897f4d`](https://github.com/climatesense-project/climafacts-kg/commit/5897f4d66f0a78637cf7d0ff115791089e24f7b7))
+
+- **eval**: Report exact match on category cases and flag weak baselines
+  ([`1fd64b0`](https://github.com/climatesense-project/climafacts-kg/commit/1fd64b01454c7cd4c4477a8920e85c8f84a0b0d8))
+
+- **eval**: Run the suite with more concurrency
+  ([`ef67944`](https://github.com/climatesense-project/climafacts-kg/commit/ef67944c20e4c0d41c33042755bc71eaa1035405))
+
+- **eval**: Show cached and new paid calls in the benchmark plan
+  ([`fbe6baa`](https://github.com/climatesense-project/climafacts-kg/commit/fbe6baa5a4206829d541f468eb0ef0e981711c01))
+
+- **eval**: Standardise the report per benchmark
+  ([`ccb7adf`](https://github.com/climatesense-project/climafacts-kg/commit/ccb7adf1510110ef85042c673b689839eec57884))
+
+- **eval**: The same shape for every benchmark in the report
+  ([`63703a0`](https://github.com/climatesense-project/climafacts-kg/commit/63703a0f18ca15fb61681ab60bcafdd20d33091d))
+
+- **eval**: The standard full-evaluation suite config
+  ([`f77773f`](https://github.com/climatesense-project/climafacts-kg/commit/f77773f27dbcfe07b6b14c1099e1fe4dddab3fe7))
+
+### Refactoring
+
+- **classifiers**: Store the tuned prompt as readable lines and rebuild its JSON wrapper
+  ([`25b2343`](https://github.com/climatesense-project/climafacts-kg/commit/25b2343516d30b5fb52a7b6c923db38b72f4587c))
+
+- **eval**: Evaluate() is one benchmark config; drop the dead report evaluators
+  ([`abc9bab`](https://github.com/climatesense-project/climafacts-kg/commit/abc9bab4feac5cfa2836140f43a4cdf5b8e9fb1b))
+
+### Testing
+
+- Cover LLM batch failure isolation, caching and context routing
+  ([`f11fc83`](https://github.com/climatesense-project/climafacts-kg/commit/f11fc83c88536640b7270e76538d53a7db3bb824))
+
+
 ## v2.3.0 (2026-10-02)
 
 ### Bug Fixes
