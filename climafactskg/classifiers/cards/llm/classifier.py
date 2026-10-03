@@ -38,6 +38,9 @@ logger = logging.getLogger(__name__)
 # even though the actual cause is upstream rate-limiting on other providers in the
 # fallback chain — so 400 is included here too.
 _RETRYABLE_STATUS_CODES = {400, 408, 429, 500, 502, 503, 504}
+# What a pre-classifier answers for text it considers off-topic. The ClimateBERT climate detector's own labels are
+# "no" / "yes"; "unrelated" is the name this code used before and still works for other pre-classifiers.
+_UNRELATED_LABELS = frozenset({"no", "unrelated"})
 _DEFAULT_MAX_RETRIES = 3
 _DEFAULT_RETRY_BASE_DELAY = 1.0
 
@@ -563,7 +566,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
         Returns:
             A CARDS taxonomy code or ``"0_0"`` if not climate misinformation.
         """
-        if not skip_preclassifier and self._preclassify(text) == "unrelated":
+        if not skip_preclassifier and self._preclassify(text) in _UNRELATED_LABELS:
             return "0"
 
         output = self._output_cache.get_or_compute(
@@ -667,7 +670,7 @@ class CARDSLLMClassifier(CARDSClassifierBase):
                     texts, key_fn=lambda t: t, compute_fn=_compute_pre
                 )
                 for i, label in enumerate(pre_labels):
-                    if label == "unrelated":
+                    if label in _UNRELATED_LABELS:
                         results[i] = "0"
                         progress.advance(task_id)
                     else:
