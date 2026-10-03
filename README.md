@@ -410,6 +410,22 @@ What the full results show:
 - **Review context does not help on v2.** It lowered exact match for 24 of 32 models, by 3.5 points on average, against gold labels that were annotated from the claim alone.
 - **Check the failure count.** A model that cannot follow the output format scores badly without the score saying why. In this run `ling-3.0-flash` answered "no narrative" for almost every claim and `mistral-large-2512` was rate-limited upstream (failed items count as wrong), so neither is a fair comparison. The report shows `n_failed` for every model.
 
+Which prompt to use. All the results above use one prompt, the `xplainnlp-nslp` preset. We also compared it with the other two built-in prompts, `climatesense-nslp` and `cards-narrative`, on three models and all three benchmarks (claim only, same settings, no failed items):
+
+| Model | Prompt | Exact category | Narrative-detection F1 | False alarms |
+| :---- | :----- | :------------- | :--------------------- | :----------- |
+| `gemma-4-31b` | `xplainnlp-nslp` (default) | 0.614 | 0.843 | 21.7% |
+| | `climatesense-nslp` | 0.566 | 0.861 | 15.7% |
+| | `cards-narrative` | 0.627 | 0.823 | 28.5% |
+| `deepseek-v4-flash` | `xplainnlp-nslp` (default) | 0.646 | 0.835 | 22.5% |
+| | `climatesense-nslp` | 0.611 | 0.858 | 14.9% |
+| | `cards-narrative` | 0.644 | 0.795 | 32.4% |
+| `ministral-14b-2512` | `xplainnlp-nslp` (default) | 0.598 | 0.830 | 18.6% |
+| | `climatesense-nslp` | 0.513 | 0.840 | 17.7% |
+| | `cards-narrative` | 0.560 | 0.701 | 54.5% |
+
+No prompt beats the default by more than noise on exact category: `cards-narrative` is +1.3 points for gemma and -0.2 for deepseek, and clearly worse for ministral. `climatesense-nslp` is more cautious (detection F1 up about 2 points, false alarms down 6 to 8 points) but loses 3 to 5 points of exact category, and 8 or more for ministral. `cards-narrative` flags more claims, so false alarms rise. The prompt matters less than the model (the best and worst models differ by about 25 points), but a small model can be hurt badly by the wrong prompt. "False alarms" is the share of documents with no narrative (`0_0`) that were given a category. The default prompt over-flags about one in five of them, so prompt optimisation (`optimization.py`, GEPA) is most worth trying to cut false alarms while keeping category accuracy; it has not been run on these models, and to avoid overfitting it should be scored on data it was not trained on.
+
 Classifying the whole graph (about 263,000 texts: 261,858 from ClimateSenseKG and 1,589 from Skeptical Science) with the gate on sends only the texts it passes to the model, about 8% or roughly 21,000 on the sample we checked. These are estimates, from a 24-claim timing test and prompt sizes, not a full run:
 
 | Setup | Cost | Time |
