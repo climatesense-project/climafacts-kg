@@ -52,6 +52,10 @@ _SELF_CONTAINED_REFLECTION_PROMPT_TEMPLATE = (
 logger = logging.getLogger(__name__)
 
 
+# Output recorded for a case whose model call raised; scored as wrong and kept out of the reflection feedback.
+_FAILED_CALL = "(call failed)"
+
+
 @dataclasses.dataclass
 class CARDSDataInst:
     """One evaluation example: a claim, its acceptable gold labels, and optional context."""
@@ -129,25 +133,36 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
         with self._agent.override(instructions=candidate["instructions"]):
             report = asyncio.run(temp_dataset.evaluate(task, max_concurrency=self._concurrency))
 
-        outputs = [str(c.output) for c in report.cases]
+        # pydantic-evals drops a case whose call raised from report.cases, so read results back by case name:
+        # a failed call must stay a wrong answer in its own slot, or every later score shifts onto the wrong claim.
+        done = {c.name: c for c in report.cases}
 
         def _blended_score(c: Any) -> float:
             exact = c.scores["CARDSOneOfMatch"].value if "CARDSOneOfMatch" in c.scores else 0.0
             hier = c.scores["CARDSHierarchicalMatch"].value if "CARDSHierarchicalMatch" in c.scores else 0.0
             return 0.5 * exact + 0.5 * hier
 
-        scores = [_blended_score(c) for c in report.cases]
+        outputs: list[str] = []
+        scores: list[float] = []
+        for i in range(len(batch)):
+            case = done.get(str(i))
+            outputs.append(str(case.output) if case is not None else _FAILED_CALL)
+            scores.append(_blended_score(case) if case is not None else 0.0)
+        if report.failures:
+            logger.warning(
+                "%d of %d GEPA evaluation calls failed and were scored as wrong.", len(report.failures), len(batch)
+            )
         trajectories = None
         if capture_traces:
             trajectories = [
                 CARDSTrajectory(
-                    claim=c.inputs[1],
-                    predicted=str(c.output),
-                    expected=c.expected_output if isinstance(c.expected_output, list) else [str(c.expected_output)],
-                    score=s,
-                    context=batch[c.inputs[0]].context,
+                    claim=item.claim,
+                    predicted=output,
+                    expected=item.expected,
+                    score=score,
+                    context=item.context,
                 )
-                for c, s in zip(report.cases, scores, strict=True)
+                for item, output, score in zip(batch, outputs, scores, strict=True)
             ]
         return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
 
@@ -159,7 +174,7 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
     ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
         records = []
         for traj in eval_batch.trajectories or []:
-            if traj.score < 1.0:
+            if traj.score < 1.0 and traj.predicted != _FAILED_CALL:
                 records.append(
                     {
                         "Inputs": {"claim": traj.claim},
@@ -170,7 +185,56 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
         return {"instructions": records}
 
 
-def build_mixed_trainval(mix: Mapping[str, tuple[int, int]]) -> tuple[Dataset, Dataset]:
+def _sliced_cases(
+    mix: Mapping[str, tuple[int, int]], *, climate_only: bool, shuffle_seed: int | None
+) -> tuple[list[Any], list[Any], list[Any]]:
+    """Per-source ``(train, val, rest)`` case lists, shared by the train/val and held-out builders."""
+    import random
+
+    from climafactskg.classifiers.cards.datasets import (
+        climatesense_dataset_v1,
+        climatesense_dataset_v2,
+        nslp_dataset,
+    )
+
+    factories: dict[str, Any] = {
+        "nslp": nslp_dataset,
+        "cs_v1": climatesense_dataset_v1,
+        "cs_v2": climatesense_dataset_v2,
+    }
+
+    train_cases: list[Any] = []
+    val_cases: list[Any] = []
+    rest_cases: list[Any] = []
+    for name, (train_n, val_n) in mix.items():
+        if train_n <= 0 and val_n <= 0:
+            continue
+        if name not in factories:
+            raise ValueError(f"Unknown dataset '{name}'. Choose from: {sorted(factories)}")
+        # The optimizer trains claim-only; say so explicitly so a future change to the datasets' default cannot
+        # silently change what the prompt is tuned on.
+        kwargs = {"with_context": False, "climate_only": climate_only} if name.startswith("cs_") else {}
+        cases = list(factories[name](**kwargs).cases)
+        if shuffle_seed is not None:
+            random.Random(f"{shuffle_seed}:{name}").shuffle(cases)
+        train_slice = cases[:train_n]
+        val_slice = cases[train_n : train_n + val_n]
+        logger.info(
+            "Dataset '%s': %d train / %d val (%d available)",
+            name,
+            len(train_slice),
+            len(val_slice),
+            len(cases),
+        )
+        train_cases.extend(train_slice)
+        val_cases.extend(val_slice)
+        rest_cases.extend(cases[train_n + val_n :])
+    return train_cases, val_cases, rest_cases
+
+
+def build_mixed_trainval(
+    mix: Mapping[str, tuple[int, int]], *, climate_only: bool = True, shuffle_seed: int | None = None
+) -> tuple[Dataset, Dataset]:
     """Build combined train/validation datasets from a per-source ``(train_n, val_n)`` mix.
 
     Lets optimization be aimed at the same multi-dataset mix used for
@@ -190,46 +254,31 @@ def build_mixed_trainval(mix: Mapping[str, tuple[int, int]]) -> tuple[Dataset, D
         mix: Mapping of dataset name (``"nslp"``, ``"cs_v1"``, or ``"cs_v2"``)
             to ``(train_n, val_n)`` case counts. Omit a name or pass
             ``(0, 0)`` to exclude that dataset entirely.
+        climate_only: Passed to the ClimateSense loaders. ``True`` (default, as before) keeps only
+            documents that carry a CARDS category, so the prompt never sees a "no narrative"
+            document; pass ``False`` to train on the ``0_0`` documents too.
+        shuffle_seed: ``None`` (default, as before) slices each dataset in file order. Pass an integer
+            to shuffle each dataset reproducibly first: the files are not in random order (the first
+            150 cases of ``climatesense_dataset_v1(climate_only=False)`` are 97% ``0_0``, the rest
+            40%), so file-order slices are not representative.
 
     Returns:
         ``(trainset, valset)`` — combined Datasets ready for :func:`optimize_prompt`.
     """
-    from climafactskg.classifiers.cards.datasets import (
-        climatesense_dataset_v1,
-        climatesense_dataset_v2,
-        nslp_dataset,
-    )
-
-    factories: dict[str, Any] = {
-        "nslp": nslp_dataset,
-        "cs_v1": climatesense_dataset_v1,
-        "cs_v2": climatesense_dataset_v2,
-    }
-
-    train_cases = []
-    val_cases = []
-    for name, (train_n, val_n) in mix.items():
-        if train_n <= 0 and val_n <= 0:
-            continue
-        if name not in factories:
-            raise ValueError(f"Unknown dataset '{name}'. Choose from: {sorted(factories)}")
-        # The optimizer trains claim-only; say so explicitly so a future change to the datasets' default cannot
-        # silently change what the prompt is tuned on.
-        kwargs = {"with_context": False} if name.startswith("cs_") else {}
-        cases = factories[name](**kwargs).cases
-        train_slice = cases[:train_n]
-        val_slice = cases[train_n : train_n + val_n]
-        logger.info(
-            "Dataset '%s': %d train / %d val (%d available)",
-            name,
-            len(train_slice),
-            len(val_slice),
-            len(cases),
-        )
-        train_cases.extend(train_slice)
-        val_cases.extend(val_slice)
-
+    train_cases, val_cases, _ = _sliced_cases(mix, climate_only=climate_only, shuffle_seed=shuffle_seed)
     return Dataset(cases=train_cases), Dataset(cases=val_cases)
+
+
+def build_heldout(
+    mix: Mapping[str, tuple[int, int]], *, climate_only: bool = True, shuffle_seed: int | None = None
+) -> Dataset:
+    """The cases :func:`build_mixed_trainval` leaves out: everything after each source's train and val slices.
+
+    Call it with the same arguments as :func:`build_mixed_trainval` and score the original and the optimised
+    prompt on it, so the comparison is on cases the optimiser never saw.
+    """
+    _, _, rest_cases = _sliced_cases(mix, climate_only=climate_only, shuffle_seed=shuffle_seed)
+    return Dataset(cases=rest_cases)
 
 
 def _dataset_to_examples(dataset: Dataset) -> list[CARDSDataInst]:
