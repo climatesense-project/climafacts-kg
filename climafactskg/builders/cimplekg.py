@@ -1,9 +1,11 @@
 import logging
+from collections import defaultdict
 from typing import Optional
 
 import preserve
 from rdflib import SDO, Graph, Namespace, URIRef
 
+from climafactskg.builders.provenance import add_classification_provenance
 from climafactskg.builders.utils import new_graph
 
 logger = logging.getLogger(__name__)
@@ -59,14 +61,21 @@ def generate_cimplekg_mappings(db: preserve.Connector) -> Graph:
     # instance-data namespace — see builders/climafactskg.py for the split rationale.
     ns = Namespace("https://purl.net/climatesense/cards/ns#")
     g = new_graph({"cards": ns})
+    labelled: dict[Optional[str], list[URIRef]] = defaultdict(list)  # classifier tag -> the reviews it labelled
 
     for _, mapping in db:
         url = mapping["url"]
         try:
             if add_cards_category_link(g, ns, URIRef(url), mapping.get("cards_category")):
+                labelled[mapping.get("cards_category_classifier")].append(URIRef(url))
                 logger.info(f"Successfully processed CimpleKG URL: {url}")
         except Exception as e:
             logger.error(f"Error processing mapping URL {url}: {e}")
+
+    # The classifier nodes are minted in the ClimaFactsKG namespace, like the other nodes the graph creates.
+    instance_ns = Namespace("https://purl.net/climatesense/climafactskg/ns#")
+    for tag, reviews in labelled.items():
+        add_classification_provenance(g, instance_ns, tag, reviews)
 
     logger.info("CimpleKG mappings generation completed.")
     return g

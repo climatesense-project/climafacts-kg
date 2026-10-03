@@ -151,13 +151,21 @@ class TestBatchClassifyCardsCategoryCachePath:
             mock_classifier_cls.from_preset.assert_called_once_with("xplainnlp-nslp")
 
 
+def _llm_mock(provider="lmstudio", model="qwen/qwen3-8b-mlx", gate=None):
+    """A stand-in LLM classifier class whose instances report the provider, model and gate they would really use."""
+    mock_classifier_cls = MagicMock()
+    instance = mock_classifier_cls.from_preset.return_value
+    instance.classify_batch.return_value = ["1_1"]
+    instance.provider, instance.model, instance.preclassifier_model = provider, model, gate
+    return mock_classifier_cls
+
+
 class TestBatchClassifyCardsCategoryLlmOptions:
-    def test_preset_and_overrides_reach_the_classifier_and_the_tag_names_the_model(self, tmp_path):
+    def test_preset_and_overrides_reach_the_classifier(self, tmp_path):
         with _make_db(tmp_path) as db:
             db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
 
-            mock_classifier_cls = MagicMock()
-            mock_classifier_cls.from_preset.return_value.classify_batch.return_value = ["1_1"]
+            mock_classifier_cls = _llm_mock("openrouter", "google/gemma-4-31b-it", "climatebert/gate")
             with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", mock_classifier_cls):
                 batch_classify_cards_category(
                     db,
@@ -174,29 +182,23 @@ class TestBatchClassifyCardsCategoryLlmOptions:
             mock_classifier_cls.from_preset.assert_called_once_with(
                 "cards-narrative", provider="openrouter", model="google/gemma-4-31b-it", use_preclassifier=True
             )
-            assert db["u1"]["cards_category_classifier"] == "cards-narrative|openrouter/google/gemma-4-31b-it"
 
-    def test_without_options_the_tag_is_the_preset_name(self, tmp_path):
+    def test_the_tag_records_the_model_that_actually_ran_even_without_overrides(self, tmp_path):
         with _make_db(tmp_path) as db:
             db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
 
-            mock_classifier_cls = MagicMock()
-            mock_classifier_cls.from_preset.return_value.classify_batch.return_value = ["1_1"]
+            with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", _llm_mock()):
+                batch_classify_cards_category(db, text_field="claim", classifier_engine="llm")
+
+            assert db["u1"]["cards_category_classifier"] == "xplainnlp-nslp|lmstudio/qwen/qwen3-8b-mlx"
+
+    def test_the_tag_names_the_gate_model_when_the_gate_is_on(self, tmp_path):
+        with _make_db(tmp_path) as db:
+            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
+
+            mock_classifier_cls = _llm_mock("openrouter", "google/gemma-4-31b-it", "climatebert/gate")
             with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", mock_classifier_cls):
                 batch_classify_cards_category(db, text_field="claim", classifier_engine="llm")
 
-            assert db["u1"]["cards_category_classifier"] == "xplainnlp-nslp"
-
-    def test_the_gate_flag_alone_does_not_rename_the_tag(self, tmp_path):
-        with _make_db(tmp_path) as db:
-            db["u1"] = {"url": "u1", "claim": "some claim", "lang": "en"}
-
-            mock_classifier_cls = MagicMock()
-            mock_classifier_cls.from_preset.return_value.classify_batch.return_value = ["1_1"]
-            with patch("climafactskg.classifiers.cards.llm.CARDSLLMClassifier", mock_classifier_cls):
-                batch_classify_cards_category(
-                    db, text_field="claim", classifier_engine="llm", llm_options={"use_preclassifier": True}
-                )
-
-            mock_classifier_cls.from_preset.assert_called_once_with("xplainnlp-nslp", use_preclassifier=True)
-            assert db["u1"]["cards_category_classifier"] == "xplainnlp-nslp"
+            expected = "xplainnlp-nslp|openrouter/google/gemma-4-31b-it+climatebert/gate"
+            assert db["u1"]["cards_category_classifier"] == expected

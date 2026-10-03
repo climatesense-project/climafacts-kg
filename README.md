@@ -63,6 +63,27 @@ The main mappings used to represent the Skeptical Science data in ClimaFactsKG a
 | *Related Argument*             | →     | `seeAlso` | <https://skepticalscience.com/global-cooling-january-2007-to-january-2008.htm>                                       |
 | *source: (...)*                | →     | `sc:citation` | <https://wattsupwiththat.wordpress.com/2008/02/19/january-2008-4-sources-say-globally-cooler-in-the-past-12-months/> |
 
+### 🏷️ Classifier Provenance
+
+Each CARDS label is the existing `schema:about` link (and its reverse `schema:subjectOf`), which is unchanged. The model that produced the labels is described next to it, from the tag stored with each classified entry, with one `schema:AssessAction` per distinct tag:
+
+| Stored tag | → | Mapping |
+| :--------- | :- | :------ |
+| one per distinct tag | → | `:classification_<md5 of the tag>` `a schema:AssessAction` with a `schema:name` |
+| each model that ran (the LLM, the gate model, or the transformer's two stages) | → | `schema:instrument` `:model_<md5 of the model id>` `a schema:SoftwareApplication`, `schema:name` = the model id |
+| each review that carries a label from that classifier | → | `schema:object` pointing at the review's own IRI |
+
+```turtle
+:classification_34368a354ffd368cd4848231b844379a
+    a schema:AssessAction ;
+    schema:name "CARDS labelling, two-stage transformer" ;
+    schema:instrument :model_0393bb74e1266405570ef25d42565c6b, :model_34e9248425d7d6b866b21c111863e2c5 ;
+    schema:object :claimreview_b9ba07b8af9a5410fdc5cb7be7acb708 .
+:model_0393bb74e1266405570ef25d42565c6b a schema:SoftwareApplication ; schema:name "crarojasca/BinaryAugmentedCARDS" .
+```
+
+Reviews with no tag, or with a bare preset name (older runs did not record the model), get no description rather than a guessed one, and a review with no CARDS link gets nothing, as before. The nodes follow the graph's `<type>_<md5>` convention and add one triple per labelled review.
+
 ### 📚 Scientific References Mappings
 
 Scholarly references cited in Skeptical Science articles are extracted from the SkS glossary and mapped to structured RDF using Schema.org as the primary vocabulary, supplemented by BIBO and CiTO:
@@ -157,7 +178,7 @@ ClimaFactsKG has a simple CLI interface accessible via the `climafactskg` comman
 
 `collect` and `process` run their steps independently: a failed step is logged and the others still run, but the command then exits 1, so scripts notice. Page and SPARQL requests time out (`CLIMAFACTSKG_FETCH_TIMEOUT`, 30 s; `CLIMAFACTSKG_SPARQL_TIMEOUT`, 300 s), and an error response is never cached or parsed. `process` classifies with the local transformer engine by default (`--classifier transformer`, requires the `transformer` extra — see Installation above); pass `--classifier llm` to use the LLM-based path instead (core install, see provider table below). `build` merges SkepticalScience, CimpleKG, and ClimateSenseKG data plus the CARDS taxonomy into one `data/climafacts_kg.ttl`.
 
-`process --classifier llm` runs the `xplainnlp-nslp` preset as defined (a local LM Studio model, ClimateBERT gate off) unless told otherwise: `--preset`, `--provider` and `--model` choose another preset, provider and model, and `--preclassifier` / `--no-preclassifier` turn the gate on or off (all four need `--classifier llm`; without them nothing changes). The provenance tag stored with each classified entry then names the provider and model, for example `xplainnlp-nslp|openrouter/google/gemma-4-31b-it`. Example: `climafactskg process --classifier llm --provider openrouter --model google/gemma-4-31b-it --preclassifier --concurrency 24`.
+`process --classifier llm` runs the `xplainnlp-nslp` preset as defined (a local LM Studio model, ClimateBERT gate off) unless told otherwise: `--preset`, `--provider` and `--model` choose another preset, provider and model, and `--preclassifier` / `--no-preclassifier` turn the gate on or off (all four need `--classifier llm`; without them nothing changes). Whatever the options, the provenance tag stored with each classified entry records the model that actually ran, for example `xplainnlp-nslp|openrouter/google/gemma-4-31b-it`, with the gate model appended when the gate is on (`...+climatebert/distilroberta-base-climate-detector`); the transformer engine's tag is `transformer:<binary model>,<taxonomy model>`. Example: `climafactskg process --classifier llm --provider openrouter --model google/gemma-4-31b-it --preclassifier --concurrency 24`.
 
 `process --cache-path` (default: `data/cards_classification_cache.db`) is a Preserve SQLite cache shared across all sources below it in the pipeline (CimpleKG, ClimateSenseKG, SkepticalScience arguments), so identical claim/argument text is classified once instead of once per source. Pass an empty string to disable caching.
 

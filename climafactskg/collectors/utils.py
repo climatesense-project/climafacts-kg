@@ -100,10 +100,12 @@ def batch_classify_cards_category(
         overrides = {"cache_path": cache_path} if cache_path is not None else {}
         overrides.update(options)
         classifier = CARDSLLMClassifier.from_preset(preset, **overrides)
-        # Presence of the tag marks an entry as classified, so naming the model in it costs nothing
-        # and shows afterwards which model produced the labels.
-        named = [str(options[k]) for k in ("provider", "model") if options.get(k)]
-        classifier_id = f"{preset}|{'/'.join(named)}" if named else preset
+        # Presence of the tag marks an entry as classified, so recording what actually ran costs nothing: the
+        # preset, the provider and model the classifier really calls (a preset's defaults included), and the
+        # pre-classifier gate when it is on. The graph builders read the tag back to describe the classifier.
+        classifier_id = f"{preset}|{classifier.provider}/{classifier.model}"
+        if classifier.preclassifier_model:
+            classifier_id += f"+{classifier.preclassifier_model}"
     else:
         raise ValueError(f"Unknown classifier_engine {classifier_engine!r}; expected 'transformer' or 'llm'")
 

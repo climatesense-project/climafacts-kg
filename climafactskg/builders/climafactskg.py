@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from rdflib import OWL, RDF, RDFS, SDO, XSD, BNode, Graph, Literal, Namespace, URIRef
 
 from climafactskg.builders.cimplekg import add_cards_category_link, generate_cimplekg_mappings
+from climafactskg.builders.provenance import add_classification_provenance
 from climafactskg.builders.utils import new_graph, safe_uriref
 from climafactskg.utils import hash_string
 
@@ -199,7 +200,8 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 )
 
             # Add cards category if present.
-            add_cards_category_link(article_g, cards_ns, ns[claimreview_id], arg.get("cards_category"))
+            if add_cards_category_link(article_g, cards_ns, ns[claimreview_id], arg.get("cards_category")):
+                add_classification_provenance(article_g, ns, arg.get("cards_category_classifier"), [ns[claimreview_id]])
 
             # Add content of the review:
             article_g.add((ns[claimreview_id], SDO.name, Literal(_normalize_text(arg["title"]), lang=lang)))

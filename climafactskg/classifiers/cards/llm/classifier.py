@@ -337,6 +337,23 @@ class CARDSLLMClassifier(CARDSClassifierBase):
     # Factory
     # ------------------------------------------------------------------
 
+    @property
+    def provider(self) -> str:
+        """The LLM provider this classifier calls (for example ``"openrouter"``)."""
+        return self._provider
+
+    @property
+    def model(self) -> str:
+        """The model id this classifier calls (for example ``"google/gemma-4-31b-it"``)."""
+        return self._model
+
+    @property
+    def preclassifier_model(self) -> Optional[str]:
+        """The id of the pre-classifier gate model in use, or ``None`` when the gate is off."""
+        if self._preclassifier is None:
+            return None
+        return getattr(self._preclassifier, "model_name", None) or type(self._preclassifier).__name__
+
     @classmethod
     def from_preset(cls, name: str, preclassifier=None, **overrides) -> "CARDSLLMClassifier":
         """Instantiate from a named preset.
