@@ -451,12 +451,18 @@ class CARDSLLMClassifier(CARDSClassifierBase):
                         result = await self._run_with_deadline(user_msg)
                 return result.output
             except UnexpectedModelBehavior as exc:
-                # A malformed reply relayed from the provider (e.g. ``choices: null``) is transient; a model that
-                # cannot produce valid output ("Exceeded maximum output retries") is not, so it is not retried.
-                if not str(exc).startswith("Invalid response from") or attempt == _DEFAULT_MAX_RETRIES:
+                # Two kinds are intermittent and worth asking again: a malformed reply relayed from the provider
+                # (``choices: null``) and output that failed validation on every inner try (a model such as
+                # gpt-oss-120b answers garbage on one attempt and valid JSON on the next). A token limit would simply
+                # repeat, so it is raised.
+                message = str(exc)
+                transient = message.startswith("Invalid response from") or message.startswith(
+                    "Exceeded maximum output retries"
+                )
+                if not transient or attempt == _DEFAULT_MAX_RETRIES:
                     raise
                 logger.warning(
-                    "Invalid provider response on attempt %d/%d, retrying", attempt + 1, _DEFAULT_MAX_RETRIES + 1
+                    "Unusable model reply on attempt %d/%d, asking again", attempt + 1, _DEFAULT_MAX_RETRIES + 1
                 )
             except asyncio.TimeoutError:
                 # The whole call exceeded the deadline (a stalled provider); retry like any transient failure.

@@ -314,9 +314,25 @@ class TestInvalidProviderResponse:
 
         assert out.cards_category == "1_1" and calls["n"] == 3
 
-    def test_a_model_that_cannot_produce_valid_output_is_not_retried(self, monkeypatch):
+    def test_invalid_output_is_retried_because_it_is_intermittent(self, monkeypatch):
+        from pydantic_ai.exceptions import UnexpectedModelBehavior
+
+        # gpt-oss-120b answers garbage on some attempts and valid JSON on the next, so a failed item is asked again.
+        out, calls = self._run(monkeypatch, UnexpectedModelBehavior("Exceeded maximum output retries (3)"), failures=2)
+
+        assert out.cards_category == "1_1" and calls["n"] == 3
+
+    def test_invalid_output_that_never_recovers_raises_after_the_retry_limit(self, monkeypatch):
         import pytest
         from pydantic_ai.exceptions import UnexpectedModelBehavior
 
         with pytest.raises(UnexpectedModelBehavior):
             self._run(monkeypatch, UnexpectedModelBehavior("Exceeded maximum output retries (3)"), failures=99)
+
+    def test_a_token_limit_is_not_retried_because_it_would_repeat(self, monkeypatch):
+        import pytest
+        from pydantic_ai.exceptions import UnexpectedModelBehavior
+
+        error = UnexpectedModelBehavior("Model token limit (8000) exceeded before any response was generated.")
+        with pytest.raises(UnexpectedModelBehavior):
+            self._run(monkeypatch, error, failures=99)
