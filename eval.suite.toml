@@ -153,6 +153,93 @@ output_mode = "prompted"
 [classifiers.options.extra_body.provider]
 ignore = ["SambaNova"]
 
+# ---- added: more Qwen, Mistral and other open-weight models -------------------------------------------------------
+# Qwen. 3.8-27b is the small open-weight 3.8; the free tier costs nothing but is rate limited, so it runs slowly.
+[[classifiers]]
+label = "qwen3.8-27b"
+model = "qwen/qwen3.8-27b:free"
+concurrency = 4
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "qwen3.5-9b"
+model = "qwen/qwen3.5-9b"
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "qwen3.7-flash"                  # closed (Alibaba), a cheap reference
+model = "qwen/qwen3.7-flash"
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "qwen3.8-flash"                  # closed (Alibaba), a cheap reference
+model = "qwen/qwen3.8-flash"
+[classifiers.options]
+max_tokens = 8000
+
+# Mistral: the new generation (Small 4, Ministral 3, Large 3).
+[[classifiers]]
+label = "mistral-small-2603"
+model = "mistralai/mistral-small-2603"
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "ministral-14b-2512"
+model = "mistralai/ministral-14b-2512"
+[classifiers.options]
+max_tokens = 1500
+
+[[classifiers]]
+label = "mistral-large-2512"
+model = "mistralai/mistral-large-2512"
+[classifiers.options]
+max_tokens = 1500
+
+# Other open-weight models.
+[[classifiers]]
+label = "glm-5.3-flash"
+model = "z-ai/glm-5.3-flash"
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "ling-3.0-flash"
+model = "inclusionai/ling-3.0-flash"
+size_b = 124                             # a 124B mixture of experts, per its model card
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "gemma-3-12b"
+model = "google/gemma-3-12b-it"
+[classifiers.options]
+max_tokens = 1500
+
+[[classifiers]]
+label = "llama-4-scout"                  # the Llama family leaves the category empty in tool mode, so prompted
+model = "meta-llama/llama-4-scout"
+size_b = 109
+active_b = 17
+[classifiers.options]
+output_mode = "prompted"
+max_tokens = 1500
+
+[[classifiers]]
+label = "nemotron-3-nano-30b"
+model = "nvidia/nemotron-3-nano-30b-a3b"
+[classifiers.options]
+max_tokens = 8000
+
+[[classifiers]]
+label = "mimo-v2.6-flash"
+model = "xiaomi/mimo-v2.6-flash"
+[classifiers.options]
+max_tokens = 8000
+
 # ---- closed, expensive: about $7 to $21 for the three benchmarks, so left out unless wanted ------------------------
 # [[classifiers]]
 # label = "gpt-5.2"
