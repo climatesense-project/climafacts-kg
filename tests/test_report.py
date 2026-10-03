@@ -830,3 +830,54 @@ class TestHierarchicalF1Plot:
         html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
 
         assert "Hierarchical F1 when detected" in _sub(_benchmark(html, "d1"), "Charts")
+
+
+class TestAveragesAcrossBenchmarks:
+    def _html(self, tmp_path, run=None):
+        return render_html([run or _separated_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+    def _section(self, html):
+        start = html.index("<h2>Across benchmarks</h2>")
+        end = html.index('<section class="benchmark">', start)
+        return html[start:end]
+
+    def test_the_section_sits_between_the_overview_and_the_benchmarks(self, tmp_path):
+        html = self._html(tmp_path)
+
+        assert (
+            html.index("<h2>Overview</h2>")
+            < html.index("<h2>Across benchmarks</h2>")
+            < html.index('<section class="benchmark">')
+        )
+
+    def test_only_models_run_on_every_benchmark_are_averaged_and_the_others_are_listed(self, tmp_path):
+        section = self._section(self._html(tmp_path))
+        note, charts = section.split("Not on every benchmark")[1].split("</p>", 1)
+
+        assert "C" in note  # listed as left out: it was only run on d1
+        assert ">A<" in charts and ">B<" in charts and ">C<" not in charts
+
+    def test_each_benchmark_counts_equally_in_the_average(self, tmp_path):
+        section = self._section(self._html(tmp_path))
+        category = section[section.index("Category when detected") :]
+
+        # A: (0.50 + 0.40) / 2 = 0.45 and B: (0.70 + 0.65) / 2 = 0.675 (shown 0.68), best first
+        assert category.index(">B<") < category.index(">A<")
+        assert "0.45" in category and "0.68" in category
+
+    def test_it_averages_detection_separately_from_the_category(self, tmp_path):
+        section = self._section(self._html(tmp_path))
+        detection = section[section.index("Narrative detection F1") :]
+
+        assert detection.index(">A<") < detection.index(">B<")  # A: (0.80 + 0.70) / 2 beats B: (0.60 + 0.55) / 2
+
+    def test_the_averages_are_also_plotted_against_model_size(self, tmp_path):
+        section = self._section(self._html(tmp_path))
+        labels = re.findall(r'aria-label="([^"]*)"', section)
+
+        assert any("against model size" in label and "average" in label.lower() for label in labels)
+
+    def test_a_single_benchmark_report_has_no_averages_section(self, tmp_path):
+        html = render_html([_two_config_run()], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "Across benchmarks" not in html

@@ -1029,6 +1029,82 @@ def _overview(summary: pd.DataFrame) -> str:
     return "<h2>Overview</h2>" + category + detection
 
 
+def _across_benchmarks(summary: pd.DataFrame, size_range: tuple[float, float] | None = None) -> str:
+    """Each model's average over the benchmarks, ranked, and against model size.
+
+    Every benchmark counts equally (a plain mean of the per-benchmark scores, context: none), so a large benchmark
+    does not outweigh a small one. Only models run on every benchmark are averaged, since an average over different
+    benchmarks is not comparable; the others are listed.
+    """
+    datasets = list(dict.fromkeys(summary["dataset"].astype(str)))
+    usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
+    configs = list(dict.fromkeys(summary["config"].astype(str)))
+    none_rows = usable[usable["context"] == "none"]
+    blocks: list[str] = []
+    complete: set[str] = set(configs)
+    specs = [
+        ("exact_detected", "Category when detected"),
+        ("hf1_detected", "Hierarchical F1 when detected"),
+        ("rel_f1", "Narrative detection F1"),
+    ]
+    if "exact_detected" not in usable.columns or usable["exact_detected"].notna().sum() == 0:
+        specs = [("exact_match", "Exact match"), ("h_f1", "Hierarchical F1")]
+    averages: dict[str, pd.Series] = {}
+    for metric, title in specs:
+        if metric not in none_rows.columns or none_rows[metric].notna().sum() == 0:
+            continue
+        table = none_rows.pivot_table(
+            index=none_rows["config"].astype(str), columns=none_rows["dataset"].astype(str), values=metric
+        )
+        full = table.reindex(columns=datasets).dropna()
+        if len(full) == 0:
+            continue
+        averages[metric] = full.mean(axis=1)
+        complete &= set(full.index)
+        items = [(str(config), float(value), float("nan"), float("nan")) for config, value in averages[metric].items()]
+        blocks.append(
+            f"<h3>{_esc(title)}, average over {len(datasets)} benchmarks</h3>"
+            + ranked_bars_svg(f"{title}, average over the benchmarks", items)
+        )
+        if "size_b" in summary.columns:
+            sizes = summary.drop_duplicates("config").set_index(summary.drop_duplicates("config")["config"].astype(str))
+            points = []
+            for config, value in averages[metric].items():
+                row = sizes.loc[str(config)]
+                if pd.isna(row["size_b"]):
+                    continue
+                points.append(
+                    {
+                        "label": str(config),
+                        "size": float(row["size_b"]),
+                        "active": None if pd.isna(row.get("active_b")) else float(row["active_b"]),
+                        "value": float(value),
+                        "lo": float("nan"),
+                        "hi": float("nan"),
+                        "flag": False,
+                    }
+                )
+            if len(points) >= 2:
+                blocks.append(
+                    size_scatter_svg(
+                        f"{title}: average over the benchmarks against model size",
+                        points,
+                        size_range=size_range,
+                        y_label=f"{title} (average)",
+                    )
+                )
+    if not blocks:
+        return ""
+    left_out = [c for c in configs if c not in complete]
+    note = (
+        '<p class="muted">The mean of the per-benchmark scores, each benchmark counting equally, over the '
+        f"{len(datasets)} benchmarks; only models run on all of them are included.</p>"
+    )
+    if left_out:
+        note += f'<p class="muted">Not on every benchmark, so left out: {", ".join(_esc(c) for c in left_out)}.</p>'
+    return "<h2>Across benchmarks</h2>" + note + "".join(blocks)
+
+
 def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: str | None = None) -> Path:
     """Renders *runs* as one self-contained HTML report at *out_path* and returns the path.
 
@@ -1065,7 +1141,7 @@ def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: st
                 f'<section class="benchmark"><h2>{_esc(dataset)}</h2>'
                 f"{_demote(_benchmark_body(part, part_cases, baseline, True, size_range))}</section>"
             )
-        body = _overview(summary) + "".join(sections)
+        body = _overview(summary) + _across_benchmarks(summary, size_range) + "".join(sections)
     document = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1"><title>CARDS evaluation report</title>'
