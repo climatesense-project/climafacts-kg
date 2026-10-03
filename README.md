@@ -110,14 +110,17 @@ The following table shows the main entity and triple counts in the current Clima
 
 | Entity / Relationship                   | Count   |
 | :-------------------------------------- | ------: |
-| `sc:ClaimReview` nodes                  | 1,589   |
+| `sc:ClaimReview` nodes                  | 1,588   |
 | `sc:Claim` nodes (unique myths)         | 252     |
 | `sc:ScholarlyArticle` / `bibo:AcademicArticle` nodes | 1,205 |
 | `sc:Periodical` / `bibo:Journal` nodes  | 420     |
-| `sc:Person` nodes (article authors)     | 4,586   |
+| `sc:Person` nodes (article authors)     | 4,585   |
 | `sc:citation` triples (source links)    | 982     |
 | `cito:cites` triples (scholarly links)  | 485     |
-| Total RDF triples                       | 91,444  |
+| CARDS labels (`schema:about` links to a `cards:` concept, each with its reverse `schema:subjectOf`) | 6,012 |
+| `sc:AssessAction` nodes (classifier descriptions, see Classifier Provenance above) | 1 |
+| `sc:SoftwareApplication` nodes (models that produced the labels) | 2 |
+| Total RDF triples                       | 95,158  |
 
 Run `climafactskg validate` for a live, always-up-to-date count of these figures.
 
