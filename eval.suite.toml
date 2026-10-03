@@ -84,6 +84,7 @@ max_tokens = 1500
 [[classifiers]]
 label = "mistral-nemo"
 model = "mistralai/mistral-nemo"
+concurrency = 6                        # the provider answers 429 above this (32 parallel calls failed 674 items)
 size_b = 12                              # not in the model id, so stated for the size plot
 
 # ---- open-weight, reasoning models (slower, a little dearer) -------------------------------------------------------
@@ -93,6 +94,7 @@ max_tokens = 1500
 [[classifiers]]
 label = "nemotron-3-super-120b"
 model = "nvidia/nemotron-3-super-120b-a12b"
+concurrency = 6                        # the provider answers 429 above this (32 parallel calls failed 674 items)
 [classifiers.options]
 max_tokens = 8000
 
