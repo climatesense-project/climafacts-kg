@@ -415,7 +415,7 @@ What the full results show:
 - **Paying more does not help.** By catalog list price, the models at $0.30 per million tokens or more reach about 0.61, below the cheapest group (about 0.65). But list price is a poor guide: reasoning models cost far more per call than it suggests. Measured per call, `deepseek-v4-flash` (0.646) costs about $0.0017, `gemma-4-31b` (0.614) about $0.0004 and `ministral-14b-2512` (0.598) about $0.0001, so each extra point of accuracy over gemma costs several times as much.
 - **Size matters below about 10B.** Under 10B the scores fall clearly (`qwen3.5-9b` 0.506, `llama-3.1-8b` 0.377). Between 14B and 35B the differences are within noise.
 - **Mistral family.** `mistral-small-3.2-24b` (0.607) is effectively tied with `gemma-4-31b` and costs about the same hosted; it needs less memory (about 14 GB at 4-bit), so it suits 16 to 24 GB hardware, but its narrative detection is a little lower (F1 0.828 against 0.843). `ministral-14b-2512` (0.598) is the best small model. `mistral-small-2603` (0.497), `mistral-nemo` (0.431) and `mistral-large-2512` (0.422, with failed items) are not worth using.
-- **Review context does not help on v2.** It lowered exact match for 24 of 32 models, by 3.5 points on average, against gold labels that were annotated from the claim alone.
+- **Review context does not help on v2.** It lowered the balanced score for six of seven finalists (significantly for `glm-5.3-flash`, -0.064, and `ministral-14b-2512`, -0.075), mostly by adding false alarms, against gold labels that were annotated from the claim alone. Classify the claim alone.
 - **Check the failure count.** A model that cannot follow the output format scores badly without the score saying why. In this run `ling-3.0-flash` answered "no narrative" for almost every claim and `mistral-large-2512` was rate-limited upstream (failed items count as wrong), so neither is a fair comparison. The report shows `n_failed` for every model.
 
 Which prompt to use. All the results above use one prompt, the `xplainnlp-nslp` preset. We also compared it with the other two built-in prompts, `climatesense-nslp` and `cards-narrative`, on three models and all three benchmarks (claim only, same settings, no failed items):
@@ -458,13 +458,14 @@ Classifying the whole graph (about 263,000 texts: 261,858 from ClimateSenseKG an
 
 For example, `climafactskg process --classifier llm --provider openrouter --model google/gemma-4-31b-it --preclassifier --concurrency 24` runs the whole graph on hosted gemma with the gate on (needs `OPENROUTER_API_KEY`, and the `transformer` extra for the gate; `--preset`, `--provider` and `--model` need `--classifier llm`). Each entry's `cards_category_classifier` field then records the preset and model, such as `xplainnlp-nslp|openrouter/google/gemma-4-31b-it`, so a later reader can tell which model produced the label (it is stored in the database, not yet emitted into the graph). A run is resumable: successful answers are cached and failed items are asked again next time. If you want to start now, `gemma-4-31b` hosted is the practical choice (best category accuracy under 120B, fast, no failures in the timing test); `deepseek-v4-flash` scores about 3 points higher and costs less, but is slow unless its reasoning effort is lowered. The ClimateSenseKG endpoint tags about 13,000 claims with `schema:mentions dbpedia:Climate_change`, which could pre-filter the query, but that silently drops every climate claim without that tag, and how many that is has not been measured, so the collector does not use it.
 
-Running it yourself (sizes and memory arithmetic, not measured on this hardware):
+Running it yourself (sizes and memory arithmetic, not measured on this hardware; the scores are within noise of each other, so choose by memory and speed, and see [docs/model-selection.md](docs/model-selection.md#running-it-yourself)):
 
 | Hardware | Memory | Model |
 | :------- | :----- | :---- |
 | T4 (Colab) | 16 GB | `ministral-14b-2512` at 4-bit (about 9 GB). The T4 has no bf16 and no FlashAttention 2, so use fp16 with an AWQ or GGUF model |
 | L4 (Colab) | 24 GB | `gemma-4-31b` at 4-bit (about 18 GB), or `mistral-small-3.2-24b` (about 14 GB) for more room for context |
 | A100 40 GB (Colab) | 40 GB | `gemma-4-31b` at 8-bit or `qwen3.6-35b` at 4-bit; `nemotron-3-super-120b` needs about 65 GB and does not fit |
+| A100 80 GB or H100 (Colab) | 80 GB | `nemotron-3-super-120b` at 4-bit (about 65 GB, a tight fit; best balanced score of the locally runnable models, 0.630, but its speed was not measured) |
 | Mac, 32 GB | 32 GB | `gemma-4-31b` or `mistral-small-3.2-24b` at 4-bit |
 | Mac or GPU, 16 GB | 16 GB | `ministral-14b-2512` at 4-bit |
 | 8 GB | 8 GB | Nothing good fits; `qwen3.5-9b` (0.506) is the best model under 10B, with a large drop in accuracy |

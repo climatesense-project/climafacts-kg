@@ -7,6 +7,7 @@ This report records how 32 classifiers were compared for labelling claims with t
 - **No model is clearly the best.** Roughly the top ten LLMs are statistically tied (95% intervals overlap by a wide margin), so the choice comes down to cost, speed, openness and which kind of mistake you can tolerate.
 - **Two kinds of mistake trade against each other.** A model can flag too many documents that carry no denial narrative (false alarms), or miss real narratives. Prompts, the ClimateBERT gate and model choice all move along that trade-off more than they improve both at once.
 - **Size stops mattering at about 14B parameters.** Between 14B and 1.6T the scores are flat within noise. Below 10B they fall clearly.
+- **Review context hurts.** It lowered the balanced score for six of seven finalists, mostly by adding false alarms, so classify the claim alone.
 - **Cost per call varies about 20-fold between models of similar quality** (measured, not list price). Catalog list prices are a poor guide: reasoning models bill many more tokens than the price suggests.
 - **A tuned prompt did not give a dependable gain.** One model gained significantly on exact match, and only for the exact text the optimiser returned. On the balanced score it lowered or did not change the result for all five models tested, and clearly hurt `ministral-14b-2512`.
 
@@ -16,6 +17,7 @@ This report records how 32 classifiers were compared for labelling claims with t
 | Highest balanced score | `qwen3.8-flash` | 0.654 (tied with `deepseek-v4-flash`), about $0.00033 per call; open weights not confirmed |
 | Highest category accuracy | `deepseek-v4-flash` | 0.604 on documents with a narrative, but the most false alarms of the finalists (19.9%) and about $0.0017 per call |
 | Fastest | `gemma-4-31b` or `ministral-14b-2512` | About 5 s per call; gemma has 19% false alarms, ministral 17% |
+| Your own hardware (16 to 24 GB) | `ministral-14b-2512` (16 GB) or `gemma-4-31b` (24 GB or more) | Balanced 0.616 and 0.620, short answers so fast per call; see [Running it yourself](#running-it-yourself) |
 | Smallest that still holds up | `ministral-14b-2512` | 14B, balanced 0.616, fits a 16 GB GPU or Mac at 4-bit |
 
 These are tie-breaks, not wins: pick by the column that matters to you.
@@ -140,9 +142,37 @@ False alarms fell on every model, and detection recall and category accuracy on 
 
 At this weighting the tuned prompt never helps and clearly hurts ministral. With equal weights (0.5) the changes are small and mixed (from -0.049 to +0.016), none significant except ministral with the wrapper (-0.049). The tuned prompt moves a model along the trade-off, fewer false alarms for less category accuracy, but does not make it more balanced, so the default prompt is the one to use. The tuned prompt is available as the opt-in `xplainnlp-nslp-tuned` preset, which records these caveats.
 
-## Hardware
+## Review context
 
-Sizes and memory arithmetic, not measured on this hardware: 4-bit `ministral-14b-2512` is about 9 GB (fits a 16 GB T4, or a Mac with 16 GB); 4-bit `gemma-4-31b` is about 18 GB (an L4 with 24 GB, or a Mac with 32 GB). Reasoning models are slow per call. For the whole graph on hosted models, `process` takes `--preset`, `--provider`, `--model` and `--preclassifier` so the cheaper models above can be run without code changes.
+Each `climatesense_v2` document can also be classified with the fact-check's review text as context (all 277 of them have one in the saved runs). With the default prompt, balanced score (0.75 / 0.25) on v2 only, without and with context:
+
+| Model | Balanced, without -> with | Change (95% interval) | Category accuracy | False alarms |
+| :---- | :------------------------ | :-------------------- | :---------------- | :----------- |
+| glm-5.3-flash | 0.603 -> 0.540 | -0.064 (-0.118 to -0.016) | 61.3% -> 54.0% | 42.5% -> 46.3% |
+| qwen3.8-flash | 0.596 -> 0.577 | -0.019 (-0.058 to +0.025) | 58.9% -> 58.1% | 38.1% -> 43.3% |
+| gemma-4-31b | 0.522 -> 0.561 | +0.040 (-0.013 to +0.093) | 52.4% -> 56.5% | 48.5% -> 44.8% |
+| ministral-14b-2512 | 0.554 -> 0.479 | -0.075 (-0.129 to -0.022) | 52.4% -> 49.2% | 35.8% -> 56.0% |
+| deepseek-v4-flash | 0.590 -> 0.557 | -0.033 (-0.079 to +0.010) | 60.5% -> 58.1% | 45.5% -> 51.5% |
+| deepseek-v4-pro | 0.584 -> 0.566 | -0.018 (-0.059 to +0.022) | 57.3% -> 58.1% | 38.1% -> 47.8% |
+| qwen3.6-35b | 0.551 -> 0.533 | -0.018 (-0.066 to +0.033) | 51.6% -> 49.2% | 34.3% -> 34.3% |
+
+Six of seven models score lower with context, and the drop is significant for `glm-5.3-flash` and `ministral-14b-2512`. The pattern is more false alarms: a review that debunks a myth quotes it, and the model then flags it. Across all 32 models, exact match fell for 24 (by 3.5 points on average). The gold labels were annotated from the claim alone, so this measures agreement with claim-only labels, not whether context would help a human. The recommendation is to classify the claim alone. The tuned prompt is claim-only, so it was not tested with context.
+
+## Running it yourself
+
+Scores are the hosted ones (0.75 / 0.25 weighting); sizes and memory are arithmetic, and neither quantisation loss nor local speed was measured.
+
+| Hardware | Model | Balanced | Category accuracy | False alarms |
+| :------- | :---- | :------- | :---------------- | :----------- |
+| T4 (16 GB), a 16 GB Mac | `ministral-14b-2512`, 4-bit (about 9 GB) | 0.616 | 54.4% | 17.1% |
+| L4 (24 GB), A100 40 GB, a 32 GB Mac | `gemma-4-31b`, 4-bit (about 18 GB) | 0.620 | 55.7% | 19.1% |
+| A100 80 GB, H100 | `nemotron-3-super-120b`, 4-bit (about 65 GB, a tight fit) | 0.630 | 56.0% | 16.1% |
+
+- **They are tied.** The three span 0.616 to 0.630 with intervals of about ±0.04, so a bigger GPU does not buy score. The best hosted model scores 0.654, so running locally costs about 0.03 to 0.04.
+- **Short answers matter locally.** `ministral-14b-2512` and `gemma-4-31b` answer in about 80 tokens (about 5 s per call hosted). `qwen3.6-35b` (0.619) hit token limits and `glm-4.7-flash` (0.602) took about 28 s per call, because both reason at length, and every generated token costs time on your own machine. `nemotron-3-super-120b` has 12B active parameters, but its reasoning length was not measured.
+- **The models that score higher are hosted only:** `glm-5.3-flash` (320B), `deepseek-v4-flash` (284B) and `qwen3.8-flash` (size unpublished).
+- **Use the gate and the default prompt.** With the gate the whole graph is about 21,000 calls instead of about 263,000, which decides whether a local run is feasible at all.
+- **Serving.** On a GPU use vLLM or Ollama so requests are batched; on a Mac with LM Studio send one request at a time. The T4 has no bf16 and no FlashAttention 2, so use fp16 with an AWQ or GGUF model. For the whole graph on hosted models, `process` takes `--preset`, `--provider`, `--model` and `--preclassifier` so no code changes are needed.
 
 ## Limits of this report
 
