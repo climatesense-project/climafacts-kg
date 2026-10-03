@@ -23,6 +23,7 @@ from .prompts import (
     XPLAINNLP_NSLP_PROVIDER,
     XPLAINNLP_NSLP_SYSTEM_PROMPT,
     XPLAINNLP_NSLP_SYSTEM_PROMPT_WITH_CONTEXT,
+    XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT,
     XPLAINNLP_NSLP_USER_PROMPT,
     XPLAINNLP_NSLP_USER_PROMPT_WITH_CONTEXT,
 )
@@ -237,6 +238,34 @@ class XplaiNLPNSLPCARDSLLMConfig(CARDSLLMConfig):
     temperature: float = 0.6
     top_p: float | None = 0.95
     max_tokens: int | None = 4096
+
+
+@register_preset("xplainnlp-nslp-tuned")
+@dataclasses.dataclass
+class XplaiNLPNSLPTunedCARDSLLMConfig(XplaiNLPNSLPCARDSLLMConfig):
+    """Preset: ``xplainnlp-nslp`` with a GEPA-tuned system prompt. Experimental, opt in by name.
+
+    Everything but the system prompt is inherited from ``xplainnlp-nslp``. What was measured, on 547 held-out cases
+    (the rest of ClimateSense v1/v2 after the tuning slices, plus the NSLP test split), all with
+    ``google/gemma-4-31b-it``, temperature 0 and the ClimateBERT gate off:
+
+    * Exact match went from 0.746 to 0.784 (+3.8 points, 95% interval +1.1 to +6.6, McNemar p = 0.009).
+    * It makes fewer false alarms (documents with no narrative given a category): v1 7.7% to 3.2%, v2 53.4% to 25.9%,
+      NSLP test 8.1% to 4.8%.
+    * It also misses more real narratives (detection recall on v2 0.897 to 0.776), and the category accuracy on
+      detected v2 claims fell (0.594 to 0.449).
+
+    Where it does not hold up, so treat it as a trade-off and not as a better prompt:
+
+    * The gain is for that exact text. With the JSON wrapper removed, gemma gained only +1.8 points (not significant).
+    * It did not transfer to ``mistralai/ministral-14b-2512`` (exact match 0.757 before and after).
+    * It was tuned for claims alone: with review context the preset uses the unchanged ``xplainnlp-nslp`` prompt.
+    * Its examples come from the annotated datasets (for instance "hide the decline"), so it may be fitted to them.
+
+    Check it on your own data before relying on it, for example with ``eval run`` against ``xplainnlp-nslp``.
+    """
+
+    system_prompt: str = XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT
 
 
 @register_preset("cards-narrative")
