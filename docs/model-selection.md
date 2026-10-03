@@ -8,7 +8,7 @@ This report records how 32 classifiers were compared for labelling claims with t
 - **Two kinds of mistake trade against each other.** A model can flag too many documents that carry no denial narrative (false alarms), or miss real narratives. Prompts, the ClimateBERT gate and model choice all move along that trade-off more than they improve both at once.
 - **Size stops mattering at about 14B parameters.** Between 14B and 1.6T the scores are flat within noise. Below 10B they fall clearly.
 - **Cost per call varies about 20-fold between models of similar quality** (measured, not list price). Catalog list prices are a poor guide: reasoning models bill many more tokens than the price suggests.
-- **A tuned prompt did not give a dependable gain.** One model gained significantly, and only for the exact text the optimiser returned.
+- **A tuned prompt did not give a dependable gain.** One model gained significantly on exact match, and only for the exact text the optimiser returned. On the balanced score it lowered or did not change the result for all five models tested, and clearly hurt `ministral-14b-2512`.
 
 | If you want | Take | Why |
 | :---------- | :--- | :-- |
@@ -126,7 +126,19 @@ Each cell is exact category (mean over the three benchmarks) / false-alarm rate.
 | ministral-14b-2512 | 0.757 | 0.757 | 0.0 points |
 | deepseek-v4-flash (299 cases) | 0.763 | 0.783 | +2.0 points (-1.7 to +5.7, p = 0.39) |
 
-False alarms fell on every model, and detection recall and category accuracy on detected claims fell with them. The one significant result is one model with one exact text. The tuned prompt is available as the opt-in `xplainnlp-nslp-tuned` preset, which records these caveats.
+False alarms fell on every model, and detection recall and category accuracy on detected claims fell with them. The one significant exact-match gain is one model with one exact text.
+
+**Balanced score with the tuned prompt** (weights 0.75 / 0.25, held-out cases, claim only; the change is tuned minus default, with a 95% interval):
+
+| Model | Cases | Default | Tuned, with wrapper | Tuned, wrapper removed |
+| :---- | :---- | :------ | :------------------ | :--------------------- |
+| gemma-4-31b | 547 | 0.654 | 0.639 (-0.015, -0.054 to +0.023) | 0.626 (-0.028, -0.069 to +0.011) |
+| glm-5.3-flash | 547 | 0.673 | 0.647 (-0.027, -0.060 to +0.004) | 0.674 (+0.001, -0.033 to +0.026) |
+| qwen3.8-flash | 547 | 0.678 | 0.667 (-0.011, -0.052 to +0.026) | 0.658 (-0.020, -0.057 to +0.016) |
+| ministral-14b-2512 | 547 | 0.654 | 0.583 (-0.071, -0.116 to -0.029) | 0.610 (-0.044, -0.089 to -0.003) |
+| deepseek-v4-flash | 299 | 0.707 | not run | 0.701 (-0.006, -0.060 to +0.049) |
+
+At this weighting the tuned prompt never helps and clearly hurts ministral. With equal weights (0.5) the changes are small and mixed (from -0.049 to +0.016), none significant except ministral with the wrapper (-0.049). The tuned prompt moves a model along the trade-off, fewer false alarms for less category accuracy, but does not make it more balanced, so the default prompt is the one to use. The tuned prompt is available as the opt-in `xplainnlp-nslp-tuned` preset, which records these caveats.
 
 ## Hardware
 
