@@ -81,6 +81,20 @@ Measured as the change in the OpenRouter account's usage over 24 real claims per
 
 The graph totals multiply the per-call cost by the number of calls and are estimates, not a full run. Latencies are from a burst of 24 concurrent calls and vary with provider load.
 
+## Weighting and the base rate
+
+59% of the benchmark documents carry no narrative, so a model that answers "no narrative" by default would look good on plain exact match. The balanced score avoids that on purpose: category accuracy is measured only on documents that have a category and the false-alarm rate only on those that do not, so each class counts equally whatever its share of the data. Models that lean on the default show up as low category accuracy, not as a high score. `gpt-oss-20b` says `0_0` for 70% of documents and flags only 73% of the real narratives (category accuracy 0.39); `glm-5.3-flash` says `0_0` for 54%, below the gold share of 59%, and flags 94% of the real narratives.
+
+The equal weighting is still a choice. Weighting category accuracy by `w` and (1 − false alarms) by `1 − w`:
+
+| Weight on category accuracy | Top of the ranking |
+| :-------------------------- | :----------------- |
+| 0.3 (false alarms matter more) | gpt-oss-20b 0.790, glm-4.7-flash 0.780, qwen3.8-flash 0.771, mistral-small-2603 0.767, deepseek-v4-pro 0.767 |
+| 0.5 (used above) | qwen3.8-flash 0.719, deepseek-v4-pro 0.710, glm-5.3-flash 0.709, deepseek-v4-flash 0.703, glm-4.7-flash 0.701 |
+| 0.7 (missed narratives matter more) | qwen3.8-flash 0.667, deepseek-v4-flash 0.663, glm-5.3-flash 0.658, deepseek-v4-pro 0.652, nemotron-3-super-120b 0.644 |
+
+`qwen3.8-flash` and `glm-5.3-flash` stay near the top under every weighting. The conservative models (`gpt-oss-20b`, `glm-4.7-flash`) lead only when false alarms dominate, and `deepseek-v4-flash` rises as category accuracy gains weight. The right weight depends on how many of the texts you classify carry a narrative, and on how costly a wrong link is compared with a missed one. The graph's own share is not known; measuring it on a labelled sample of gate-passed texts would settle the weighting.
+
 ## The ClimateBERT gate
 
 The LLM classifier can skip texts that a small local model (`climatebert/distilroberta-base-climate-detector`) calls not climate-related. It is off in the benchmarks. On a sample of the graph's texts it set aside about 92% as not about climate. Measured on `climatesense_v1` (398 documents) with three models, turning it on:
@@ -89,7 +103,7 @@ The LLM classifier can skip texts that a small local model (`climatebert/distilr
 - lowered recall by 3.5 points for every model, because it drops about 3% of the claims that do carry a narrative (5 of 153);
 - left narrative-detection F1 within noise and lowered exact category by 2 to 2.6 points.
 
-On v2 and NSLP it removes nothing. Its value is cost on the full graph; whether the 3.5-point recall loss is acceptable is a decision, not a finding. (An earlier version of the classifier compared against the wrong label and the gate never filtered anything; that is fixed.)
+On v2 and NSLP it removes nothing: all their no-narrative documents (258) are climate-related, and so are 52 of v1's 245, so these hard negatives stay behind the gate and keep producing false alarms. Simulating the gate on every model (its answer depends only on the text; gated documents become `0_0`) lowers false alarms only a little (`deepseek-v4-flash` 19.9% to 18.3%, `gemma-4-31b` 19.1% to 16.9%, `qwen3.8-flash` 15.1% to 14.1%) and leaves the ranking essentially unchanged (`qwen3.8-flash` 0.719, `glm-5.3-flash` 0.713, `deepseek-v4-pro` 0.712, `deepseek-v4-flash` 0.706); [model-selection/gate_and_weights.py](model-selection/gate_and_weights.py) reproduces it. Its value is cost on the full graph; whether the 3.5-point recall loss is acceptable is a decision, not a finding. (An earlier version of the classifier compared against the wrong label and the gate never filtered anything; that is fixed.)
 
 ## Prompts and prompt optimisation
 
