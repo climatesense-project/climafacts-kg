@@ -55,6 +55,7 @@ from .scoring import (
     case_scores,
     charged_gold,
     compute_metrics,
+    detected_category_scores,
     is_not_climate_gold,
     normalize_gold,
     normalize_label,
@@ -252,6 +253,10 @@ def benchmark_configs(
                     "not_related_rate": float("nan"),
                     "exact_unambiguous": float("nan"),
                     "n_unambiguous": float("nan"),
+                    "n_detected": float("nan"),
+                    "exact_detected": float("nan"),
+                    "exact_detected_lo": float("nan"),
+                    "exact_detected_hi": float("nan"),
                     "n_category": float("nan"),
                     "exact_category": float("nan"),
                     "n_not_climate": float("nan"),
@@ -284,6 +289,8 @@ def benchmark_configs(
         hier_lo, hier_hi = bootstrap_ci([score[1] for score in per_case])
         macro_lo, macro_hi = bootstrap_macro_f1(s_preds, s_golds)
         has_negatives = relation.n_not_related > 0
+        detected_scores = detected_category_scores(s_preds, s_golds)  # the CARDS category, apart from relatedness
+        detected_lo, detected_hi = bootstrap_ci(detected_scores)
         with_category = [
             score[0] for score, gold in zip(per_case, s_golds, strict=True) if not is_not_climate_gold(gold)
         ]
@@ -331,6 +338,12 @@ def benchmark_configs(
                 "not_related_rate": round(metrics.not_related_rate, 4),
                 "exact_unambiguous": round(metrics.exact_unambiguous, 4),
                 "n_unambiguous": metrics.n_unambiguous,
+                "n_detected": len(detected_scores),
+                "exact_detected": round(sum(detected_scores) / len(detected_scores), 4)
+                if detected_scores
+                else float("nan"),
+                "exact_detected_lo": detected_lo,
+                "exact_detected_hi": detected_hi,
                 "n_category": len(with_category),
                 "exact_category": round(sum(with_category) / len(with_category), 4) if with_category else float("nan"),
                 "n_not_climate": relation.n_not_related,

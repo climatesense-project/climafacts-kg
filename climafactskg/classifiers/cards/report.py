@@ -18,11 +18,18 @@ from .runs import BenchmarkRun, changed_cases, compare_configs, context_effect
 _SERIES_LIGHT = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948")
 _SERIES_DARK = ("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767")
 MAX_SERIES = len(_SERIES_LIGHT)
-_METRICS = (("exact_match", "Exact match"), ("h_f1", "Hierarchical F1"), ("d2_macro_f1", "Depth-2 macro F1"))
+_METRICS = (
+    ("exact_match", "Exact match"),
+    ("h_f1", "Hierarchical F1"),
+    ("d2_macro_f1", "Depth-2 macro F1"),
+    ("exact_detected", "Category when detected"),
+    ("rel_f1", "Narrative detection F1"),
+)
 _CI_COLUMNS = {
     "exact_match": ("exact_lo", "exact_hi"),
     "h_f1": ("h_f1_lo", "h_f1_hi"),
     "d2_macro_f1": ("d2_macro_f1_lo", "d2_macro_f1_hi"),
+    "exact_detected": ("exact_detected_lo", "exact_detected_hi"),
 }
 _esc = html.escape
 
@@ -222,13 +229,14 @@ def size_scatter_svg(
     width: int = 900,
     height: int = 420,
     size_range: tuple[float, float] | None = None,
+    y_label: str = "",
 ) -> str:
     """Result against model size as inline SVG: log x axis, 95% interval whiskers and the efficient frontier.
 
     *points* are dicts with ``label``, ``size`` (billions of parameters), ``active`` (or ``None``), ``value`` (0..1),
     ``lo``/``hi`` (NaN for no interval) and ``flag`` (a hollow marker: the score understates the model).
     """
-    left, right, top, bottom = 44, 24, 18, 46
+    left, right, top, bottom = 58, 24, 18, 46
     plot_w, plot_h = width - left - right, height - top - bottom
     # ``size_range`` fixes the x axis (smallest, largest size in billions) so several plots can share one scale.
     sizes = [p["size"] for p in points] + list(size_range or ())
@@ -263,6 +271,11 @@ def size_scatter_svg(
         f'<text x="{left + plot_w / 2:.1f}" y="{height - 6}" text-anchor="middle">'
         "Model size (parameters, log scale)</text>"
     )
+    if y_label:
+        parts.append(
+            f'<text transform="rotate(-90)" x="{-(top + plot_h / 2):.1f}" y="13" text-anchor="middle">'
+            f"{_esc(y_label)}</text>"
+        )
 
     front = _pareto_front([(p["size"], p["value"]) for p in points])
     if len(front) > 1:
@@ -325,52 +338,89 @@ def size_scatter_svg(
     return "".join(parts)
 
 
+def _size_points(group: pd.DataFrame, metric: str, ci: tuple[str, str] | None) -> tuple[list[dict], list[str]]:
+    """``(points, unsized)`` for one metric: one point per config, taken from its context-free row where it has one."""
+    points: list[dict] = []
+    unsized: list[str] = []
+    for config in dict.fromkeys(group["config"].astype(str)):
+        rows = group[group["config"].astype(str) == config]
+        row = rows[rows["context"] == "none"].iloc[0] if (rows["context"] == "none").any() else rows.iloc[0]
+        if pd.isna(row["size_b"]) or pd.isna(row[metric]):
+            unsized.append(config)
+            continue
+        n_failed = 0 if pd.isna(row.get("n_failed")) else float(row["n_failed"])
+        lo = row.get(ci[0]) if ci else None
+        hi = row.get(ci[1]) if ci else None
+        has_interval = lo is not None and hi is not None and not pd.isna(lo) and not pd.isna(hi)
+        points.append(
+            {
+                "label": config,
+                "size": float(row["size_b"]),
+                "active": None if pd.isna(row.get("active_b")) else float(row["active_b"]),
+                "value": float(row[metric]),
+                "lo": float(lo) if has_interval else float("nan"),
+                "hi": float(hi) if has_interval else float("nan"),
+                "flag": n_failed / max(float(row["n_cases"]), 1) > 0.10,
+            }
+        )
+    return points, unsized
+
+
 def _size_section(summary: pd.DataFrame, size_range: tuple[float, float] | None = None) -> str:
-    """Result against model size per dataset; empty unless at least two configs of a dataset have a known size."""
+    """Result against model size per benchmark, for the two questions apart: the CARDS category and detection.
+
+    Empty unless at least two configs of a benchmark have a known size. Runs saved before the two scores were
+    separated fall back to one plot of exact match.
+    """
     if "size_b" not in summary.columns:
         return ""
     usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
     blocks: list[str] = []
     for dataset in dict.fromkeys(usable["dataset"].astype(str)):
         group = usable[usable["dataset"].astype(str) == dataset]
-        mixed = _has_not_climate(group) and "exact_category" in group.columns and group["exact_category"].notna().any()
-        metric = "exact_category" if mixed else "exact_match"
-        points: list[dict] = []
+
+        def has(column: str, group: pd.DataFrame = group) -> bool:
+            return column in group.columns and bool(group[column].notna().any())
+
+        if has("exact_detected"):
+            plots = [
+                ("exact_detected", ("exact_detected_lo", "exact_detected_hi"), "category when a narrative is detected")
+            ]
+            if has("rel_f1"):
+                plots.append(("rel_f1", None, "narrative detection (F1)"))
+        else:
+            mixed = _has_not_climate(group) and has("exact_category")
+            plots = [
+                (
+                    "exact_category" if mixed else "exact_match",
+                    None if mixed else ("exact_lo", "exact_hi"),
+                    "exact match on cases with a category" if mixed else "exact match",
+                )
+            ]
+        parts: list[str] = []
         unsized: list[str] = []
-        for config in dict.fromkeys(group["config"].astype(str)):
-            rows = group[group["config"].astype(str) == config]
-            row = rows[rows["context"] == "none"].iloc[0] if (rows["context"] == "none").any() else rows.iloc[0]
-            if pd.isna(row["size_b"]) or pd.isna(row[metric]):
-                unsized.append(config)
+        flagged = False
+        for metric, ci, what in plots:
+            points, unsized = _size_points(group, metric, ci)
+            if len(points) < 2:
                 continue
-            n_failed = 0 if pd.isna(row.get("n_failed")) else float(row["n_failed"])
-            has_interval = (
-                metric == "exact_match" and not pd.isna(row.get("exact_lo")) and not pd.isna(row.get("exact_hi"))
+            flagged = flagged or any(p["flag"] for p in points)
+            title = f"{dataset}: {what} against model size"
+            parts.append(
+                f"<h4>{_esc(what[0].upper() + what[1:])}</h4>"
+                + size_scatter_svg(title, points, size_range=size_range, y_label=what[0].upper() + what[1:])
             )
-            points.append(
-                {
-                    "label": config,
-                    "size": float(row["size_b"]),
-                    "active": None if pd.isna(row.get("active_b")) else float(row["active_b"]),
-                    "value": float(row[metric]),
-                    "lo": float(row["exact_lo"]) if has_interval else float("nan"),
-                    "hi": float(row["exact_hi"]) if has_interval else float("nan"),
-                    "flag": n_failed / max(float(row["n_cases"]), 1) > 0.10,
-                }
-            )
-        if len(points) < 2:
+        if not parts:
             continue
-        title = f"{dataset}: {'exact match on cases with a category' if mixed else 'exact match'} against model size"
-        block = f"<h3>{_esc(dataset)}</h3>" + size_scatter_svg(title, points, size_range=size_range)
         notes = ["Dashed line: models that no smaller model beats."]
-        if any(p["flag"] for p in points):
+        if flagged:
             notes.append("Hollow marker: failed on more than 10% of claims, so its score understates the model.")
         if unsized:
             notes.append(
                 f"No published size, so not plotted: {', '.join(_esc(name) for name in unsized)} "
                 "(state `size_b` for them in the config)."
             )
-        blocks.append(block + f'<p class="muted">{" ".join(notes)}</p>')
+        blocks.append(f"<h3>{_esc(dataset)}</h3>" + "".join(parts) + f'<p class="muted">{" ".join(notes)}</p>')
     return "<h2>Size and result</h2>" + "".join(blocks) if blocks else ""
 
 
@@ -421,6 +471,7 @@ def _has_not_climate(summary: pd.DataFrame) -> bool:
 def _comparison(summary: pd.DataFrame, standard: bool = False) -> str:
     # ``standard``: every benchmark of a multi-benchmark report gets the same columns, with or without 0_0 documents.
     show_category = standard or (_has_not_climate(summary) and "exact_category" in summary.columns)
+    show_detected = "exact_detected" in summary.columns and bool(summary["exact_detected"].notna().any())
     best: dict[tuple[str, str], float] = {}
     for metric in ("exact_match", "h_f1", "d1_macro_f1", "d2_macro_f1"):
         if metric in summary.columns:
@@ -432,6 +483,8 @@ def _comparison(summary: pd.DataFrame, standard: bool = False) -> str:
     headers += [("Exact", True)]
     if show_category:
         headers += [("Exact, category cases", True)]
+    if show_detected:
+        headers += [("Category when detected", True)]
     headers += [("hF1", True), ("D1 macro", True), ("D2 macro", True), ("Note", False)]
     rows = []
     for _, r in summary.iterrows():
@@ -455,6 +508,17 @@ def _comparison(summary: pd.DataFrame, standard: bool = False) -> str:
                 has_category = not failed and category is not None and not pd.isna(category)
                 label = f"{_fmt(category)} (n={_count(n_category)})" if has_category else "—"
                 cells.append(_td(label, num=True))
+            if metric == "h_f1" and show_detected:
+                detected = r.get("exact_detected")
+                if failed or detected is None or pd.isna(detected):
+                    cells.append(_td("—", num=True))
+                else:
+                    text = f"{detected:.3f}"
+                    lo, hi = r.get("exact_detected_lo"), r.get("exact_detected_hi")
+                    if lo is not None and hi is not None and not pd.isna(lo) and not pd.isna(hi):
+                        text += f' <span class="ci">[{lo:.2f}–{hi:.2f}]</span>'
+                    text += f' <span class="ci">(n={_count(r.get("n_detected"))})</span>'
+                    cells.append(_td(text, num=True, raw=True))
             value = r.get(metric)
             is_best = not failed and (str(r["dataset"]), metric) in best and value == best[(str(r["dataset"]), metric)]
             text = "—" if failed else _esc(_fmt(value))
@@ -897,25 +961,20 @@ def _benchmark_body(
     )
 
 
-def _overview(summary: pd.DataFrame) -> str:
-    """Models by benchmarks in one table: the score each model reached where it was run, a dash where it was not."""
+def _matrix(summary: pd.DataFrame, metrics: Sequence[str], title: str, note: str) -> str:
+    """Models by benchmarks for one score: the value where a model was run, a dash where it was not.
+
+    *metrics* lists columns in order of preference; the first one with any value is used, so runs saved before a
+    score existed still render.
+    """
     datasets = list(dict.fromkeys(summary["dataset"].astype(str)))
     configs = list(dict.fromkeys(summary["config"].astype(str)))
     usable = summary[(summary["n_cases"] > 0) & summary["exact_match"].notna()]
-    # One metric for every benchmark: exact match on the cases that carry a category (equal to plain exact match
-    # where a benchmark has no 0_0 documents); older runs without that column fall back to exact match.
-    metric = (
-        "exact_category"
-        if "exact_category" in usable.columns and usable["exact_category"].notna().any()
-        else "exact_match"
-    )
-    metric_of = dict.fromkeys(datasets, metric)
+    metric = next((m for m in metrics if m in usable.columns and usable[m].notna().any()), "exact_match")
     cell: dict[tuple[str, str], tuple[float, bool]] = {}
     for (config, dataset), rows in usable.groupby([usable["config"].astype(str), usable["dataset"].astype(str)]):
         row = rows[rows["context"] == "none"].iloc[0] if (rows["context"] == "none").any() else rows.iloc[0]
-        value = row[metric_of[dataset]]
-        if pd.isna(value):
-            value = row["exact_match"]
+        value = row[metric]
         if pd.isna(value):
             continue
         failed = (0 if pd.isna(row.get("n_failed")) else float(row["n_failed"])) / max(float(row["n_cases"]), 1) > 0.10
@@ -932,13 +991,32 @@ def _overview(summary: pd.DataFrame) -> str:
             value, failed = cell[(config, dataset)]
             tds.append(_td(f"{value:.3f}{' †' if failed else ''}", num=True, best=value == best[dataset]))
         rows_html.append(tds)
-    intro = (
-        '<p class="muted">Exact match per model and benchmark (context: none where it was run). On benchmarks that '
-        "also hold 0_0 documents the score is on the cases that carry a category (the same metric on every "
-        "benchmark). Bold: best on that benchmark; "
-        "—: not run; †: failed on more than 10% of claims, so the score understates the model.</p>"
+    return f"<h3>{title}</h3>" + f'<p class="muted">{note}</p>' + _table(headers, rows_html)
+
+
+def _overview(summary: pd.DataFrame) -> str:
+    """Models by benchmarks, with the two questions kept apart: the CARDS category, and detecting a narrative."""
+    legend = (
+        "Context: none where it was run. Bold: best on that benchmark; —: not run; †: failed on more than 10% of "
+        "claims, so the score understates the model."
     )
-    return "<h2>Overview</h2>" + intro + _table(headers, rows_html)
+    category = _matrix(
+        summary,
+        ("exact_detected", "exact_category", "exact_match"),
+        "Category accuracy when a narrative is detected",
+        "Exact match of the CARDS category on the claims that have a category and where the model found a narrative "
+        "(it did not answer 0_0). A missed narrative is not counted here; it shows under detection. " + legend,
+    )
+    detection = ""
+    if "rel_f1" in summary.columns and summary["rel_f1"].notna().any():
+        detection = _matrix(
+            summary,
+            ("rel_f1",),
+            "Narrative detection (F1)",
+            "Does the model find a denial narrative at all (any CARDS category) or answer 0_0, scored on every "
+            "document including those annotated 0_0. " + legend,
+        )
+    return "<h2>Overview</h2>" + category + detection
 
 
 def render_html(runs: Sequence[BenchmarkRun], out_path: str | Path, baseline: str | None = None) -> Path:

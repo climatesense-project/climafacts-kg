@@ -213,3 +213,31 @@ class TestRelatedness:
 
         assert is_not_climate_gold(["0"]) and is_not_climate_gold(["0_0"])
         assert not is_not_climate_gold(["0_0", "1_1"]) and not is_not_climate_gold(["1_1"])
+
+
+class TestCategoryWhenDetected:
+    """The CARDS category score, separated from relatedness: only cases where a narrative exists and was detected."""
+
+    def _scores(self, preds, golds):
+        from climafactskg.classifiers.cards.scoring import detected_category_scores
+
+        return detected_category_scores(preds, golds)
+
+    def test_only_cases_with_a_category_that_the_model_detected_are_scored(self):
+        golds = [["1_1"], ["1_1"], ["1_1"], ["0_0"], ["0_0", "2_1"]]
+        preds = ["1_1", "2_2", "0", "1_1", "2_1"]
+
+        # hit, wrong category, narrative missed (excluded), no category in the gold (excluded), tie resolved
+        assert self._scores(preds, golds) == [1.0, 0.0, 1.0]
+
+    def test_a_failed_prediction_is_not_a_detection(self):
+        assert self._scores([None], [["1_1"]]) == []
+
+    def test_a_tied_gold_that_accepts_not_related_does_not_count_a_not_related_answer(self):
+        assert self._scores(["0_0"], [["0_0", "1_1"]]) == []
+
+    def test_labels_are_compared_at_depth_two(self):
+        assert self._scores(["2_1_1"], [["2_1"]]) == [1.0]
+
+    def test_nothing_detected_gives_an_empty_list(self):
+        assert self._scores(["0", "0_0"], [["1_1"], ["2_1"]]) == []
