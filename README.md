@@ -355,13 +355,9 @@ class MyCARDSLLMConfig(CARDSLLMConfig):
     model: str = "llama3.3"
 ```
 
-### 📏 Evaluation and benchmarking
-
-The optional `eval` extra scores the classifiers against annotated data and writes an HTML report (`climafactskg eval run eval.toml --report`). See [docs/evaluation.md](docs/evaluation.md) for how to use it and [docs/model-selection.md](docs/model-selection.md) for the results.
-
 ### 🧭 Which model to use
 
-The full write-up, with charts, the measured costs and the caveats, is in [docs/model-selection.md](docs/model-selection.md). Its main finding is that no model is clearly the best: about the top ten LLMs are statistically tied, so the choice is a matter of cost, speed and which kind of mistake you can tolerate.
+The full write-up, with charts, the measured costs and the caveats, is in [docs/model-selection.md](docs/model-selection.md). How to run the benchmarks yourself is in [docs/evaluation.md](docs/evaluation.md). Its main finding is that no model is clearly the best: about the top ten LLMs are statistically tied, so the choice is a matter of cost, speed and which kind of mistake you can tolerate.
 
 These recommendations come from the standard suite ([eval.suite.toml](eval.suite.toml)): 30 LLM configurations plus the transformer and matcher, scored on `climatesense_v1`, `climatesense_v2` and `nslp` with the claim alone (no review context). Scores are averaged over the three benchmarks, each counting equally. The table keeps the two questions apart: *narrative detection* (does the model flag a denial narrative at all) and *category accuracy* (is the CARDS category right on the claims where it did). With about 140 to 400 cases per benchmark, differences of roughly four points are noise, so models within that range of each other are effectively tied.
 
