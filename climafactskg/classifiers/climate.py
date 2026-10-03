@@ -45,7 +45,7 @@ class ClimateBertClassifier:
         self.model.to(self.device)
         self.model.eval()
 
-        # Map of index to label (e.g., {0: 'unrelated', 1: 'climate-related'})
+        # Map of index to label. The climate detector's labels are {0: 'no', 1: 'yes'}.
         self.labels = self.model.config.id2label
 
     def classify(self, text: str, context: str | None = None) -> str:
@@ -58,7 +58,7 @@ class ClimateBertClassifier:
                 ``max_length=512`` tokens automatically.
 
         Returns:
-            The predicted class label (e.g., ``'unrelated'`` or ``'related'``).
+            The model's own class label: ``'no'`` (not about climate) or ``'yes'`` (about climate).
         """
         input_text = f"{text}\n\n{context}" if context else text
         probabilities = self.predict_proba(input_text)
@@ -78,7 +78,7 @@ class ClimateBertClassifier:
         text = str(text).strip()
         if not text:
             # Return a default probability distribution if text is empty
-            # Assuming the model has 2 classes (unrelated, climate-related)
+            # The model has two classes: no (not about climate) and yes (about climate)
             return np.array([1.0, 0.0])
 
         inputs = self.tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(

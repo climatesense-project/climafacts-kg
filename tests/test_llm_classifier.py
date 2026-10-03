@@ -336,3 +336,55 @@ class TestInvalidProviderResponse:
         error = UnexpectedModelBehavior("Model token limit (8000) exceeded before any response was generated.")
         with pytest.raises(UnexpectedModelBehavior):
             self._run(monkeypatch, error, failures=99)
+
+
+class TestClimateBertGate:
+    """The ClimateBERT detector answers 'no' / 'yes'; the gate must act on its real labels, not on invented ones."""
+
+    class _Gate:
+        model_name = "stub-gate"
+
+        def __init__(self, unrelated):
+            self.unrelated = unrelated
+            self.asked = []
+
+        def classify(self, text, context=None):
+            self.asked.append(text)
+            return "no" if text in self.unrelated else "yes"
+
+    def _classifier(self, gate):
+        from climafactskg.classifiers.cards.cache import ClassificationCache
+        from climafactskg.classifiers.cards.llm.classifier import CARDSOutput
+
+        clf = CARDSLLMClassifier.__new__(CARDSLLMClassifier)
+        clf._preclassifier = gate
+        clf._preclassifier_cache = ClassificationCache(None, fingerprint="gate")
+        clf._output_cache = ClassificationCache(None, fingerprint="fp")
+        clf._default_concurrency = 1
+        clf._model = "stub"
+        clf.llm_calls = []
+
+        async def fake(texts, contexts, concurrency, progress, task_id):
+            clf.llm_calls.extend(texts)
+            return [CARDSOutput(is_climate_related=True, cards_category="1_1", reasoning="r") for _ in texts]
+
+        clf._classify_batch_async = fake
+        return clf
+
+    def test_texts_the_gate_calls_no_are_resolved_without_an_llm_call(self):
+        clf = self._classifier(self._Gate(unrelated={"cat video", "football score"}))
+
+        labels = clf.classify_batch(["cat video", "ice is melting", "football score"])
+
+        assert labels == ["0", "1_1", "0"]
+        assert clf.llm_calls == ["ice is melting"]  # only the climate text reached the LLM
+
+    def test_the_old_label_name_still_works(self):
+        class _Old(self._Gate):
+            def classify(self, text, context=None):
+                return "unrelated" if text == "cat video" else "related"
+
+        clf = self._classifier(_Old(unrelated=set()))
+
+        assert clf.classify_batch(["cat video", "ice is melting"]) == ["0", "1_1"]
+        assert clf.llm_calls == ["ice is melting"]
