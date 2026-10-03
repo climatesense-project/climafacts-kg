@@ -1,0 +1,138 @@
+# Choosing a model for CARDS classification
+
+This report records how 32 classifiers were compared for labelling claims with the CARDS misinformation taxonomy, what the numbers say, and what they do not say. The README links to it; the raw numbers are in [model-selection/results.csv](model-selection/results.csv) and the charts can be rebuilt from a saved run with [model-selection/make_plots.py](model-selection/make_plots.py).
+
+## Summary
+
+- **No model is clearly the best.** Roughly the top ten LLMs are statistically tied (95% intervals overlap by a wide margin), so the choice comes down to cost, speed, openness and which kind of mistake you can tolerate.
+- **Two kinds of mistake trade against each other.** A model can flag too many documents that carry no denial narrative (false alarms), or miss real narratives. Prompts, the ClimateBERT gate and model choice all move along that trade-off more than they improve both at once.
+- **Size stops mattering at about 14B parameters.** Between 14B and 1.6T the scores are flat within noise. Below 10B they fall clearly.
+- **Cost per call varies about 20-fold between models of similar quality** (measured, not list price). Catalog list prices are a poor guide: reasoning models bill many more tokens than the price suggests.
+- **A tuned prompt did not give a dependable gain.** One model gained significantly, and only for the exact text the optimiser returned.
+
+| If you want | Take | Why |
+| :---------- | :--- | :-- |
+| Lowest cost among the top group | `glm-5.3-flash` | Balanced score 0.709 (top three), about $0.00009 per call, no failures. Licence and size not checked. |
+| Highest balanced score | `qwen3.8-flash` | 0.719, but a closed API model at about $0.00033 per call |
+| Highest category accuracy | `deepseek-v4-flash` | 0.604 on documents with a narrative, but the most false alarms of the finalists (19.9%) and about $0.0017 per call |
+| Fastest | `gemma-4-31b` or `ministral-14b-2512` | About 5 s per call; gemma has 19% false alarms, ministral 17% |
+| Smallest that still holds up | `ministral-14b-2512` | 14B, balanced 0.687, fits a 16 GB GPU or Mac at 4-bit |
+
+These are tie-breaks, not wins: pick by the column that matters to you.
+
+## What was measured
+
+**Data.** Three benchmarks, claim text only (no review context): `climatesense_v1` (398 documents), `climatesense_v2` (277) and the NSLP/ClimateCheck test split (172), 847 documents in all. 503 of them (59%) carry no denial narrative (code `0_0`) and 316 carry a category. 28 more have a gold set that ties a category with `0_0`; they are left out of both measures below. 114 documents have tied gold labels overall, and a prediction counts as right if it matches any of them. Gold labels come from annotators who saw only the claim.
+
+**Models.** 30 LLMs served through OpenRouter, plus the free `transformer` and `matcher` engines as baselines. One prompt (the `xplainnlp-nslp` preset), temperature 0, ClimateBERT gate off, structured output (prompted output where a model needs it). Configuration: [`eval.suite.toml`](../eval.suite.toml). `ling-3.0-flash` (answers "no narrative" for nearly everything) and `mistral-large-2512` (failed items from upstream rate limits) are left out of the charts.
+
+**Two questions, scored separately.** CARDS code `0_0` means "no denial narrative". So a classifier answers two things:
+
+1. *Is there a narrative at all?* Measured on the documents with no narrative as the **false-alarm rate**: the share given a category.
+2. *Which category, when there is one?* Measured as **category accuracy** on the documents that carry a category: the answer is an accepted gold label. A missed narrative counts as wrong here.
+
+The **balanced score** used for ranking is the mean of category accuracy and (1 − false-alarm rate), pooled over all 847 documents, with a bootstrap 95% interval. The equal weighting is a choice made for this report, not a standard. Plain exact match over all documents is a poor ranking here, because 59% of documents have no narrative, so a model that says "no narrative" often looks good (`gpt-oss-20b` tops it while scoring 0.39 category accuracy). The full benchmark tables (exact match, hierarchical F1, narrative-detection precision and recall, per-benchmark results) are in the HTML report that `climafactskg eval report` writes.
+
+## Results
+
+![Balanced score by model](model-selection/balanced_ranking.svg)
+
+The top ten models span 0.687 to 0.719, with intervals about ±0.03 wide, so their order is not established. The ranking then falls steadily below about 0.68, and the free baselines (`transformer`, `matcher`) are at 0.50.
+
+| Model | Balanced | Category accuracy | False alarms | Failed items |
+| :---- | :------- | :---------------- | :----------- | :----------- |
+| qwen3.8-flash | 0.719 | 0.589 | 15.1% | 0 |
+| deepseek-v4-pro | 0.710 | 0.567 | 14.7% | 0 |
+| glm-5.3-flash | 0.709 | 0.582 | 16.5% | 0 |
+| deepseek-v4-flash | 0.703 | 0.604 | 19.9% | 0 |
+| glm-4.7-flash | 0.701 | 0.503 | 10.1% | 0 |
+| qwen3.6-35b | 0.700 | 0.538 | 13.7% | 0 |
+| nemotron-3-super-120b | 0.700 | 0.560 | 16.1% | 0 |
+| minimax-m2.7 | 0.698 | 0.538 | 14.1% | 0 |
+| ministral-14b-2512 | 0.687 | 0.544 | 17.1% | 0 |
+| gemma-4-31b | 0.683 | 0.557 | 19.1% | 0 |
+
+### The trade-off
+
+![Category accuracy against false-alarm rate](model-selection/tradeoff.svg)
+
+Models sit along a front: those with the fewest false alarms (`gpt-oss-20b`, `glm-4.7-flash`) have lower category accuracy, and `deepseek-v4-flash` has the highest category accuracy with a higher false-alarm rate. Nothing is far above the front, which is why the balanced scores bunch together.
+
+### Size
+
+![Balanced score against model size](model-selection/balanced_vs_size.svg)
+
+Past about 14B the frontier is flat. Larger models are not better at this task, and the 1.6T `deepseek-v4-pro` is within noise of the 14B `ministral-14b-2512` on exact category accuracy. Several models have no published size (for example `gpt-4o-mini`, `qwen3.8-flash`, `glm-5.3-flash`) and are not on this plot.
+
+### Cost
+
+Measured as the change in the OpenRouter account's usage over 24 real claims per model. The catalog list price does not predict it: `deepseek-v4-flash` listed at $0.028 per million input tokens cost about 28 times what that implied, because calls were routed to dearer providers and reasoning tokens are billed.
+
+![Balanced score against measured cost per call](model-selection/cost_vs_score.svg)
+
+| Model | Cost per call | Median latency | Whole graph, gate on (about 21,000 calls) | Gate off (about 263,000 calls) |
+| :---- | :------------ | :------------- | :---------------------------------------- | :----------------------------- |
+| glm-5.3-flash | $0.00009 | 14 s | about $2 | about $24 |
+| ministral-14b-2512 | $0.00010 | 5 s | about $2 | about $26 |
+| glm-4.7-flash | $0.00030 | 28 s | about $6 | about $79 |
+| qwen3.8-flash | $0.00033 | 26 s | about $7 | about $87 |
+| gemma-4-31b | $0.00039 | 5 s | about $8 | about $103 |
+| deepseek-v4-flash | $0.0017 | 34 s | about $36 | about $450 |
+
+The graph totals multiply the per-call cost by the number of calls and are estimates, not a full run. Latencies are from a burst of 24 concurrent calls and vary with provider load.
+
+## The ClimateBERT gate
+
+The LLM classifier can skip texts that a small local model (`climatebert/distilroberta-base-climate-detector`) calls not climate-related. It is off in the benchmarks. On a sample of the graph's texts it set aside about 92% as not about climate. Measured on `climatesense_v1` (398 documents) with three models, turning it on:
+
+- removed about a third of the false alarms (precision up 3 to 6 points; for example false alarms 9.8% to 6.5% for `deepseek-v4-flash`);
+- lowered recall by 3.5 points for every model, because it drops about 3% of the claims that do carry a narrative (5 of 153);
+- left narrative-detection F1 within noise and lowered exact category by 2 to 2.6 points.
+
+On v2 and NSLP it removes nothing. Its value is cost on the full graph; whether the 3.5-point recall loss is acceptable is a decision, not a finding. (An earlier version of the classifier compared against the wrong label and the gate never filtered anything; that is fixed.)
+
+## Prompts and prompt optimisation
+
+**Three built-in prompts** on three models, all benchmarks:
+
+| Model | `xplainnlp-nslp` (default) | `climatesense-nslp` | `cards-narrative` |
+| :---- | :------------------------- | :------------------ | :---------------- |
+| gemma-4-31b | 0.614 / 21.7% | 0.566 / 15.7% | 0.627 / 28.5% |
+| deepseek-v4-flash | 0.646 / 22.5% | 0.611 / 14.9% | 0.644 / 32.4% |
+| ministral-14b-2512 | 0.598 / 18.6% | 0.513 / 17.7% | 0.560 / 54.5% |
+
+Each cell is exact category (mean over the three benchmarks) / false-alarm rate. No prompt beats the default by more than noise. `climatesense-nslp` is more cautious (fewer false alarms, lower category accuracy); `cards-narrative` flags more.
+
+**GEPA prompt optimisation** (tuned on `gemma-4-31b`, then scored on 547 held-out cases the optimiser never saw):
+
+| Model | Exact match before | after | Difference (95% interval) |
+| :---- | :----------------- | :---- | :------------------------ |
+| gemma-4-31b, the optimiser's exact text | 0.746 | 0.784 | +3.8 points (+1.1 to +6.6, p = 0.009) |
+| gemma-4-31b, JSON wrapper removed | 0.746 | 0.764 | +1.8 points (-0.7 to +4.4, p = 0.22) |
+| ministral-14b-2512 | 0.757 | 0.757 | 0.0 points |
+| deepseek-v4-flash (299 cases) | 0.763 | 0.783 | +2.0 points (-1.7 to +5.7, p = 0.39) |
+
+False alarms fell on every model, and detection recall and category accuracy on detected claims fell with them. The one significant result is one model with one exact text. The tuned prompt is available as the opt-in `xplainnlp-nslp-tuned` preset, which records these caveats.
+
+## Hardware
+
+Sizes and memory arithmetic, not measured on this hardware: 4-bit `ministral-14b-2512` is about 9 GB (fits a 16 GB T4, or a Mac with 16 GB); 4-bit `gemma-4-31b` is about 18 GB (an L4 with 24 GB, or a Mac with 32 GB). Reasoning models are slow per call. For the whole graph on hosted models, `process` takes `--preset`, `--provider`, `--model` and `--preclassifier` so the cheaper models above can be run without code changes.
+
+## Limits of this report
+
+- **Ties.** With 316 documents that carry a category and 503 that do not, differences under about 3 to 4 points are noise. Significance tests between models were run only for a few pairs, and p-values are not corrected for the number of comparisons.
+- **The balanced score is a choice.** Weighting false alarms against missed narratives differently changes the order within the top group.
+- **Gold labels.** Annotated from the claim alone, with ties (114 documents have tied gold sets), so an accepted-label match is lenient.
+- **Benchmarks are not the graph.** They are mostly climate text; the graph is mostly not. The gate matters there and was measured on benchmark data for its recall loss and on a graph sample only for how much it removes.
+- **Costs and latencies** come from 24-call samples on one day and change with providers and load. List prices are not used.
+- **Not measured:** quantised local models, Colab speed, `qwen3.8-27b` (skipped, paid), `mistral-small-3.2-24b` cost (usage not booked in the test window).
+- **Open weights** were assumed from OpenRouter's listing for some models (`glm-5.3-flash`, `minimax-m2.7`) and not checked against the licences.
+
+## Reproducing
+
+```bash
+uv sync --extra eval
+climafactskg eval run eval.suite.toml --dry-run      # planned, cached and new calls
+climafactskg eval run eval.suite.toml --yes --report # needs OPENROUTER_API_KEY; costs real money
+python docs/model-selection/make_plots.py data/eval_runs/<run>   # rebuild results.csv and the charts
+```

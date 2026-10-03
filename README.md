@@ -393,11 +393,14 @@ The report is a single self-contained HTML file (no JavaScript or external asset
 
 ### 🧭 Which model to use
 
+The full write-up, with charts, the measured costs and the caveats, is in [docs/model-selection.md](docs/model-selection.md). Its main finding is that no model is clearly the best: about the top ten LLMs are statistically tied, so the choice is a matter of cost, speed and which kind of mistake you can tolerate.
+
 These recommendations come from the standard suite ([eval.suite.toml](eval.suite.toml)): 30 LLM configurations plus the transformer and matcher, scored on `climatesense_v1`, `climatesense_v2` and `nslp` with the claim alone (no review context). Scores are averaged over the three benchmarks, each counting equally. The table keeps the two questions apart: *narrative detection* (does the model flag a denial narrative at all) and *category accuracy* (is the CARDS category right on the claims where it did). With about 140 to 400 cases per benchmark, differences of roughly four points are noise, so models within that range of each other are effectively tied.
 
 | You want | Use | Exact category | Narrative-detection F1 | Notes |
 | :------- | :-- | :------------- | :--------------------- | :---- |
-| Best value, hosted | `google/gemma-4-31b-it` | 0.614 | 0.843 | Measured about $0.0004 per call and about 5 s per call, no failures; `mistralai/ministral-14b-2512` (0.598) is cheaper still at about $0.0001 per call |
+| Lowest cost among the top group | `z-ai/glm-5.3-flash` | 0.628 | 0.864 | Statistically tied with the best on a balanced score of category accuracy and false alarms; measured about $0.00009 per call, no failures; licence and size not checked |
+| Fastest | `google/gemma-4-31b-it` | 0.614 | 0.843 | Measured about $0.0004 per call and about 5 s per call, no failures; `mistralai/ministral-14b-2512` (0.598) is about as fast at about $0.0001 per call |
 | Best category accuracy | `deepseek/deepseek-v4-flash` | 0.646 | 0.835 | Open weights (284B, 13B active), but a reasoning model: measured about $0.0017 per call (about 4 times gemma) and about 18 s per call, despite a catalog list price of $0.028 per million input tokens |
 | Best at spotting narratives | `nvidia/nemotron-3-super-120b-a12b` | 0.612 | 0.865 | First of all models on narrative detection, about five times the price of deepseek-v4-flash |
 | Best closed model | `qwen/qwen3.8-flash` | 0.637 | 0.859 | Needs `output_mode = "prompted"`, see the suite config |
