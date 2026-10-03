@@ -808,3 +808,25 @@ class TestRelatednessAndCategorySeparated:
         charts = _sub(_benchmark(html, "d1"), "Charts")
 
         assert "Category when detected" in charts and "Narrative detection F1" in charts
+
+
+class TestHierarchicalF1Plot:
+    def test_hierarchical_f1_gets_its_own_size_plot_between_the_category_and_detection_plots(self, tmp_path):
+        run = _separated_run()
+        run.summary["hf1_detected"] = run.summary["exact_detected"] + 0.2
+        run.summary["hf1_detected_lo"] = run.summary["hf1_detected"] - 0.05
+        run.summary["hf1_detected_hi"] = run.summary["hf1_detected"] + 0.05
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+        labels = re.findall(r'aria-label="([^"]*)"', _sub(_benchmark(html, "d1"), "Size and result"))
+
+        assert len(labels) == 3
+        assert (
+            "category" in labels[0].lower() and "hierarchical" in labels[1].lower() and "detection" in labels[2].lower()
+        )
+
+    def test_the_charts_list_it_too(self, tmp_path):
+        run = _separated_run()
+        run.summary["hf1_detected"] = 0.5
+        html = render_html([run], tmp_path / "r.html").read_text(encoding="utf-8")
+
+        assert "Hierarchical F1 when detected" in _sub(_benchmark(html, "d1"), "Charts")

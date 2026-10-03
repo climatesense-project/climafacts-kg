@@ -290,26 +290,41 @@ def relatedness(preds: Sequence[str | None], golds: Sequence[Any]) -> Relatednes
     return Relatedness(tp + fn, fp + tn, precision, recall, f1, _rate(fp, fp + tn))
 
 
-def detected_category_scores(preds: Sequence[str | None], golds: Sequence[Any]) -> list[float]:
-    """Exact-match scores of the CARDS category alone, separated from relatedness.
+def _detected_cases(preds: Sequence[str | None], golds: Sequence[Any]) -> list[tuple[str, Any]]:
+    """The ``(prediction, gold)`` pairs where the gold has a category and the model detected a narrative.
 
-    A case counts when the gold has a category (some label other than ``0_0``) and the model detected a narrative
-    (answered with a category, not ``0_0`` and not a failure). A missed narrative is a relatedness error, scored by
-    :func:`relatedness`; counting it here as well would mix the two questions. The score is 1.0 when the prediction is
-    one of the acceptable gold labels, else 0.0. Labels are compared at depth 2 on both sides.
+    Detected means it answered a category: not ``0_0`` and not a failure. A missed narrative is a relatedness error,
+    scored by :func:`relatedness`, so it is left out here; counting it as a wrong category too would mix the two
+    questions.
     """
     if len(preds) != len(golds):
         raise ValueError(f"{len(preds)} predictions but {len(golds)} gold sets")
-    scores: list[float] = []
+    pairs: list[tuple[str, Any]] = []
     for pred, gold in zip(preds, golds, strict=True):
         labels = normalize_gold(gold)
         if pred is None or not any(label != _NOT_RELATED for label in labels):
             continue
-        label = normalize_label(pred)
-        if label == _NOT_RELATED:
+        if normalize_label(pred) == _NOT_RELATED:
             continue
-        scores.append(1.0 if label in labels else 0.0)
-    return scores
+        pairs.append((pred, gold))
+    return pairs
+
+
+def detected_category_scores(preds: Sequence[str | None], golds: Sequence[Any]) -> list[float]:
+    """Exact-match scores of the CARDS category alone, separated from relatedness (see :func:`_detected_cases`).
+
+    The score is 1.0 when the prediction is one of the acceptable gold labels, else 0.0; labels are compared at
+    depth 2 on both sides.
+    """
+    return [case_scores(pred, gold)[0] for pred, gold in _detected_cases(preds, golds)]
+
+
+def detected_category_hf1(preds: Sequence[str | None], golds: Sequence[Any]) -> list[float]:
+    """Hierarchical F1 of the CARDS category on the same cases as :func:`detected_category_scores`.
+
+    A near miss in the right branch (``2_2`` for ``2_1``) gets partial credit; the closest gold label is used.
+    """
+    return [case_scores(pred, gold)[1] for pred, gold in _detected_cases(preds, golds)]
 
 
 def bootstrap_macro_f1(
@@ -359,6 +374,7 @@ __all__ = [
     "case_scores",
     "charged_gold",
     "compute_metrics",
+    "detected_category_hf1",
     "detected_category_scores",
     "is_not_climate_gold",
     "normalize_gold",

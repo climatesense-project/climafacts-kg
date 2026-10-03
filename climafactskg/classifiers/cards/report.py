@@ -23,6 +23,7 @@ _METRICS = (
     ("h_f1", "Hierarchical F1"),
     ("d2_macro_f1", "Depth-2 macro F1"),
     ("exact_detected", "Category when detected"),
+    ("hf1_detected", "Hierarchical F1 when detected"),
     ("rel_f1", "Narrative detection F1"),
 )
 _CI_COLUMNS = {
@@ -30,6 +31,7 @@ _CI_COLUMNS = {
     "h_f1": ("h_f1_lo", "h_f1_hi"),
     "d2_macro_f1": ("d2_macro_f1_lo", "d2_macro_f1_hi"),
     "exact_detected": ("exact_detected_lo", "exact_detected_hi"),
+    "hf1_detected": ("hf1_detected_lo", "hf1_detected_hi"),
 }
 _esc = html.escape
 
@@ -386,6 +388,14 @@ def _size_section(summary: pd.DataFrame, size_range: tuple[float, float] | None 
             plots = [
                 ("exact_detected", ("exact_detected_lo", "exact_detected_hi"), "category when a narrative is detected")
             ]
+            if has("hf1_detected"):
+                plots.append(
+                    (
+                        "hf1_detected",
+                        ("hf1_detected_lo", "hf1_detected_hi"),
+                        "hierarchical F1 when a narrative is detected",
+                    )
+                )
             if has("rel_f1"):
                 plots.append(("rel_f1", None, "narrative detection (F1)"))
         else:

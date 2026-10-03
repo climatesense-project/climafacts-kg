@@ -241,3 +241,24 @@ class TestCategoryWhenDetected:
 
     def test_nothing_detected_gives_an_empty_list(self):
         assert self._scores(["0", "0_0"], [["1_1"], ["2_1"]]) == []
+
+
+class TestHierarchicalF1WhenDetected:
+    def _hf1(self, preds, golds):
+        from climafactskg.classifiers.cards.scoring import detected_category_hf1
+
+        return detected_category_hf1(preds, golds)
+
+    def test_it_scores_the_same_cases_as_the_exact_category_score(self):
+        golds = [["1_1"], ["1_1"], ["1_1"], ["0_0"], ["0_0", "2_1"]]
+        preds = ["1_1", "2_2", "0", "1_1", "2_1"]
+
+        assert len(self._hf1(preds, golds)) == 3  # the missed narrative and the 0_0 gold are left out
+
+    def test_a_near_miss_in_the_same_branch_gets_partial_credit(self):
+        assert self._hf1(["2_2"], [["2_1"]]) == [0.5]  # same top-level category, different subcategory
+        assert self._hf1(["2_1"], [["2_1"]]) == [1.0]
+        assert self._hf1(["4_1"], [["2_1"]]) == [0.0]  # a different branch scores nothing
+
+    def test_the_closest_gold_label_is_used(self):
+        assert self._hf1(["2_2"], [["4_1", "2_1"]]) == [0.5]
