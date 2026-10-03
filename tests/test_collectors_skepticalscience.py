@@ -64,3 +64,35 @@ class TestProcessUrls:
                 sks.process_urls(db, URLS)
 
         assert sorted(db) == ["https://sks.test/a", "https://sks.test/c"]
+
+
+MISINFORMERS_PAGE = (
+    '<html><body><div id="centerColumn"><ul>'
+    '<li><a href="skeptic_Bob_Carter.htm">Bob Carter</a></li>'
+    '<li><a href="skeptic_John_Christy.htm">John Christy</a></li>'
+    "</ul></div></body></html>"
+)
+QUOTES_PAGE = '<html><body><div id="centerColumn"><div><a href="skepticquotes_x.php">X</a></div></div></body></html>'
+
+
+class TestFetchMisinformersUrls:
+    def _fetch(self, misinformers_page):
+        def fetch(url, **kwargs):
+            return misinformers_page if "misinformers.php" in url else QUOTES_PAGE
+
+        return fetch
+
+    def test_the_misinformers_page_is_requested_with_404_accepted(self):
+        with patch.object(sks, "fetch_url_content", side_effect=self._fetch(MISINFORMERS_PAGE)) as fetch:
+            urls = sks.fetch_misinformers_urls()
+
+        misinformers_call = next(c for c in fetch.call_args_list if "misinformers.php" in c.args[0])
+        assert misinformers_call.kwargs.get("accept_statuses") == (404,)  # the server sends this page with a 404
+        assert "https://skepticalscience.com/skeptic_Bob_Carter.htm" in urls
+        assert "https://skepticalscience.com/skepticquotes_x.php" in urls
+
+    def test_a_real_not_found_page_is_an_error_not_an_empty_list(self):
+        not_found = "<html><body><div id='centerColumn'><p>Page not found</p></div></body></html>"
+        with patch.object(sks, "fetch_url_content", side_effect=self._fetch(not_found)):
+            with pytest.raises(ValueError, match="No misinformers found"):
+                sks.fetch_misinformers_urls()

@@ -49,9 +49,14 @@ def fetch_misinformers_urls(ignore_urls: Optional[list] = None) -> list:
 
     # 1) Extract from the main list:
     url = "https://skepticalscience.com/misinformers.php"
-    content = fetch_url_content(url)
+    # The server sends this page, complete, with a 404 status (seen October 2026), so 404 is accepted here; a real
+    # not-found page has no list of misinformers, which the check below turns back into an error.
+    content = fetch_url_content(url, accept_statuses=(404,))
     soup = BeautifulSoup(content, "html.parser")
-    misinformers_urls.update([urljoin(url, str(a["href"])) for a in soup.select("#centerColumn > ul > li > a")])
+    main_list = [urljoin(url, str(a["href"])) for a in soup.select("#centerColumn > ul > li > a")]
+    if not main_list:
+        raise ValueError(f"No misinformers found on '{url}': the page is missing or its layout changed.")
+    misinformers_urls.update(main_list)
 
     # 2) Extract from the politicians list:
     url = "https://skepticalscience.com/skepticquotes.php"

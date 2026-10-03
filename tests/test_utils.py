@@ -160,6 +160,25 @@ class TestFetchUrlContent:
             assert fetch_url_content("https://x.test/a", cache_dir=str(tmp_path)) == "<html>page</html>"
         assert get.call_count == 1  # the failed response was not served from the cache
 
+    def test_an_accepted_error_status_returns_its_body_and_is_not_cached(self, tmp_path):
+        from climafactskg.utils import fetch_url_content
+
+        wrong_status = self._response(404, "<html>the real page</html>")
+        with patch("climafactskg.utils.requests.get", return_value=wrong_status) as get:
+            first = fetch_url_content("https://x.test/a", cache_dir=str(tmp_path), accept_statuses=(404,))
+            second = fetch_url_content("https://x.test/a", cache_dir=str(tmp_path), accept_statuses=(404,))
+
+        assert first == second == "<html>the real page</html>"
+        assert get.call_count == 2  # nothing was cached
+        assert not list(tmp_path.glob("*.json"))
+
+    def test_a_status_that_is_not_accepted_still_raises(self, tmp_path):
+        from climafactskg.utils import fetch_url_content
+
+        with patch("climafactskg.utils.requests.get", return_value=self._response(500, "<html>oops</html>")):
+            with pytest.raises(ValueError, match="500"):
+                fetch_url_content("https://x.test/a", cache_dir=str(tmp_path), accept_statuses=(404,))
+
     def test_no_partial_cache_file_is_left_behind(self, tmp_path):
         from climafactskg.utils import fetch_url_content
 

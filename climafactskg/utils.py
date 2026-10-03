@@ -362,6 +362,7 @@ def fetch_url_content(
     url: str,
     cache_dir: Optional[str] = None,
     cache_expiry: Optional[timedelta] = None,
+    accept_statuses: tuple[int, ...] = (),
 ) -> str:
     """Fetch the content of a URL using a disk cache. Cache expires after a given period.
 
@@ -373,13 +374,15 @@ def fetch_url_content(
         cache_expiry (timedelta, optional): The cache expiry duration. Defaults to the
             ``CLIMAFACTSKG_KG_CACHE_EXPIRY`` env var in seconds (read at call time),
             or 1 hour.
+        accept_statuses (tuple[int, ...], optional): Error statuses whose body is returned instead of raising,
+            for a page a server serves with the wrong status. Such a body is never cached. Default: none.
 
     Returns:
         str: The content of the URL.
 
     Raises:
         requests.RequestException: If the request fails or times out (``CLIMAFACTSKG_FETCH_TIMEOUT`` seconds, 30).
-        ValueError: If the server answers with an error status; nothing is cached then.
+        ValueError: If the server answers with an error status not in *accept_statuses*; nothing is cached then.
     """
     if cache_dir is None:
         cache_dir = os.getenv("CLIMAFACTSKG_CACHE_DIR", tempfile.gettempdir())
@@ -407,7 +410,9 @@ def fetch_url_content(
     response = requests.get(url, headers=headers, timeout=FETCH_TIMEOUT_SECONDS)
     # Any error status is a failure: an error page must neither be parsed as the page nor sit in the cache.
     if not response.ok:
-        raise ValueError(f"Failed to fetch URL content for '{url}'. Status code: {response.status_code}")
+        if response.status_code not in accept_statuses:
+            raise ValueError(f"Failed to fetch URL content for '{url}'. Status code: {response.status_code}")
+        return response.text  # an accepted error status: use the body, but never cache it
 
     content = response.text
 
