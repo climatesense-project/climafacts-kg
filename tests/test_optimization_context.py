@@ -7,7 +7,7 @@ pytest.importorskip("gepa")
 
 from climafactskg.classifiers.cards import datasets  # noqa: E402
 from climafactskg.classifiers.cards.datasets import CARDSInput  # noqa: E402
-from climafactskg.classifiers.cards.optimization import build_mixed_trainval  # noqa: E402
+from climafactskg.classifiers.cards.optimization import build_heldout, build_mixed_trainval  # noqa: E402
 
 
 def test_mixed_trainval_loads_climatesense_datasets_without_context(monkeypatch):
@@ -28,3 +28,68 @@ def test_mixed_trainval_loads_climatesense_datasets_without_context(monkeypatch)
     for name in ("cs_v1", "cs_v2"):
         assert seen[name].get("with_context") is False, f"{name} must be loaded explicitly claim-only"
         assert seen[name].get("context_path") is None
+
+
+def _fake_datasets(monkeypatch, n=10):
+    seen: dict[str, dict] = {}
+
+    def fake_factory(name):
+        def factory(**kwargs):
+            seen[name] = kwargs
+            return Dataset(
+                cases=[
+                    Case(name=f"{name}-{i}", inputs=CARDSInput(text=f"{name} claim {i}"), expected_output=["1_1"])
+                    for i in range(n)
+                ]
+            )
+
+        return factory
+
+    monkeypatch.setattr(datasets, "climatesense_dataset_v1", fake_factory("cs_v1"))
+    monkeypatch.setattr(datasets, "climatesense_dataset_v2", fake_factory("cs_v2"))
+    monkeypatch.setattr(datasets, "nslp_dataset", fake_factory("nslp"))
+    return seen
+
+
+def test_mixed_trainval_keeps_climate_only_by_default_and_can_include_the_no_narrative_documents(monkeypatch):
+    seen = _fake_datasets(monkeypatch)
+
+    build_mixed_trainval({"cs_v1": (1, 0)})
+    assert seen["cs_v1"]["climate_only"] is True
+
+    build_mixed_trainval({"cs_v1": (1, 0), "cs_v2": (1, 0)}, climate_only=False)
+    assert seen["cs_v1"]["climate_only"] is False
+    assert seen["cs_v2"]["climate_only"] is False
+
+
+def test_mixed_trainval_keeps_file_order_unless_a_seed_is_given(monkeypatch):
+    _fake_datasets(monkeypatch)
+
+    train, _ = build_mixed_trainval({"cs_v1": (4, 2)})
+
+    assert [c.name for c in train.cases] == ["cs_v1-0", "cs_v1-1", "cs_v1-2", "cs_v1-3"]
+
+
+def test_shuffle_seed_is_reproducible_and_changes_the_order(monkeypatch):
+    _fake_datasets(monkeypatch)
+
+    first, _ = build_mixed_trainval({"cs_v1": (6, 2)}, shuffle_seed=7)
+    again, _ = build_mixed_trainval({"cs_v1": (6, 2)}, shuffle_seed=7)
+    other, _ = build_mixed_trainval({"cs_v1": (6, 2)}, shuffle_seed=8)
+
+    assert [c.name for c in first.cases] == [c.name for c in again.cases]
+    assert [c.name for c in first.cases] != [c.name for c in other.cases]
+    assert [c.name for c in first.cases] != [f"cs_v1-{i}" for i in range(6)]
+
+
+def test_heldout_is_exactly_what_train_and_val_leave_out(monkeypatch):
+    _fake_datasets(monkeypatch)
+    mix = {"cs_v1": (3, 2), "nslp": (2, 1)}
+
+    train, val = build_mixed_trainval(mix, shuffle_seed=3)
+    heldout = build_heldout(mix, shuffle_seed=3)
+
+    used = [c.name for c in train.cases] + [c.name for c in val.cases]
+    left = [c.name for c in heldout.cases]
+    assert not set(used) & set(left)
+    assert sorted(used + left) == sorted([f"cs_v1-{i}" for i in range(10)] + [f"nslp-{i}" for i in range(10)])
