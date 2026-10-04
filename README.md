@@ -1,33 +1,25 @@
 # 🌍 ClimaFactsKG - An Interlinked Knowledge Graph of Scientific Evidence to Fight Climate Misinformation
 
-![Source code icense](https://img.shields.io/badge/Source_code_license-MIT-blue.svg?style=flat)
-
+![Source code license](https://img.shields.io/badge/Source_code_license-MIT-blue.svg?style=flat)
 ![ClimaFactsKG license](https://img.shields.io/badge/ClimaFactsKG_license-CC%20BY%204.0-success.svg?style=flat)
-
 [![CI](https://github.com/climatesense-project/climafacts-kg/actions/workflows/ci.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/ci.yml)
-[![Create Release](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml)
+[![Software Release](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/semantic-release.yml)
+[![Data Release](https://github.com/climatesense-project/climafacts-kg/actions/workflows/data-release.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/data-release.yml)
 [![Publish ClimaFactsKG RDF](https://github.com/climatesense-project/climafacts-kg/actions/workflows/gh-pages-publish.yml/badge.svg)](https://github.com/climatesense-project/climafacts-kg/actions/workflows/gh-pages-publish.yml)
 
-> [ClimaFactsKG](https://purl.net/climatesense/climafactskg/ns) is a knowledge graph designed to combat pervasive climate misinformation by linking 253 common climate myths — available in 28 languages — with scientific corrections and peer-reviewed evidence.
-> ClimaFactsKG is integrated with [CimpleKG](https://github.com/CIMPLE-project/knowledge-base).
+> [ClimaFactsKG](https://purl.net/climatesense/climafactskg/ns) is a knowledge graph designed to combat climate misinformation by linking common climate myths across 28 languages with scientific corrections and peer-reviewed evidence. Integrated with [CimpleKG](https://github.com/CIMPLE-project/knowledge-base).
 
-Despite the overwhelming scientific evidence supporting the impact of humans on the environment, climate misinformation remains pervasive. This persistent spread of falsehoods is often achieved through the misrepresentation of scientific evidence and the promotion of pseudoscientific narratives that hinder effective climate action. To combat this issue, we introduce [ClimaFactsKG](https://purl.net/climatesense/climafactskg/ns), a knowledge graph that links common climate change denial narratives with scientific corrections. ClimaFactsKG covers 253 unique climate myths (with 1,589 `sc:ClaimReview` entries spanning 28 languages) and links them to 1,205 peer-reviewed `sc:ScholarlyArticle` references drawn from the Skeptical Science literature database. A key feature of ClimaFactsKG is its strategic integration with [CimpleKG](https://github.com/CIMPLE-project/knowledge-base), one of the largest existing misinformation knowledge graphs. This connection allows the interlinking of scientific corrections and climate claims found in CimpleKG and significantly enhances the utility of ClimaFactsKG. By providing a structured and interlinked repository of climate change myths and their scientific rebuttals, ClimaFactsKG offers a valuable resource for researchers studying climate misinformation, fact-checkers seeking reliable counter-evidence, and educators aiming to improve climate literacy.
+ClimaFactsKG covers 253 unique climate myths (represented by 1,589 `sc:ClaimReview` entities across 28 languages) and links them to 1,205 peer-reviewed `sc:ScholarlyArticle` references collected from [Skeptical Science](https://skepticalscience.com/). Integration with [CimpleKG](https://github.com/CIMPLE-project/knowledge-base) connects scientific corrections with widespread climate claims, providing a structured resource for researchers, fact-checkers, and educators.
 
-## 🔍 Knowledge Graph Overview and Documentation
+## 🔍 Knowledge Graph Overview
 
-[ClimaFactsKG](https://purl.net/climatesense/climafactskg/ns) uses [`sc:ClaimReview`](https://schema.org/ClaimReview) from the [Schema.org](https://schema.org/) vocabulary to represent claims and scientific corrections collected from the [Skeptical Science](https://skepticalscience.com/) website.
-The categorisation of misinforming climate claims is based on the [CARDS](https://cardsclimate.com/) taxonomy. CARDS is used to connect `sc:ClaimReview` between ClimaFactsKG and [CimpleKG](https://github.com/CIMPLE-project/knowledge-base).
-
-ClimaFactsKG also integrates the scientific references cited in Skeptical Science articles as structured `sc:ScholarlyArticle` nodes, linking them back to the `sc:ClaimReview` entries that cite them.
+ClimaFactsKG represents claims and scientific rebuttals using [`sc:ClaimReview`](https://schema.org/ClaimReview) from [Schema.org](https://schema.org/). Climate claims are categorised using the [CARDS](https://cardsclimate.com/) taxonomy, which also connects `sc:ClaimReview` entries between ClimaFactsKG and [CimpleKG](https://github.com/CIMPLE-project/knowledge-base) (see [docs/taxonomy.md](docs/taxonomy.md) for taxonomy definitions and assessment mappings). References cited in Skeptical Science rebuttals are modelled as structured `sc:ScholarlyArticle` nodes linked directly to the reviews that cite them.
 
 ### 🔗 RDF Namespaces
 
-The ClimaFactsKG instance-data namespace is: https://purl.net/climatesense/climafactskg/ns#.
+The ClimaFactsKG instance-data namespace is `https://purl.net/climatesense/climafactskg/ns#`.
 
-The CARDS taxonomy has its own separate namespace: https://purl.net/climatesense/cards/ns#. CARDS is a
-shared taxonomy also used to connect claims in [CimpleKG](https://github.com/CIMPLE-project/knowledge-base),
-not something owned by ClimaFactsKG specifically, so its concepts (`cards:1_1`, `cards:2_3`, ...) are kept
-under their own identity rather than nested inside the ClimaFactsKG namespace.
+The CARDS taxonomy uses its own namespace (`https://purl.net/climatesense/cards/ns#`) to maintain a shared identifier space (`cards:1_1`, `cards:2_3`, ...) across both ClimaFactsKG and CimpleKG.
 
 ClimaFactsKG commonly uses the following namespaces and prefixes:
 
@@ -65,13 +57,13 @@ The main mappings used to represent the Skeptical Science data in ClimaFactsKG a
 
 ### 🏷️ Classifier Provenance
 
-Each CARDS label is the existing `schema:about` link (and its reverse `schema:subjectOf`), which is unchanged. The model that produced the labels is described next to it, from the tag stored with each classified entry, with one `schema:AssessAction` per distinct tag:
+Each CARDS label is linked to its review via `schema:about` (and reciprocal `schema:subjectOf`). Provenance for the classification model is recorded using `schema:AssessAction`:
 
-| Stored tag | → | Mapping |
-| :--------- | :- | :------ |
-| one per distinct tag | → | `:classification_<md5 of the tag>` `a schema:AssessAction` with a `schema:name` |
-| each model that ran (the LLM, the gate model, or the transformer's two stages) | → | `schema:instrument` `:model_<md5 of the model id>` `a schema:SoftwareApplication`, `schema:name` = the model id |
-| each review that carries a label from that classifier | → | `schema:object` pointing at the review's own IRI |
+| Entity | Mapping | Description |
+| :----- | :------ | :---------- |
+| Classification run | `:classification_<md5>` | `schema:AssessAction` representing the classification event |
+| Model | `schema:instrument` `:model_<md5>` | `schema:SoftwareApplication` identifying the model used |
+| Target review | `schema:object` | IRI of the classified `ClaimReview` |
 
 ```turtle
 :classification_34368a354ffd368cd4848231b844379a
@@ -79,10 +71,9 @@ Each CARDS label is the existing `schema:about` link (and its reverse `schema:su
     schema:name "CARDS labelling, two-stage transformer" ;
     schema:instrument :model_0393bb74e1266405570ef25d42565c6b, :model_34e9248425d7d6b866b21c111863e2c5 ;
     schema:object :claimreview_b9ba07b8af9a5410fdc5cb7be7acb708 .
+
 :model_0393bb74e1266405570ef25d42565c6b a schema:SoftwareApplication ; schema:name "crarojasca/BinaryAugmentedCARDS" .
 ```
-
-Reviews with no tag, or with a bare preset name (older runs did not record the model), get no description rather than a guessed one, and a review with no CARDS link gets nothing, as before. The nodes follow the graph's `<type>_<md5>` convention and add one triple per labelled review.
 
 ### 📚 Scientific References Mappings
 
@@ -124,38 +115,49 @@ The following table shows the main entity and triple counts in the current Clima
 
 Run `climafactskg validate` for a live, always-up-to-date count of these figures.
 
-## 🖥️ ClimaFactsKG Source Code
+## 🖥️ Source Code and Installation
 
-The data and source code releases can be found on the [releases page](https://github.com/climatesense-project/climafacts-kg/releases).
+Knowledge graph datasets and release artifacts are available on the [releases page](https://github.com/climatesense-project/climafacts-kg/releases).
 
 ### 📦 Installation
 
-Core install covers `collect`, `build`, `serve`, `export`, and `process --classifier llm` (the LLM-based path). `process`'s *default* classifier is the local two-stage transformer (no API key or cost, matches the pre-refactor pipeline) — that one needs the `transformer` extra below, since it pulls in PyTorch/HuggingFace.
+Install directly from GitHub via `pip`:
 
 ```bash
-pip install climafactskg
+# Core install (CLI, SPARQL server, and LLM classifier)
+pip install "git+https://github.com/climatesense-project/climafacts-kg.git"
 ```
 
-The `matcher` and `transformer` CARDS classifiers, and the annotation-evaluation pipeline, pull in
-heavy optional dependencies (spaCy, PyTorch/HuggingFace, Google Sheets/Drive, GEPA). Install only
-what you need via extras:
+Or from a local clone:
 
 ```bash
-pip install "climafactskg[matcher]"      # rule-based Jaccard-similarity classifier (spaCy)
-pip install "climafactskg[transformer]"  # two-stage HuggingFace classifier (pulls PyTorch)
-pip install "climafactskg[eval]"         # CARDS eval/optimization pipeline (GEPA, pydantic-evals, Sheets)
-pip install "climafactskg[all]"          # everything
+git clone https://github.com/climatesense-project/climafacts-kg.git
+cd climafacts-kg
+pip install .
 ```
 
-With [uv](https://docs.astral.sh/uv/), from a checkout of this repository:
+#### Optional Extras
+
+Install additional classifiers or evaluation tooling via extras:
 
 ```bash
-uv sync --extra matcher --extra transformer --extra eval   # or: --all-extras
+pip install "climafactskg[transformer] @ git+https://github.com/climatesense-project/climafacts-kg.git"  # Two-stage HuggingFace model & ClimateBERT gate
+pip install "climafactskg[matcher] @ git+https://github.com/climatesense-project/climafacts-kg.git"      # Rule-based Jaccard similarity matcher (spaCy)
+pip install "climafactskg[eval] @ git+https://github.com/climatesense-project/climafacts-kg.git"         # Benchmark evaluation pipeline (GEPA, pydantic-evals)
+pip install "climafactskg[all] @ git+https://github.com/climatesense-project/climafacts-kg.git"          # All optional dependencies
+```
+
+With [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add "git+https://github.com/climatesense-project/climafacts-kg.git"
+# Or from a local clone:
+uv sync --all-extras
 ```
 
 ### ⌨️ Command Line Interface (CLI)
 
-ClimaFactsKG has a simple CLI interface accessible via the `climafactskg` command.
+ClimaFactsKG provides a command-line interface via `climafactskg`:
 
 ```
  Usage: climafactskg [OPTIONS] COMMAND [ARGS]...
@@ -179,11 +181,19 @@ ClimaFactsKG has a simple CLI interface accessible via the `climafactskg` comman
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-`collect` and `process` run their steps independently: a failed step is logged and the others still run, but the command then exits 1, so scripts notice. Page and SPARQL requests time out (`CLIMAFACTSKG_FETCH_TIMEOUT`, 30 s; `CLIMAFACTSKG_SPARQL_TIMEOUT`, 300 s), and an error response is never cached or parsed (the one exception: the Skeptical Science misinformers page is served complete but with a 404 status, so `collect` accepts that status for it only, and fails if the page then lists no misinformers). `process` classifies with the local transformer engine by default (`--classifier transformer`, requires the `transformer` extra — see Installation above); pass `--classifier llm` to use the LLM-based path instead (core install, see provider table below). `build` merges SkepticalScience, CimpleKG, and ClimateSenseKG data plus the CARDS taxonomy into one `data/climafacts_kg.ttl`.
+#### Pipeline Workflow
 
-`process --classifier llm` runs the `xplainnlp-nslp` preset as defined (a local LM Studio model, ClimateBERT gate off) unless told otherwise: `--preset`, `--provider` and `--model` choose another preset, provider and model, and `--preclassifier` / `--no-preclassifier` turn the gate on or off (all four need `--classifier llm`; without them nothing changes). Whatever the options, the provenance tag stored with each classified entry records the model that actually ran, for example `xplainnlp-nslp|openrouter/google/gemma-4-31b-it`, with the gate model appended when the gate is on (`...+climatebert/distilroberta-base-climate-detector`); the transformer engine's tag is `transformer:<binary model>,<taxonomy model>`. Example: `climafactskg process --classifier llm --provider openrouter --model google/gemma-4-31b-it --preclassifier --concurrency 24`.
+1. **`collect`**: Gathers raw claims and debunkings from Skeptical Science, CimpleKG, and ClimateSenseKG.
+2. **`process`**: Classifies claims using the CARDS taxonomy. Supports the local two-stage transformer (`--classifier transformer`, default, requires `[transformer]`) or LLM-based classification (`--classifier llm`). Results are cached in SQLite (`data/cards_classification_cache.db`).
+3. **`build`**: Merges collected data, references, and taxonomy into `data/climafacts_kg.ttl`.
+4. **`serve`**: Serves the knowledge graph over a local SPARQL endpoint (see [docs/sparql.md](docs/sparql.md) for query patterns).
+5. **`validate`**: Validates Turtle syntax and RDF/XML serialisation.
 
-`process --cache-path` (default: `data/cards_classification_cache.db`) is a Preserve SQLite cache shared across all sources below it in the pipeline (CimpleKG, ClimateSenseKG, SkepticalScience arguments), so identical claim/argument text is classified once instead of once per source. Pass an empty string to disable caching.
+Example running the full LLM classification pipeline:
+
+```bash
+climafactskg process --classifier llm --provider openrouter --model google/gemma-4-31b-it --preclassifier --concurrency 24
+```
 
 #### `classify` — CARDS taxonomy classification
 
@@ -239,11 +249,15 @@ climafactskg classify "CO2 is just plant food" --context "Reviewer verdict: fals
 
 ### 🧩 CARDS Classifiers (Python API)
 
-The `climafactskg.classifiers.cards` module exposes three classifiers for programmatic use. All three inherit `CARDSClassifierBase` and share the same interface: `classify(text, context=None) -> str` and `classify_batch(texts, contexts=None) -> list[str]`. `context` is optional fact-check context (e.g. reviewer verdict, sources) — matcher and transformer append it to the text before classifying; the LLM classifier routes it to a dedicated context-aware prompt.
+The `climafactskg.classifiers.cards` module provides three classifiers sharing a common interface (`classify(text, context=None)` and `classify_batch(texts, contexts=None)`):
 
-#### Batch classification with context (full or partial)
+* **`CARDSLLMClassifier`**: LLM-based classification with optional ClimateBERT pre-filtering.
+* **`CARDSClassifier`**: Local two-stage transformer (ClimateBERT relevance filter + fine-tuned CARDS model).
+* **`CARDSMatcher`**: Fast rule-based Jaccard similarity matcher.
 
-`classify_batch(texts, contexts)` takes one context per text, in the same order. Use `None` for the items that have no context: each item is classified with its own context if it has one and from the claim text alone otherwise, so a batch can mix both. Passing no `contexts` classifies everything without context. A `contexts` list of a different length than `texts` raises `ValueError`.
+#### Batch Classification
+
+`classify_batch` supports optional fact-check context per claim (use `None` for claims without context). Results are cached by text and context:
 
 ```python
 from climafactskg.classifiers.cards import CARDSLLMClassifier
@@ -262,8 +276,6 @@ contexts = [
 ]
 labels = clf.classify_batch(texts, contexts=contexts, concurrency=4)
 ```
-
-The same call works for the transformer and matcher classifiers, which append the context to the text instead of using a context-aware prompt. Cached results are keyed by claim *and* context, so the with- and without-context answers for one claim are cached separately.
 
 #### Transformer classifier (two-stage, default)
 
@@ -355,24 +367,24 @@ class MyCARDSLLMConfig(CARDSLLMConfig):
     model: str = "llama3.3"
 ```
 
-### 🧭 Which model to use
+### 🧭 Model Recommendations
 
-No model is clearly the best: roughly the top ten LLMs are statistically tied, so the choice comes down to cost, speed, where you run it and which kind of mistake you can tolerate. All results use the default prompt on the claim alone (neither the tuned prompt nor review context helped).
+Evaluation benchmarks indicate comparable performance across top-performing models, with the optimal choice depending on cost, inference latency, hardware availability, and error profile:
 
-| If you want | Take | Why |
-| :---------- | :--- | :-- |
-| Lowest cost among the top group | `glm-5.3-flash` | Balanced score 0.645 (third), about $0.00009 per call, no failures. Open weights, MIT licence, 320B total and 18B active parameters (model card), so hosted only for most people. |
-| Highest balanced score | `qwen3.8-flash` | 0.654 (tied with `deepseek-v4-flash`), about $0.00033 per call; open weights not confirmed |
-| Highest category accuracy | `deepseek-v4-flash` | 0.604 on documents with a narrative, but the most false alarms of the finalists (19.9%) and about $0.0017 per call |
-| Fastest | `gemma-4-31b` or `ministral-14b-2512` | About 5 s per call; gemma has 19% false alarms, ministral 17% |
-| Your own hardware (16 to 24 GB) | `ministral-14b-2512` (16 GB) or `gemma-4-31b` (24 GB or more) | Balanced 0.616 and 0.620, short answers so fast per call; see [Running it yourself](#running-it-yourself) |
-| Smallest that still holds up | `ministral-14b-2512` | 14B, balanced 0.616, fits a 16 GB GPU or Mac at 4-bit |
+| Requirement | Recommended Model | Characteristics |
+| :---------- | :---------------- | :-------------- |
+| Lowest inference cost | `glm-5.3-flash` | Balanced score 0.645, ~\$0.00009 per call. MIT licence, MoE architecture (320B total / 18B active parameters). |
+| Highest balanced score | `qwen3.8-flash` | Balanced score 0.654, ~\$0.00033 per call. |
+| Highest category accuracy | `deepseek-v4-flash` | 0.604 category accuracy on narrative claims, 19.9% false-alarm rate, ~\$0.0017 per call. |
+| Lowest latency | `gemma-4-31b` or `ministral-14b-2512` | ~5 s per call via hosted providers. |
+| Local inference (16–24 GB VRAM) | `ministral-14b-2512` (16 GB) or `gemma-4-31b` (24 GB+) | Balanced score 0.616 / 0.620; see [docs/model-selection.md](docs/model-selection.md#running-it-yourself). |
+| Compact local model | `ministral-14b-2512` | 14B parameters, balanced score 0.616; runs on 16 GB Apple Silicon / GPU at 4-bit quantisation. |
 
-For the whole graph, classify with the ClimateBERT gate on (`--preclassifier`), which sets aside about 92% of the texts as not about climate, for example `climafactskg process --classifier llm --provider openrouter --model z-ai/glm-5.3-flash --preclassifier`. The charts, measured costs, the prompt and gate experiments, hardware notes and caveats are in [docs/model-selection.md](docs/model-selection.md); how to run the benchmarks yourself is in [docs/evaluation.md](docs/evaluation.md).
+Enabling the ClimateBERT pre-classifier gate (`--preclassifier`) filters out approximately 92% of non-climate content prior to LLM inference, significantly lowering API token costs. Comprehensive benchmarks, measured costs, prompt experiments, and hardware guidance are detailed in [docs/model-selection.md](docs/model-selection.md); benchmarking procedures are described in [docs/evaluation.md](docs/evaluation.md).
 
-## ©️ Licenses
+## ©️ Licences
 
-ClimaFactsKG source code is released under the [MIT license](https://opensource.org/license/mit), whereas the knowledge graph is released under the [Creative Commons Attribution 4.0 International (CC-BY 4.0) license](https://creativecommons.org/licenses/by/4.0/).
+ClimaFactsKG source code is released under the [MIT licence](https://opensource.org/license/mit), whereas the knowledge graph is released under the [Creative Commons Attribution 4.0 International (CC-BY 4.0) licence](https://creativecommons.org/licenses/by/4.0/).
 
 ## 🎓 Citation
 
