@@ -1,42 +1,56 @@
-name: Create Release
+name: Create Software Release
+
 'on':
   push:
     branches:
       - main
+    paths:
+      - 'climafactskg/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'tests/**'
+  workflow_dispatch:
+
 # Never run two releases at once (each one pushes a commit and a tag).
 concurrency:
   group: release
   cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write # release commit, tag, GitHub release and assets
-      actions: write # `gh workflow run` for the GH-Pages publish
     env:
       GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
     steps:
       - uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
+
       - name: Configure Python Environment (v3.13)
         uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.13'
+
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
+
       # Only the dev group (pinned python-semantic-release from uv.lock); skips
       # the project and its heavy ML dependencies, which a release does not need.
       - name: Install release tooling
         run: uv sync --locked --only-group dev
+
       # Bumps pyproject.toml, runs build_command (relocks uv.lock, builds dist/),
       # updates CHANGELOG.md, commits, tags, pushes and creates the GitHub release.
       # Exits 0 without side effects when there are no releasable commits.
+      # Guaranteed no PyPI upload (upload_to_PyPI = false in pyproject.toml).
       - name: Semantic Release
         run: uv run --no-sync semantic-release version
+
       - name: Detect release
         id: release
         shell: bash
@@ -55,61 +69,13 @@ jobs:
             echo "released=false" >> "$GITHUB_OUTPUT"
             echo "No new release this run."
           fi
+
       - if: steps.release.outputs.released == 'true'
-        name: Upload wheel and sdist
-        shell: bash
-        run: gh release upload "${{ steps.release.outputs.tag }}" dist/* --clobber
-      - if: steps.release.outputs.released == 'true'
-        name: Convert TTL to RDF
+        name: Set release title and upload wheel/sdist
         shell: bash
         run: |
-          uv run --no-project --with rdflib python -c "from rdflib import Graph; g = Graph(); g.parse('data/climafacts_kg.ttl', format='turtle'); g.serialize(destination='data/climafacts_kg.rdf', format='xml')"
-          uv run --no-project --with rdflib python -c "from rdflib import Graph; g = Graph(); g.parse('data/cards.ttl', format='turtle'); g.serialize(destination='data/cards.rdf', format='xml')"
-      - if: steps.release.outputs.released == 'true'
-        name: Add TTL and RDF to Release
-        shell: bash
-        run: |
-          gh release upload "${{ steps.release.outputs.tag }}" --clobber \
-            data/climafacts_kg.ttl#climafacts_kg.ttl \
-            data/climafacts_kg.rdf#climafacts_kg.rdf \
-            data/cards.ttl#cards.ttl \
-            data/cards.rdf#cards.rdf
-      - if: steps.release.outputs.released == 'true'
-        name: Add graph stats to release notes
-        shell: bash
-        run: |
-          uv run --no-project --with rdflib python -c "
-          from rdflib import RDF, Graph, Namespace
-
-          SDO = Namespace('https://schema.org/')
-          CITO = Namespace('http://purl.org/spar/cito/')
-
-          g = Graph()
-          g.parse('data/climafacts_kg.ttl')
-
-          stats = {
-              'Total RDF triples': len(g),
-              'sc:ClaimReview nodes': sum(1 for _ in g.triples((None, RDF.type, SDO.ClaimReview))),
-              'sc:ScholarlyArticle nodes': sum(1 for _ in g.triples((None, RDF.type, SDO.ScholarlyArticle))),
-              'sc:citation triples': sum(1 for _ in g.triples((None, SDO.citation, None))),
-              'cito:cites triples': sum(1 for _ in g.triples((None, CITO.cites, None))),
-          }
-
-          with open('stats.md', 'w') as f:
-              f.write('## Knowledge Graph Statistics\n\n')
-              f.write('| Metric | Count |\n')
-              f.write('| :--- | ---: |\n')
-              for key, value in stats.items():
-                  f.write(f'| {key} | {value:,} |\n')
-          "
-          gh release view "${{ steps.release.outputs.tag }}" --json body -q '.body // ""' > notes.md
-          echo "" >> notes.md
-          cat stats.md >> notes.md
-          gh release edit "${{ steps.release.outputs.tag }}" --notes-file notes.md
-      - if: steps.release.outputs.released == 'true'
-        name: Run GH-Pages Workflow
-        shell: bash
-        run: gh workflow run gh-pages-publish.yml
+          gh release edit "${{ steps.release.outputs.tag }}" --title "Software ${{ steps.release.outputs.tag }}"
+          gh release upload "${{ steps.release.outputs.tag }}" dist/* --clobber
     outputs:
       released: '${{ steps.release.outputs.released }}'
       tag: '${{ steps.release.outputs.tag }}'

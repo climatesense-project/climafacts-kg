@@ -2,35 +2,46 @@ name: Deploy Released ClimaFactsKG RDF to GH-Pages
 'on':
   repository_dispatch:
     types: [release-event]
-  workflow_dispatch: null
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to download assets from (e.g. data-2026.10.04)'
+        required: false
+        default: ''
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pages: write
       id-token: write
     steps:
-      - name: Get latest release assets
+      - name: Get release assets
         id: get_asset
         env:
-          # Authenticated: the previous unauthenticated `curl` to the releases API
-          # intermittently returned no `.assets` (rate limiting on shared runner IPs).
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # No custom domain (no CNAME) — this is a standard GitHub Project
-          # Pages site, already served at
-          # https://climatesense-project.github.io/climafacts-kg/ with the
-          # repo-name path segment provided by GitHub's routing for free.
-          # Publishing at the artifact root here is correct; adding another
-          # climafacts-kg/ folder would double-nest the path and 404 the
-          # actual site root (no index.html there).
-          gh release download --repo "${{ github.repository }}" --clobber \
-            --pattern climafacts_kg.rdf --pattern climafacts_kg.ttl \
-            --pattern cards.rdf --pattern cards.ttl
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            # Look for the latest data release tag
+            TAG=$(gh release list --limit 20 --json tagName -q '[.[] | select(.tagName | startswith("data-"))][0].tagName // ""')
+          fi
+
+          if [ -n "$TAG" ]; then
+            echo "Downloading assets from tag: $TAG"
+            gh release download "$TAG" --repo "${{ github.repository }}" --clobber \
+              --pattern climafacts_kg.rdf --pattern climafacts_kg.ttl \
+              --pattern cards.rdf --pattern cards.ttl
+          else
+            echo "No data-* tag found; downloading from latest release"
+            gh release download --repo "${{ github.repository }}" --clobber \
+              --pattern climafacts_kg.rdf --pattern climafacts_kg.ttl \
+              --pattern cards.rdf --pattern cards.ttl
+          fi
+
           for FILE_NAME in climafacts_kg.rdf climafacts_kg.ttl cards.rdf cards.ttl; do
             if [ ! -s "$FILE_NAME" ]; then
-              echo "Error: File '${FILE_NAME}' not found in the latest release assets."
+              echo "Error: File '${FILE_NAME}' not found in release assets."
               exit 1
             fi
           done
