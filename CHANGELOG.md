@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v2.4.1 (2026-10-04)
+
+### Bug Fixes
+
+- **builders**: Sanitize control characters in literals and validate RDF/XML output
+  ([`6fd9835`](https://github.com/climatesense-project/climafacts-kg/commit/6fd9835cbef97ec43bbc320cde6077c5dc48ab26))
+
+### Documentation
+
+- Cut the README's evaluation section to a pointer
+  ([`e4082af`](https://github.com/climatesense-project/climafacts-kg/commit/e4082af889891cc561062bfc1073fa4237d3535b))
+
+- Drop the evaluation section from the README
+  ([`09b6fa3`](https://github.com/climatesense-project/climafacts-kg/commit/09b6fa3bd72c381a7fa6c0ddf7cd3b8a6e852f77))
+
+- Move the evaluation guide out of the README into docs/evaluation.md
+  ([`2e41878`](https://github.com/climatesense-project/climafacts-kg/commit/2e41878a8417f4b59ab0ee860378b00192767f3b))
+
+- Shorten the README's model section and keep its details in the report
+  ([`b629e90`](https://github.com/climatesense-project/climafacts-kg/commit/b629e903393920f5a0b6368a48fbbc2449694f62))
+
+### Testing
+
+- Read the CLI's error text the same on a CI runner as in a terminal
+  ([`2c8d83b`](https://github.com/climatesense-project/climafacts-kg/commit/2c8d83baa1d23bbec2e389152cfbcac3e2625fef))
+
+
 ## v2.4.0 (2026-10-03)
 
 ### Bug Fixes
