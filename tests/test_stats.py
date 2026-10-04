@@ -3,8 +3,10 @@
 This is the RDF validity/sanity check backing the `climafactskg validate` CLI command.
 """
 
+import xml.etree.ElementTree as ET
+
 import pytest
-from climafactskg.stats import count_graph_stats
+from climafactskg.stats import count_graph_stats, validate_graph_xml
 
 _VALID_TTL = """
 @prefix sc: <https://schema.org/> .
@@ -20,6 +22,13 @@ _VALID_TTL = """
 _EMPTY_TTL = ""
 
 _MALFORMED_TTL = "this is not valid turtle {{{ @broken"
+
+_INVALID_XML_TTL = """
+@prefix sc: <https://schema.org/> .
+
+<http://example.org/review1> a sc:ClaimReview ;
+    sc:name "has control char \x03 in literal" .
+"""
 
 
 def _write(tmp_path, name, content):
@@ -51,3 +60,14 @@ class TestCountGraphStats:
         path = _write(tmp_path, "bad.ttl", _MALFORMED_TTL)
         with pytest.raises(SyntaxError):
             count_graph_stats(path)
+
+
+class TestValidateGraphXml:
+    def test_valid_graph_passes_xml_validation(self, tmp_path):
+        path = _write(tmp_path, "valid.ttl", _VALID_TTL)
+        validate_graph_xml(path)  # does not raise
+
+    def test_invalid_control_char_fails_xml_validation(self, tmp_path):
+        path = _write(tmp_path, "invalid_xml.ttl", _INVALID_XML_TTL)
+        with pytest.raises(ET.ParseError):
+            validate_graph_xml(path)

@@ -33860,7 +33860,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1029/2022gl098160" ] ;
     schema:isPartOf :volume_ec3ae57a82972673151e0c4ce4588242 ;
-    schema:name " Satellites Suggest Rising Tropical High Cloud Altitude: 2002 - 2021" ;
+    schema:name "Satellites Suggest Rising Tropical High Cloud Altitude: 2002 - 2021" ;
     schema:sameAs <https://doi.org/10.1029/2022gl098160> .
 
 :article_20b6585fefff3ba50adb65a8cc2160d5 a bibo:AcademicArticle,
@@ -33906,7 +33906,7 @@ cards:5_3_2 a skos:Concept ;
             schema:name "Druckman, J. N." ] ;
     schema:datePublished "2018" ;
     schema:isPartOf :issue_603af6cf974af07af227bb4534fd729b ;
-    schema:name "Do partisanship and politicization undermine the impact of a scientific consensus message about climate change? " ;
+    schema:name "Do partisanship and politicization undermine the impact of a scientific consensus message about climate change?" ;
     schema:pageEnd "402" ;
     schema:pageStart "389" ;
     schema:pagination "389-402" ;
@@ -33991,7 +33991,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1088/1674-4527/ac981c" ] ;
     schema:isPartOf :issue_2d3a63e1c823756efbae20853ee87ba5 ;
-    schema:name " Erroneous use of Statistics behind Claims of a Major Solar Role in Recent Warming" ;
+    schema:name "Erroneous use of Statistics behind Claims of a Major Solar Role in Recent Warming" ;
     schema:pageStart "125008" ;
     schema:pagination "125008" ;
     schema:sameAs <https://doi.org/10.1088/1674-4527/ac981c> .
@@ -34047,7 +34047,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1016/j.jafrearsci.2018.11.022" ] ;
     schema:isPartOf :volume_6833459f176b785017f4872b64bab6e4 ;
-    schema:name " 30ŌĆ»years of the Lakes Nyos and Monoun gas disasters: A scientific, technological, institutional and social adventure" ;
+    schema:name "30ŌĆ»years of the Lakes Nyos and Monoun gas disasters: A scientific, technological, institutional and social adventure" ;
     schema:sameAs <https://doi.org/10.1016/j.jafrearsci.2018.11.022> .
 
 :article_22aca34b3b2f570abcd73c6f2811e1e8 a bibo:AcademicArticle,
@@ -35268,7 +35268,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1088/1748-9326/ac2774" ] ;
     schema:isPartOf :issue_b0a311621b9c8f05a63f3e0d06b7b1d1 ;
-    schema:name " Consensus revisited: quantifying scientific agreement on climate change and climate expertise among Earth scientists 10 years later" ;
+    schema:name "Consensus revisited: quantifying scientific agreement on climate change and climate expertise among Earth scientists 10 years later" ;
     schema:pageStart "104030" ;
     schema:pagination "104030" ;
     schema:sameAs <https://doi.org/10.1088/1748-9326/ac2774> .
@@ -35356,7 +35356,7 @@ cards:5_3_2 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.31234/osf.io/q3mkd" ] ;
-    schema:name " Refuting spurious COVID-19 treatment claims reduces demand and misinformation sharing" ;
+    schema:name "Refuting spurious COVID-19 treatment claims reduces demand and misinformation sharing" ;
     schema:sameAs <https://doi.org/10.31234/osf.io/q3mkd> ;
     schema:url <https://psyarxiv.com/q3mkd/> .
 
@@ -36664,7 +36664,7 @@ cards:5_3_2 a skos:Concept ;
         [ a schema:Person ;
             schema:name "Zahnle, K." ],
         [ a schema:Person ;
-            schema:name "Sleep, N.Norman H." ],
+            schema:name "Sleep, N.Norman H." ],
         [ a schema:Person ;
             schema:name "Selsis, F." ],
         [ a schema:Person ;
@@ -38182,7 +38182,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1177/1940161220919082" ] ;
     schema:isPartOf :issue_2247c21ef7fd41bdd1c4effa0c505760 ;
-    schema:name " Testing the Effectiveness of Correction Placement and Type on Instagram" ;
+    schema:name "Testing the Effectiveness of Correction Placement and Type on Instagram" ;
     schema:pageEnd "652" ;
     schema:pageStart "632" ;
     schema:pagination "632-652" ;
@@ -40348,7 +40348,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1088/1748-9326/ac2966" ] ;
     schema:isPartOf :issue_152337742840c415e7407559cb2e4800 ;
-    schema:name " Greater than 99% consensus on human caused climate change in the peer-reviewed scientific literature" ;
+    schema:name "Greater than 99% consensus on human caused climate change in the peer-reviewed scientific literature" ;
     schema:pageStart "114005" ;
     schema:pagination "114005" ;
     schema:sameAs <https://doi.org/10.1088/1748-9326/ac2966> ;
@@ -40802,7 +40802,7 @@ cards:5_3_2 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.3390/atmos9050187" ] ;
-    schema:name "Projected Changes in Wet-Bulb Globe Temperature under Alternative Climate Scenarios " ;
+    schema:name "Projected Changes in Wet-Bulb Globe Temperature under Alternative Climate Scenarios" ;
     schema:sameAs <https://doi.org/10.3390/atmos9050187> ;
     schema:url <https://www.mdpi.com/2073-4433/9/5/187> .
 
@@ -40911,7 +40911,7 @@ cards:5_3_2 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.1002/2014JD022766" ] ;
-    schema:name "Observing  and  modeling  the  influence  of  layering  on  bubble  trapping  in  polar  firn" ;
+    schema:name "Observing and modeling the influence of layering on bubble trapping in polar firn" ;
     schema:sameAs <https://doi.org/10.1002/2014JD022766> ;
     schema:url <https://ir.library.oregonstate.edu/xmlui/bitstream/handle/1957/55856/MitchellLoganCEOASObservingModelingInfluence.pdf?sequence=1> .
 
@@ -41072,7 +41072,7 @@ cards:5_3_2 a skos:Concept ;
     schema:alternateName "Som et al. (2016)",
         "Som et al. 2016" ;
     schema:author [ a schema:Person ;
-            schema:name "Harnmeijer, J.Jelte P." ],
+            schema:name "Harnmeijer, J.Jelte P." ],
         [ a schema:Person ;
             schema:name "Hagadorn, J.W." ],
         [ a schema:Person ;
@@ -41645,7 +41645,7 @@ cards:5_3_2 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.1175/BAMS-D-16-0134.1" ] ;
-    schema:name "Will Global Warming Make Hurricane Forecasting More Difficult? " ;
+    schema:name "Will Global Warming Make Hurricane Forecasting More Difficult?" ;
     schema:sameAs <https://doi.org/10.1175/BAMS-D-16-0134.1> ;
     schema:url <https://journals.ametsoc.org/view/journals/bams/98/3/bams-d-16-0134.1.xml> .
 
@@ -43218,7 +43218,7 @@ cards:5_3_2 a skos:Concept ;
     schema:author [ a schema:Person ;
             schema:name "Amazeen, M.A." ] ;
     schema:datePublished "2020" ;
-    schema:name " Resisting covert persuasion in digital news: Comparing inoculation and reactance in the processing of native advertising disclosures and article engagement intentions" ;
+    schema:name "Resisting covert persuasion in digital news: Comparing inoculation and reactance in the processing of native advertising disclosures and article engagement intentions" ;
     schema:url <https://journals.sagepub.com/doi/abs/10.1177/1077699020952131> .
 
 :article_8794046b42263bcd6b6d6f7684bdb2eb a bibo:AcademicArticle,
@@ -43914,7 +43914,7 @@ cards:5_3_2 a skos:Concept ;
             schema:name "Anhang, J." ] ;
     schema:datePublished "2009" ;
     schema:isPartOf :journal_337418e7bbb91463bccd59f93d74d255 ;
-    schema:name " Livestock and Climate Change: What is the key actors in climate change are cows, pigs, and chickens?" ;
+    schema:name "Livestock and Climate Change: What is the key actors in climate change are cows, pigs, and chickens?" ;
     schema:url <https://www.cabdirect.org/cabdirect/abstract/20093312389> .
 
 :article_8fd5fe7b9fc28e78dc3e1eaea72de3ec a bibo:AcademicArticle,
@@ -45502,7 +45502,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1080/15456870.2017.1324453" ] ;
     schema:isPartOf :issue_568971a21d40caed69063a2e585fb144 ;
-    schema:name " ŌĆ£A Statistically Representative Climate Change DebateŌĆØ: Satirical Television News, Scientific Consensus, and Public Perceptions of Global Warming" ;
+    schema:name "ŌĆ£A Statistically Representative Climate Change DebateŌĆØ: Satirical Television News, Scientific Consensus, and Public Perceptions of Global Warming" ;
     schema:pageEnd "180" ;
     schema:pageStart "166" ;
     schema:pagination "166-180" ;
@@ -45598,7 +45598,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1130/g47365.1" ] ;
     schema:isPartOf :issue_ca5fffa74b3a21388f1233ae40a688b3 ;
-    schema:name " Field evidence for coal combustion links the 252 Ma Siberian Traps with global carbon disruption" ;
+    schema:name "Field evidence for coal combustion links the 252 Ma Siberian Traps with global carbon disruption" ;
     schema:pageEnd "991" ;
     schema:pageStart "986" ;
     schema:pagination "986-991" ;
@@ -47609,7 +47609,7 @@ cards:5_3_2 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.1175/1520-0442(2003)016<4079:DMUTSC>2.0.CO;2" ] ;
-    schema:name " Do models underestimate the solar contribution to recent climate change?" ;
+    schema:name "Do models underestimate the solar contribution to recent climate change?" ;
     schema:sameAs <https://doi.org/10.1175/1520-0442(2003)016%3C4079:DMUTSC%3E2.0.CO;2> ;
     schema:url <http://climate.envsci.rutgers.edu/pdf/StottEtAl.pdf> .
 
@@ -47864,7 +47864,7 @@ cards:5_3_2 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.1175/JCLI-D-16-0076.1" ] ;
-    schema:name " Past and Projected Changes in Western North Pacific Tropical Cyclone Exposure" ;
+    schema:name "Past and Projected Changes in Western North Pacific Tropical Cyclone Exposure" ;
     schema:sameAs <https://doi.org/10.1175/JCLI-D-16-0076.1> ;
     schema:url <https://journals.ametsoc.org/view/journals/clim/29/16/jcli-d-16-0076.1.xml?tab_body=abstract-display> .
 
@@ -48505,7 +48505,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1002/gch2.201600008" ] ;
     schema:isPartOf :issue_a90e5747e58b384a7bfe1c935a04c9f8 ;
-    schema:name "Inoculating the public against misinformation about climate change. " ;
+    schema:name "Inoculating the public against misinformation about climate change." ;
     schema:pageStart "1600008" ;
     schema:pagination "1600008" ;
     schema:sameAs <https://doi.org/10.1002/gch2.201600008> ;
@@ -49238,7 +49238,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.5194/essd-15-1597-2023" ] ;
     schema:isPartOf :issue_5655c404f258f47e27f254fdb71069b9 ;
-    schema:name " Mass balance of the Greenland and Antarctic ice sheets from 1992 to 2020" ;
+    schema:name "Mass balance of the Greenland and Antarctic ice sheets from 1992 to 2020" ;
     schema:pageEnd "1616" ;
     schema:pageStart "1597" ;
     schema:pagination "1597-1616" ;
@@ -50676,7 +50676,7 @@ cards:5_3_2 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1007/s00382-010-0914-z" ] ;
     schema:isPartOf :volume_e1d5bd71800345070797d883c0fbe66d ;
-    schema:name "Support for global climate reorganization during the ŌĆ£Medieval Climate AnomalyŌĆØ " ;
+    schema:name "Support for global climate reorganization during the ŌĆ£Medieval Climate AnomalyŌĆØ" ;
     schema:sameAs <https://doi.org/10.1007/s00382-010-0914-z> .
 
 :article_d3d3bf4443a9a3fb350e4bddba1b840a a bibo:AcademicArticle,
@@ -54878,7 +54878,7 @@ cards:5_3_2 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.1029/96JD03382" ] ;
-    schema:name "Modeling  air  movement  and  bubble  trapping  in  firn " ;
+    schema:name "Modeling air movement and bubble trapping in firn" ;
     schema:sameAs <https://doi.org/10.1029/96JD03382> ;
     schema:url <http://onlinelibrary.wiley.com/doi/10.1029/96JD03382/epdf> .
 
@@ -55159,7 +55159,7 @@ cards:5_3_2 a skos:Concept ;
             schema:name "Soden, B. J." ] ;
     schema:datePublished "2000" ;
     schema:isPartOf :issue_ffec5d686a796d67aa0edab8c767d77d ;
-    schema:name "Water vapor feedback and global warming " ;
+    schema:name "Water vapor feedback and global warming" ;
     schema:pageEnd "475" ;
     schema:pageStart "441" ;
     schema:pagination "441-475" ;
@@ -78899,14 +78899,14 @@ cards:5_3_2 a skos:Concept ;
     schema:license <https://creativecommons.org/licenses/by/3.0/> ;
     schema:name "What do the CERN experiments tell us about global warming?"@en ;
     schema:publisher :organization_sks ;
-    schema:reviewBody "Many climate \"skeptics\" have claimed that CLOUD at CERN has “proven that cosmic rays drive climate change”, or something to that effect. Unfortunately for “skeptics” (and if we don’t reign in greenhouse emissions, everyone else), it’s not true. While cosmic rays may have some influence on cloud formation, they are not responsible for the present, human-driven climatic change or alleged changes in the geologic past. Although seemingly out of fashion for a while until recently, the “cosmic rays are driving climate” myth has long been one of the mainstays of the self-contradictory climate “skeptic” argument stable, and it’s something covered fairly often at The Way Things Break (previous posts here, here, here, here, here, and here). And as with any good falsehood, it starts with a kernel of truth. It is completely accepted in mainstream science that galactic cosmic rays (GCRs) might be able to influence the nucleation process of potential cloud condensation nuclei (CCN), and that it’s conceivable that this could influence cloud behavior at some level. As the IPCC AR4 noted, \"By altering the population of CCN and hence microphysical cloud properties (droplet number and concentration), cosmic rays may also induce processes analogous to the indirect effect of tropospheric aerosols. The presence of ions, such as produced by cosmic rays, is recognised as influencing several microphysical mechanisms (Harrison and Carslaw, 2003). Aerosols may nucleate preferentially on atmospheric cluster ions. In the case of low gas-phase sulphuric acid concentrations, ion-induced nucleation may dominate over binary sulphuric acid-water nucleation.\" While a plausible mechanism exists, real world verifications are necessarily difficult to undertake. The CLOUD project at CERN is seeking to do exactly that. The “skeptic” and right wing blogospheres are abuzz because Jasper Kirkby, et al. have just published the first results in Nature (Kirkby 2011). RealClimate has a good rundown of what Kirkby et al.’s results do and do not mean. The short version is that Kirkby et al. do find increased aerosol nucleation under increased ionization (i.e. “more cosmic rays”), particularly in the mid-troposphere, but the effect is smaller at warmer, lower levels where the cosmic ray-climate myth proponents claim it has its greatest climatic effect. Lead author Jasper Kirkby has tried to set the record straight, stating (emphasis added): \"[The paper] actually says nothing about a possible cosmic-ray effect on clouds and climate, but it’s a very important first step.\" More recently, in May 2013 Kirkby reiterated this point. \"At the present time we can not say whether cosmic rays affect the climate\" While the CLOUD results provide some confirmation of the potential mechanism by which GCRs might induce cloud nucleation, they in no way demonstrate that GCRs do significantly promote cloud formation in the real world, let alone support the myth that GCRs drive significant climatic change. This point was driven home by Erlykin et al. (2013), who examined the preliminary CLOUD results in the context of climate change. The authors found: Taken at face value the CLOUD results would indicate an increase in nucleation rate of about 3 orders of magnitude in going from the equator to a latitude of 80. Even allowing for various reductions due to ‘sinks’ (Kirkby 2012, private communication), a big change should surely follow. A search for the latitude dependence of the [cosmic ray, low cloud] correlation, or the related dependence on the [cosmic ray] vertical rigidity cut-off (VRCO), gave negative results (Sloan and Wolfendale 2008), and indeed, this was one of the first demonstrations of the lack of a genuine [cosmic ray, low cloud] correlation. A latitude dependence of the correlation was not detected at any altitude, in fact. Thus, the expected big change with latitude for H2SO4 nucleation anywhere is not observed. “But wait!” I’m sure some of you may be thinking, “the CLOUD results themselves don’t disprove GCRs drive significant climatic changes.” And that’s true enough. In reference to the present anthropogenic climatic changes that we’re driving through alteration of the planetary energy balance notably through greenhouse gas emissions, we can theorize what certain “fingerprints” of enhanced greenhouse warming should look like, and examine observational data to see whether those fingerprints show up. And they do. Moreover, we can examine the claims made by Svensmark, Shaviv, and others who proclaim GCRs drive climate and see whether or not they hold up. They don’t. We can look at the paleoclimatic record during periods of significant changes in GCR activity, and there is no corresponding change in climate, e.g. the Laschamp excursion ~40kya (Muscheler 2005). We can examine the change in GCRs in response to solar variability over recent decades or the course of a solar cycle, and find there is no or little corresponding change in climate (Lockwood 2007, Lockwood 2008, Kulmala 2010). We can look at alleged correlations between GCRs and climate in the geologic past due to our sun passing through galactic spiral arms, and find that these “correlations” were based on an unrealistic, overly-simplified model of spiral structure and are not valid (Overholt 2009). Standard climatic processes (like CO2) more parsimoniously explained the climatic changes even before taking the flawed spiral model into account (Rahmstorf 2004). We can examine the specific mechanisms by which Svensmark and others have claimed GCRs influence climate via cloud behavior and show that alleged correlations between GCRs and clouds were incorrectly calculated or insufficiently large, proposed mechanisms (e.g. Forbush decreases) are too short lived, too small in magnitude, or otherwise incapable of altering cloud behavior on a large enough scale to drive significant climatic change (Sloan 2008, Erlykin 2009, Erlykin 2009a, Pierce 2009, Calogovic 2010, Snow-Kropla 2011, Erlykin 2011). Basically, what’s actually been demonstrated by Kirkby, et al. isn’t at odds with the IPCC. What is at odds with the IPCC hasn’t been demonstrated by Kirkby, et al. And the claims by Svensmark, Shaviv, and other ‘GCRs drive climate’ proponents have been debunked at pretty much every step of the way. GCRs may have some influence on cloud behavior, but they’re not responsible for significant climatic changes now or in the geologic past. The CLOUD project at CERN is essentially just getting started. Its preliminary findings will help aerosol modelers, and hopefully it will continue to provide useful results. After the initial furor of “skeptic” blog-spinning dies down, cosmic rays will probably find themselves falling out of favor once again. But there’s no such thing as too debunked when it comes to myths about climate change, and there’s little chance this will be the last time cosmic rays will be trotted out to claim that we don’t need to reduce greenhouse gas emissions."@en ;
+    schema:reviewBody "Many climate \"skeptics\" have claimed that CLOUD at CERN has “proven that cosmic rays drive climate change”, or something to that effect. Unfortunately for “skeptics” (and if we don’t reign in greenhouse emissions, everyone else), it’s not true. While cosmic rays may have some influence on cloud formation, they are not responsible for the present, human-driven climatic change or alleged changes in the geologic past. Although seemingly out of fashion for a while until recently, the “cosmic rays are driving climate” myth has long been one of the mainstays of the self-contradictory climate “skeptic” argument stable, and it’s something covered fairly often at The Way Things Break (previous posts here, here, here, here, here, and here). And as with any good falsehood, it starts with a kernel of truth. It is completely accepted in mainstream science that galactic cosmic rays (GCRs) might be able to influence the nucleation process of potential cloud condensation nuclei (CCN), and that it’s conceivable that this could influence cloud behavior at some level. As the IPCC AR4 noted, \"By altering the population of CCN and hence microphysical cloud properties (droplet number and concentration), cosmic rays may also induce processes analogous to the indirect effect of tropospheric aerosols. The presence of ions, such as produced by cosmic rays, is recognised as influencing several microphysical mechanisms (Harrison and Carslaw, 2003). Aerosols may nucleate preferentially on atmospheric cluster ions. In the case of low gas-phase sulphuric acid concentrations, ion-induced nucleation may dominate over binary sulphuric acid-water nucleation.\" While a plausible mechanism exists, real world verifications are necessarily difficult to undertake. The CLOUD project at CERN is seeking to do exactly that. The “skeptic” and right wing blogospheres are abuzz because Jasper Kirkby, et al. have just published the first results in Nature (Kirkby 2011). RealClimate has a good rundown of what Kirkby et al.’s results do and do not mean. The short version is that Kirkby et al. do find increased aerosol nucleation under increased ionization (i.e. “more cosmic rays”), particularly in the mid-troposphere, but the effect is smaller at warmer, lower levels where the cosmic ray-climate myth proponents claim it has its greatest climatic effect. Lead author Jasper Kirkby has tried to set the record straight, stating (emphasis added): \"[The paper] actually says nothing about a possible cosmic-ray effect on clouds and climate, but it’s a very important first step.\" More recently, in May 2013 Kirkby reiterated this point. \"At the present time we can not say whether cosmic rays affect the climate\" While the CLOUD results provide some confirmation of the potential mechanism by which GCRs might induce cloud nucleation, they in no way demonstrate that GCRs do significantly promote cloud formation in the real world, let alone support the myth that GCRs drive significant climatic change. This point was driven home by Erlykin et al. (2013), who examined the preliminary CLOUD results in the context of climate change. The authors found: Taken at face value the CLOUD results would indicate an increase in nucleation rate of about 3 orders of magnitude in going from the equator to a latitude of 80. Even allowing for various reductions due to ‘sinks’ (Kirkby 2012, private communication), a big change should surely follow. A search for the latitude dependence of the [cosmic ray, low cloud] correlation, or the related dependence on the [cosmic ray] vertical rigidity cut-off (VRCO), gave negative results (Sloan and Wolfendale 2008), and indeed, this was one of the first demonstrations of the lack of a genuine [cosmic ray, low cloud] correlation. A latitude dependence of the correlation was not detected at any altitude, in fact. Thus, the expected big change with latitude for H2SO4 nucleation anywhere is not observed. “But wait!” I’m sure some of you may be thinking, “the CLOUD results themselves don’t disprove GCRs drive significant climatic changes.” And that’s true enough. In reference to the present anthropogenic climatic changes that we’re driving through alteration of the planetary energy balance notably through greenhouse gas emissions, we can theorize what certain “fingerprints” of enhanced greenhouse warming should look like, and examine observational data to see whether those fingerprints show up. And they do. Moreover, we can examine the claims made by Svensmark, Shaviv, and others who proclaim GCRs drive climate and see whether or not they hold up. They don’t. We can look at the paleoclimatic record during periods of significant changes in GCR activity, and there is no corresponding change in climate, e.g. the Laschamp excursion ~40kya (Muscheler 2005). We can examine the change in GCRs in response to solar variability over recent decades or the course of a solar cycle, and find there is no or little corresponding change in climate (Lockwood 2007, Lockwood 2008, Kulmala 2010). We can look at alleged correlations between GCRs and climate in the geologic past due to our sun passing through galactic spiral arms, and find that these “correlations” were based on an unrealistic, overly-simplified model of spiral structure and are not valid (Overholt 2009). Standard climatic processes (like CO2) more parsimoniously explained the climatic changes even before taking the flawed spiral model into account (Rahmstorf 2004). We can examine the specific mechanisms by which Svensmark and others have claimed GCRs influence climate via cloud behavior and show that alleged correlations between GCRs and clouds were incorrectly calculated or insufficiently large, proposed mechanisms (e.g. Forbush decreases) are too short lived, too small in magnitude, or otherwise incapable of altering cloud behavior on a large enough scale to drive significant climatic change (Sloan 2008, Erlykin 2009, Erlykin 2009a, Pierce 2009, Calogovic 2010, Snow-Kropla 2011, Erlykin 2011). Basically, what’s actually been demonstrated by Kirkby, et al. isn’t at odds with the IPCC. What is at odds with the IPCC hasn’t been demonstrated by Kirkby, et al. And the claims by Svensmark, Shaviv, and other ‘GCRs drive climate’ proponents have been debunked at pretty much every step of the way. GCRs may have some influence on cloud behavior, but they’re not responsible for significant climatic changes now or in the geologic past. The CLOUD project at CERN is essentially just getting started. Its preliminary findings will help aerosol modelers, and hopefully it will continue to provide useful results. After the initial furor of “skeptic” blog-spinning dies down, cosmic rays will probably find themselves falling out of favor once again. But there’s no such thing as too debunked when it comes to myths about climate change, and there’s little chance this will be the last time cosmic rays will be trotted out to claim that we don’t need to reduce greenhouse gas emissions."@en ;
     schema:reviewRating [ a schema:Rating ;
             schema:bestRating 1 ;
             schema:name "False"^^schema:Text ;
             schema:ratingExplanation "Climate Myth..."@en ;
             schema:ratingValue 0 ;
             schema:worstRating 0 ] ;
-    schema:text "Many climate \"skeptics\" have claimed that CLOUD at CERN has “proven that cosmic rays drive climate change”, or something to that effect. Unfortunately for “skeptics” (and if we don’t reign in greenhouse emissions, everyone else), it’s not true. While cosmic rays may have some influence on cloud formation, they are not responsible for the present, human-driven climatic change or alleged changes in the geologic past. Although seemingly out of fashion for a while until recently, the “cosmic rays are driving climate” myth has long been one of the mainstays of the self-contradictory climate “skeptic” argument stable, and it’s something covered fairly often at The Way Things Break (previous posts here, here, here, here, here, and here). And as with any good falsehood, it starts with a kernel of truth. It is completely accepted in mainstream science that galactic cosmic rays (GCRs) might be able to influence the nucleation process of potential cloud condensation nuclei (CCN), and that it’s conceivable that this could influence cloud behavior at some level. As the IPCC AR4 noted, \"By altering the population of CCN and hence microphysical cloud properties (droplet number and concentration), cosmic rays may also induce processes analogous to the indirect effect of tropospheric aerosols. The presence of ions, such as produced by cosmic rays, is recognised as influencing several microphysical mechanisms (Harrison and Carslaw, 2003). Aerosols may nucleate preferentially on atmospheric cluster ions. In the case of low gas-phase sulphuric acid concentrations, ion-induced nucleation may dominate over binary sulphuric acid-water nucleation.\" While a plausible mechanism exists, real world verifications are necessarily difficult to undertake. The CLOUD project at CERN is seeking to do exactly that. The “skeptic” and right wing blogospheres are abuzz because Jasper Kirkby, et al. have just published the first results in Nature (Kirkby 2011). RealClimate has a good rundown of what Kirkby et al.’s results do and do not mean. The short version is that Kirkby et al. do find increased aerosol nucleation under increased ionization (i.e. “more cosmic rays”), particularly in the mid-troposphere, but the effect is smaller at warmer, lower levels where the cosmic ray-climate myth proponents claim it has its greatest climatic effect. Lead author Jasper Kirkby has tried to set the record straight, stating (emphasis added): \"[The paper] actually says nothing about a possible cosmic-ray effect on clouds and climate, but it’s a very important first step.\" More recently, in May 2013 Kirkby reiterated this point. \"At the present time we can not say whether cosmic rays affect the climate\" While the CLOUD results provide some confirmation of the potential mechanism by which GCRs might induce cloud nucleation, they in no way demonstrate that GCRs do significantly promote cloud formation in the real world, let alone support the myth that GCRs drive significant climatic change. This point was driven home by Erlykin et al. (2013), who examined the preliminary CLOUD results in the context of climate change. The authors found: Taken at face value the CLOUD results would indicate an increase in nucleation rate of about 3 orders of magnitude in going from the equator to a latitude of 80. Even allowing for various reductions due to ‘sinks’ (Kirkby 2012, private communication), a big change should surely follow. A search for the latitude dependence of the [cosmic ray, low cloud] correlation, or the related dependence on the [cosmic ray] vertical rigidity cut-off (VRCO), gave negative results (Sloan and Wolfendale 2008), and indeed, this was one of the first demonstrations of the lack of a genuine [cosmic ray, low cloud] correlation. A latitude dependence of the correlation was not detected at any altitude, in fact. Thus, the expected big change with latitude for H2SO4 nucleation anywhere is not observed. “But wait!” I’m sure some of you may be thinking, “the CLOUD results themselves don’t disprove GCRs drive significant climatic changes.” And that’s true enough. In reference to the present anthropogenic climatic changes that we’re driving through alteration of the planetary energy balance notably through greenhouse gas emissions, we can theorize what certain “fingerprints” of enhanced greenhouse warming should look like, and examine observational data to see whether those fingerprints show up. And they do. Moreover, we can examine the claims made by Svensmark, Shaviv, and others who proclaim GCRs drive climate and see whether or not they hold up. They don’t. We can look at the paleoclimatic record during periods of significant changes in GCR activity, and there is no corresponding change in climate, e.g. the Laschamp excursion ~40kya (Muscheler 2005). We can examine the change in GCRs in response to solar variability over recent decades or the course of a solar cycle, and find there is no or little corresponding change in climate (Lockwood 2007, Lockwood 2008, Kulmala 2010). We can look at alleged correlations between GCRs and climate in the geologic past due to our sun passing through galactic spiral arms, and find that these “correlations” were based on an unrealistic, overly-simplified model of spiral structure and are not valid (Overholt 2009). Standard climatic processes (like CO2) more parsimoniously explained the climatic changes even before taking the flawed spiral model into account (Rahmstorf 2004). We can examine the specific mechanisms by which Svensmark and others have claimed GCRs influence climate via cloud behavior and show that alleged correlations between GCRs and clouds were incorrectly calculated or insufficiently large, proposed mechanisms (e.g. Forbush decreases) are too short lived, too small in magnitude, or otherwise incapable of altering cloud behavior on a large enough scale to drive significant climatic change (Sloan 2008, Erlykin 2009, Erlykin 2009a, Pierce 2009, Calogovic 2010, Snow-Kropla 2011, Erlykin 2011). Basically, what’s actually been demonstrated by Kirkby, et al. isn’t at odds with the IPCC. What is at odds with the IPCC hasn’t been demonstrated by Kirkby, et al. And the claims by Svensmark, Shaviv, and other ‘GCRs drive climate’ proponents have been debunked at pretty much every step of the way. GCRs may have some influence on cloud behavior, but they’re not responsible for significant climatic changes now or in the geologic past. The CLOUD project at CERN is essentially just getting started. Its preliminary findings will help aerosol modelers, and hopefully it will continue to provide useful results. After the initial furor of “skeptic” blog-spinning dies down, cosmic rays will probably find themselves falling out of favor once again. But there’s no such thing as too debunked when it comes to myths about climate change, and there’s little chance this will be the last time cosmic rays will be trotted out to claim that we don’t need to reduce greenhouse gas emissions."@en ;
+    schema:text "Many climate \"skeptics\" have claimed that CLOUD at CERN has “proven that cosmic rays drive climate change”, or something to that effect. Unfortunately for “skeptics” (and if we don’t reign in greenhouse emissions, everyone else), it’s not true. While cosmic rays may have some influence on cloud formation, they are not responsible for the present, human-driven climatic change or alleged changes in the geologic past. Although seemingly out of fashion for a while until recently, the “cosmic rays are driving climate” myth has long been one of the mainstays of the self-contradictory climate “skeptic” argument stable, and it’s something covered fairly often at The Way Things Break (previous posts here, here, here, here, here, and here). And as with any good falsehood, it starts with a kernel of truth. It is completely accepted in mainstream science that galactic cosmic rays (GCRs) might be able to influence the nucleation process of potential cloud condensation nuclei (CCN), and that it’s conceivable that this could influence cloud behavior at some level. As the IPCC AR4 noted, \"By altering the population of CCN and hence microphysical cloud properties (droplet number and concentration), cosmic rays may also induce processes analogous to the indirect effect of tropospheric aerosols. The presence of ions, such as produced by cosmic rays, is recognised as influencing several microphysical mechanisms (Harrison and Carslaw, 2003). Aerosols may nucleate preferentially on atmospheric cluster ions. In the case of low gas-phase sulphuric acid concentrations, ion-induced nucleation may dominate over binary sulphuric acid-water nucleation.\" While a plausible mechanism exists, real world verifications are necessarily difficult to undertake. The CLOUD project at CERN is seeking to do exactly that. The “skeptic” and right wing blogospheres are abuzz because Jasper Kirkby, et al. have just published the first results in Nature (Kirkby 2011). RealClimate has a good rundown of what Kirkby et al.’s results do and do not mean. The short version is that Kirkby et al. do find increased aerosol nucleation under increased ionization (i.e. “more cosmic rays”), particularly in the mid-troposphere, but the effect is smaller at warmer, lower levels where the cosmic ray-climate myth proponents claim it has its greatest climatic effect. Lead author Jasper Kirkby has tried to set the record straight, stating (emphasis added): \"[The paper] actually says nothing about a possible cosmic-ray effect on clouds and climate, but it’s a very important first step.\" More recently, in May 2013 Kirkby reiterated this point. \"At the present time we can not say whether cosmic rays affect the climate\" While the CLOUD results provide some confirmation of the potential mechanism by which GCRs might induce cloud nucleation, they in no way demonstrate that GCRs do significantly promote cloud formation in the real world, let alone support the myth that GCRs drive significant climatic change. This point was driven home by Erlykin et al. (2013), who examined the preliminary CLOUD results in the context of climate change. The authors found: Taken at face value the CLOUD results would indicate an increase in nucleation rate of about 3 orders of magnitude in going from the equator to a latitude of 80. Even allowing for various reductions due to ‘sinks’ (Kirkby 2012, private communication), a big change should surely follow. A search for the latitude dependence of the [cosmic ray, low cloud] correlation, or the related dependence on the [cosmic ray] vertical rigidity cut-off (VRCO), gave negative results (Sloan and Wolfendale 2008), and indeed, this was one of the first demonstrations of the lack of a genuine [cosmic ray, low cloud] correlation. A latitude dependence of the correlation was not detected at any altitude, in fact. Thus, the expected big change with latitude for H2SO4 nucleation anywhere is not observed. “But wait!” I’m sure some of you may be thinking, “the CLOUD results themselves don’t disprove GCRs drive significant climatic changes.” And that’s true enough. In reference to the present anthropogenic climatic changes that we’re driving through alteration of the planetary energy balance notably through greenhouse gas emissions, we can theorize what certain “fingerprints” of enhanced greenhouse warming should look like, and examine observational data to see whether those fingerprints show up. And they do. Moreover, we can examine the claims made by Svensmark, Shaviv, and others who proclaim GCRs drive climate and see whether or not they hold up. They don’t. We can look at the paleoclimatic record during periods of significant changes in GCR activity, and there is no corresponding change in climate, e.g. the Laschamp excursion ~40kya (Muscheler 2005). We can examine the change in GCRs in response to solar variability over recent decades or the course of a solar cycle, and find there is no or little corresponding change in climate (Lockwood 2007, Lockwood 2008, Kulmala 2010). We can look at alleged correlations between GCRs and climate in the geologic past due to our sun passing through galactic spiral arms, and find that these “correlations” were based on an unrealistic, overly-simplified model of spiral structure and are not valid (Overholt 2009). Standard climatic processes (like CO2) more parsimoniously explained the climatic changes even before taking the flawed spiral model into account (Rahmstorf 2004). We can examine the specific mechanisms by which Svensmark and others have claimed GCRs influence climate via cloud behavior and show that alleged correlations between GCRs and clouds were incorrectly calculated or insufficiently large, proposed mechanisms (e.g. Forbush decreases) are too short lived, too small in magnitude, or otherwise incapable of altering cloud behavior on a large enough scale to drive significant climatic change (Sloan 2008, Erlykin 2009, Erlykin 2009a, Pierce 2009, Calogovic 2010, Snow-Kropla 2011, Erlykin 2011). Basically, what’s actually been demonstrated by Kirkby, et al. isn’t at odds with the IPCC. What is at odds with the IPCC hasn’t been demonstrated by Kirkby, et al. And the claims by Svensmark, Shaviv, and other ‘GCRs drive climate’ proponents have been debunked at pretty much every step of the way. GCRs may have some influence on cloud behavior, but they’re not responsible for significant climatic changes now or in the geologic past. The CLOUD project at CERN is essentially just getting started. Its preliminary findings will help aerosol modelers, and hopefully it will continue to provide useful results. After the initial furor of “skeptic” blog-spinning dies down, cosmic rays will probably find themselves falling out of favor once again. But there’s no such thing as too debunked when it comes to myths about climate change, and there’s little chance this will be the last time cosmic rays will be trotted out to claim that we don’t need to reduce greenhouse gas emissions."@en ;
     schema:url <https://skepticalscience.com/cern-cloud-proves-cosmic-rays-causing-global-warming-intermediate.htm> .
 
 :claimreview_febf9525bc29918444d2294122e86391 a schema:ClaimReview ;
@@ -80138,7 +80138,7 @@ cards:4_3 a skos:Concept ;
     schema:identifier [ a schema:PropertyValue ;
             schema:propertyID "doi" ;
             schema:value "10.1175/JCLI-D-12-00547.1" ] ;
-    schema:name "An Analysis of the Short-Term Cloud Feedback Using MODIS Data. " ;
+    schema:name "An Analysis of the Short-Term Cloud Feedback Using MODIS Data." ;
     schema:sameAs <https://doi.org/10.1175/JCLI-D-12-00547.1> ;
     schema:url <https://journals.ametsoc.org/view/journals/clim/26/13/jcli-d-12-00547.1.xml?tab_body=pdf> .
 
@@ -80534,7 +80534,7 @@ cards:4_3 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1177/0959683608098952" ] ;
     schema:isPartOf :issue_bc26481a47b5de48fb9ab4e6b60fe027 ;
-    schema:name " High-resolution palaeoclimatology of the last millennium: a review of current status and future prospects" ;
+    schema:name "High-resolution palaeoclimatology of the last millennium: a review of current status and future prospects" ;
     schema:pageEnd "49" ;
     schema:pageStart "3" ;
     schema:pagination "3-49" ;
@@ -83826,7 +83826,7 @@ cards:4_4 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1175/JCLI3865.1" ] ;
     schema:isPartOf :journal_9dd0eaf4e62591ff897a649939c02ec6 ;
-    schema:name "Constraining Climate Sensitivity from the Seasonal Cycle in Surface Temperature " ;
+    schema:name "Constraining Climate Sensitivity from the Seasonal Cycle in Surface Temperature" ;
     schema:sameAs <https://doi.org/10.1175/JCLI3865.1> ;
     schema:url <https://journals.ametsoc.org/view/journals/clim/19/17/jcli3865.1.xml> .
 
@@ -84315,7 +84315,7 @@ cards:4_4 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1038/347139a0" ] ;
     schema:isPartOf :issue_bf038d651c6e71122ba979bae9b0e3f0 ;
-    schema:name " The ice-core record: climate sensitivity and future greenhouse warming" ;
+    schema:name "The ice-core record: climate sensitivity and future greenhouse warming" ;
     schema:pageEnd "145" ;
     schema:pageStart "139" ;
     schema:pagination "139-145" ;
@@ -86216,7 +86216,7 @@ cards:3 a skos:Concept ;
             schema:propertyID "doi" ;
             schema:value "10.1038/s41586-022-04946-0" ] ;
     schema:isPartOf :issue_2f1d233ae5710f9bcbe73608b4fb7cc2 ;
-    schema:name " Response of the East Antarctic Ice Sheet to past and future climate change" ;
+    schema:name "Response of the East Antarctic Ice Sheet to past and future climate change" ;
     schema:pageEnd "286" ;
     schema:pageStart "275" ;
     schema:pagination "275-286" ;

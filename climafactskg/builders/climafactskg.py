@@ -11,18 +11,10 @@ from rdflib import OWL, RDF, RDFS, SDO, XSD, BNode, Graph, Literal, Namespace, U
 from climafactskg.builders.cimplekg import add_cards_category_link, generate_cimplekg_mappings
 from climafactskg.builders.provenance import add_classification_provenance
 from climafactskg.builders.utils import new_graph, safe_uriref
+from climafactskg.builders.utils import normalize_text as _normalize_text
 from climafactskg.utils import hash_string
 
 logger = logging.getLogger(__name__)
-
-
-def _normalize_text(value: str) -> str:
-    """Collapse all whitespace runs (including newlines) to a single space.
-
-    rdflib serialises any string containing newlines or double-quotes as a
-    triple-quoted Turtle literal. Normalising here keeps every text Literal on one logical line.
-    """
-    return " ".join(value.split())
 
 
 _LEVEL_SUFFIX_RE = re.compile(r"-(basic|intermediate|advanced)(\.htm)$", re.IGNORECASE)
@@ -145,7 +137,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
                 author_id = f"person_{hash_string(arg['author'])}"
                 article_g.add((ns[claimreview_id], SDO.author, ns[author_id]))
                 article_g.add((ns[author_id], RDF.type, SDO.Person))
-                article_g.add((ns[author_id], SDO.name, Literal(arg["author"])))
+                article_g.add((ns[author_id], SDO.name, Literal(_normalize_text(arg["author"]))))
 
             # Add publisher information:
             article_g.add((ns[claimreview_id], SDO.publisher, ns["organization_sks"]))
@@ -187,7 +179,7 @@ def generate_climafactskg_base(db: preserve.Connector, ignore_urls: Optional[lis
             # Add keywords if present:
             if "keywords" in arg and arg["keywords"] is not None:
                 for keyword in arg["keywords"]:
-                    article_g.add((ns[claimreview_id], SDO.keywords, Literal(keyword, lang=lang)))
+                    article_g.add((ns[claimreview_id], SDO.keywords, Literal(_normalize_text(keyword), lang=lang)))
 
             # Add abstract if at glance is present:
             if "at_glance" in arg and arg["at_glance"] is not None:

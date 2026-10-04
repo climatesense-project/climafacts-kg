@@ -338,12 +338,18 @@ def _validate_graph(graph_path: str, min_claim_reviews: int = 1) -> None:
     triples, or has fewer than *min_claim_reviews* sc:ClaimReview nodes —
     each usually means a source DB was empty or missing when built.
     """
-    from climafactskg.stats import count_graph_stats
+    from climafactskg.stats import count_graph_stats, validate_graph_xml
 
     try:
         stats = count_graph_stats(graph_path)
     except Exception as e:
         logger.error("FAILED: could not parse %r as RDF: %s", graph_path, e)
+        raise typer.Exit(code=1) from e
+
+    try:
+        validate_graph_xml(graph_path)
+    except Exception as e:
+        logger.error("FAILED: graph %r serializes to invalid RDF/XML: %s", graph_path, e)
         raise typer.Exit(code=1) from e
 
     for key, value in stats.items():

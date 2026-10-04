@@ -1,5 +1,6 @@
 """Shared helpers for builders/*.py graph construction."""
 
+import re
 import urllib.parse
 
 from rdflib import Graph, Namespace, URIRef
@@ -9,6 +10,20 @@ from climafactskg.utils import strip_credential_query_params
 
 # RFC 3986 characters that are safe to leave unencoded in a URI
 _URI_SAFE = ":/?#[]@!$&'()*+,;=-._~%"
+
+# XML 1.0 legal characters: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+_INVALID_XML_CHARS = re.compile(r"[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD\U00010000-\U0010FFFF]")
+
+
+def normalize_text(value: str) -> str:
+    """Collapse all whitespace runs (including newlines) to a single space and strip invalid XML characters.
+
+    rdflib serialises any string containing newlines or double-quotes as a
+    triple-quoted Turtle literal. Normalising here keeps every text Literal on one logical line
+    and strips control characters (e.g. ASCII 0x00-0x08, 0x0B-0x0C, 0x0E-0x1F) that break XML 1.0 serialization.
+    """
+    cleaned = _INVALID_XML_CHARS.sub("", value)
+    return " ".join(cleaned.split())
 
 
 def safe_uriref(url: str) -> URIRef:
