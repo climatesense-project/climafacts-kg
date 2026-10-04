@@ -15,7 +15,7 @@ from urllib.parse import quote
 import preserve
 from rdflib import RDF, SDO, BNode, Graph, Literal, Namespace, URIRef
 
-from climafactskg.builders.utils import new_graph, safe_uriref
+from climafactskg.builders.utils import new_graph, normalize_text, safe_uriref
 from climafactskg.utils import hash_string
 
 logger = logging.getLogger(__name__)
@@ -145,11 +145,11 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
                     g.add((article_uri, SDO.alternateName, Literal(alt_key)))
 
             if ref.get("header"):
-                g.add((article_uri, SDO.name, Literal(ref["header"])))
+                g.add((article_uri, SDO.name, Literal(normalize_text(ref["header"]))))
 
             # Year — kept as a plain literal to allow "2012a"-style suffixes
             if ref.get("year"):
-                g.add((article_uri, SDO.datePublished, Literal(ref["year"])))
+                g.add((article_uri, SDO.datePublished, Literal(normalize_text(str(ref["year"])))))
 
             # Authors — split into individual schema:Person nodes.
             # BNode ids are derived from content (article + position + name) rather
@@ -161,7 +161,7 @@ def generate_references_graph(db: preserve.Connector) -> Graph:
                     b = BNode(hash_string(f"author|{article_uri}|{i}|{author_name}"))
                     g.add((article_uri, SDO.author, b))
                     g.add((b, RDF.type, SDO.Person))
-                    g.add((b, SDO.name, Literal(author_name)))
+                    g.add((b, SDO.name, Literal(normalize_text(author_name))))
 
             # Link to paper / PDF / abstract
             if ref.get("url"):

@@ -1,10 +1,24 @@
 """Tests for builders/utils.py's shared new_graph helper."""
 
-from climafactskg.builders.utils import new_graph, safe_uriref
+from climafactskg.builders.utils import new_graph, normalize_text, safe_uriref
 from rdflib import Namespace
 
 NS = Namespace("http://example.org/ns#")
 OTHER_NS = Namespace("http://example.org/other#")
+
+
+class TestNormalizeText:
+    def test_collapses_whitespace(self):
+        assert normalize_text("  hello \n \t world  ") == "hello world"
+
+    def test_strips_invalid_xml_control_characters(self):
+        # \x03 (ETX), \x00 (NUL), \x08 (BS), \x1F (US) are illegal in XML 1.0
+        text = "latitude of 80\x03.\x00\x08\x1f Even allowing for..."
+        assert normalize_text(text) == "latitude of 80. Even allowing for..."
+
+    def test_preserves_valid_unicode(self):
+        text = "Temperature in °C — 80° latitude."
+        assert normalize_text(text) == "Temperature in °C — 80° latitude."
 
 
 class TestNewGraph:

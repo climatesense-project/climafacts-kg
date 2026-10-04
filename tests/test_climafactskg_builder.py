@@ -75,3 +75,15 @@ class TestArticleFailureHandling:
         g = generate_climafactskg_base([("k", entry)], ignore_urls=["https://example.org/skipped.htm"])
 
         assert _claim_review_urls(g) == set()
+
+    def test_control_characters_in_content_are_sanitized_for_xml(self):
+        import xml.etree.ElementTree as ET
+
+        entry = _make_entry("https://example.org/control_char.htm") | {
+            "content": "latitude of 80\x03. Even allowing for\x00\x08 reductions...",
+            "description": "Some \x1f description",
+        }
+        g = generate_climafactskg_base([("k1", entry)])
+        xml_bytes = g.serialize(format="xml")
+        root = ET.fromstring(xml_bytes)
+        assert root is not None

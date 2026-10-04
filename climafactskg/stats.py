@@ -78,6 +78,25 @@ def count_graph_stats(graph_path: str | Path) -> dict:
     return stats
 
 
+def validate_graph_xml(graph_or_path: Graph | str | Path) -> None:
+    """Ensure the RDF graph can be serialized to RDF/XML and parsed as well-formed XML.
+
+    Raises:
+        xml.etree.ElementTree.ParseError: If the serialized RDF/XML contains invalid XML 1.0 tokens
+            (such as illegal C0 control characters).
+    """
+    import xml.etree.ElementTree as ET
+
+    if isinstance(graph_or_path, Graph):
+        g = graph_or_path
+    else:
+        g = Graph()
+        g.parse(str(graph_or_path))
+
+    xml_bytes = g.serialize(format="xml")
+    ET.fromstring(xml_bytes)
+
+
 if __name__ == "__main__":
     from dotenv import load_dotenv
 
