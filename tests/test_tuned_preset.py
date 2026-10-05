@@ -4,7 +4,11 @@ import dataclasses
 import hashlib
 
 from climafactskg.classifiers.cards.llm.presets import _REGISTRY, registered_presets
-from climafactskg.classifiers.cards.llm.prompts import XPLAINNLP_NSLP_SYSTEM_PROMPT, XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT
+from climafactskg.classifiers.cards.llm.prompts import (
+    XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT,
+    XPLAINNLP_NSLP_SYSTEM_PROMPT,
+    XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT,
+)
 
 
 def test_the_tuned_preset_is_registered_but_the_default_is_unchanged():
@@ -38,3 +42,22 @@ def test_the_tuned_prompt_is_byte_identical_to_the_text_that_was_measured():
 
     assert digest == "e8aa6c26ca71c3521091af143ad284c5e2c77a455f3d9bd2c9455706bfca5fb6"
     assert len(XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT) == 6754
+
+
+def test_the_gemma_tuned_preset_differs_from_the_default_only_in_the_system_prompt():
+    base = dataclasses.asdict(_REGISTRY["xplainnlp-nslp"]())
+    tuned = dataclasses.asdict(_REGISTRY["xplainnlp-nslp-gemma-tuned"]())
+
+    assert {key for key in base if base[key] != tuned[key]} == {"system_prompt"}
+    assert tuned["system_prompt"] == XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT
+
+
+def test_the_gemma_tuned_prompt_is_byte_identical_to_the_text_that_was_measured():
+    digest = hashlib.sha256(XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT.encode("utf-8")).hexdigest()
+
+    assert digest == "5ffcb35494278c83350105ff0728c253db11d35ac1d2d9f31b17d2dd0da6a0d7"
+    assert len(XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT) == 6860
+    assert (
+        "0_0" in XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT
+        and "cards_category" in XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT
+    )

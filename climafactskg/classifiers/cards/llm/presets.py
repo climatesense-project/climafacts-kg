@@ -19,6 +19,7 @@ from .prompts import (
     CLIMATESENSE_NSLP_SYSTEM_PROMPT,
     CLIMATESENSE_NSLP_SYSTEM_PROMPT_WITH_CONTEXT,
     CLIMATESENSE_NSLP_USER_PROMPT,
+    XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT,
     XPLAINNLP_NSLP_MODEL,
     XPLAINNLP_NSLP_PROVIDER,
     XPLAINNLP_NSLP_SYSTEM_PROMPT,
@@ -272,6 +273,37 @@ class XplaiNLPNSLPTunedCARDSLLMConfig(XplaiNLPNSLPCARDSLLMConfig):
     """
 
     system_prompt: str = XPLAINNLP_NSLP_TUNED_SYSTEM_PROMPT
+
+
+@register_preset("xplainnlp-nslp-gemma-tuned")
+@dataclasses.dataclass
+class XplaiNLPNSLPGemmaTunedCARDSLLMConfig(XplaiNLPNSLPCARDSLLMConfig):
+    """Preset: ``xplainnlp-nslp`` with a prompt tuned for ``google/gemma-4-31b-it``. Experimental, opt in by name.
+
+    Everything but the system prompt is inherited from ``xplainnlp-nslp``. The prompt was tuned on gemma-4-31b for the
+    balanced score ``0.75 * category accuracy + 0.25 * (1 - false-alarm rate)``. Scored on 547 held-out cases (the rest
+    of ClimateSense v1/v2 after the tuning slices, plus the NSLP test split), claim only, temperature 0, gate off,
+    with ``google/gemma-4-31b-it``:
+
+    * Balanced score (75/25): 0.654 to 0.693, +0.039 with a 95% interval of +0.005 to +0.071.
+    * Balanced score (equal weights): 0.717 to 0.748, +0.031 (+0.006 to +0.054).
+    * Category accuracy on narrative documents: 59.2% to 63.9%. False alarms: 15.7% to 14.2%. Exact match 0.746 to
+      0.771. Both kinds of mistake fell, which the earlier ``xplainnlp-nslp-tuned`` prompt did not manage.
+
+    Limits to keep in mind:
+
+    * It is for gemma-4-31b. The same tuning recipe made ``ministral-14b-2512`` worse (balanced 0.654 to 0.619,
+      false alarms 12.8% to 20.5%) and left ``glm-5.3-flash`` unchanged (-0.007 and +0.005, within noise), each with a
+      prompt tuned on that model. This gemma prompt itself has not been tested on other models.
+    * The interval's lower end is close to zero, and the tuner's own validation score barely moved (0.361 to 0.366),
+      so the size of the gain is uncertain.
+    * It is longer than the default (6,860 characters against 3,751), so each call is slower and dearer.
+    * It was tuned for claims alone: with review context the preset uses the unchanged ``xplainnlp-nslp`` prompt.
+
+    Check it against the default on your own data before relying on it, for example with ``eval run``.
+    """
+
+    system_prompt: str = XPLAINNLP_NSLP_GEMMA_TUNED_SYSTEM_PROMPT
 
 
 @register_preset("cards-narrative")

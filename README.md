@@ -339,7 +339,7 @@ clf = CARDSLLMClassifier.from_preset("climatesense-nslp", cache_path="/tmp/cards
 
 # List registered presets
 from climafactskg.classifiers.cards import registered_presets
-print(registered_presets())  # → ('climatesense-nslp', 'xplainnlp-nslp', 'xplainnlp-nslp-tuned', 'cards-narrative')
+print(registered_presets())  # → ('climatesense-nslp', 'xplainnlp-nslp', 'xplainnlp-nslp-tuned', 'xplainnlp-nslp-gemma-tuned', 'cards-narrative')
 
 # Batch classification (concurrent LLM calls)
 labels = clf.classify_batch(["text one", "text two", "text three"], concurrency=4)
@@ -352,6 +352,7 @@ labels = clf.classify_batch(["text one", "text two", "text three"], concurrency=
 | `climatesense-nslp` | `openrouter` | `openai/gpt-5.2` |
 | `xplainnlp-nslp` | `lmstudio` | `qwen/qwen3-8b-mlx` |
 | `xplainnlp-nslp-tuned` | `lmstudio` | `qwen/qwen3-8b-mlx` (experimental: `xplainnlp-nslp` with a GEPA-tuned system prompt, see the results under "Which model to use") |
+| `xplainnlp-nslp-gemma-tuned` | `lmstudio` | `qwen/qwen3-8b-mlx` (experimental: a prompt tuned for `google/gemma-4-31b-it`, +0.039 balanced score there; it is not meant for other models, see its docstring) |
 | `cards-narrative` | `CARDS_LLM_PROVIDER` (default `openai`) | `CARDS_LLM_MODEL` (default `gpt-4o-mini`); classifies the narrative a claim promotes, not its surface wording |
 
 Custom presets can be registered with the `@register_preset` decorator:
