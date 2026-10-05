@@ -153,3 +153,112 @@ def test_a_failed_call_is_not_fed_back_to_the_reflection_model_as_a_wrong_predic
     records = adapter.make_reflective_dataset({"instructions": "prompt"}, result, ["instructions"])["instructions"]
 
     assert [r["Inputs"]["claim"] for r in records] == ["claim a"]  # a wrong answer; the failure is left out
+
+
+class _AnswerAgent:
+    """Answers each claim from a table ``{claim: category}``; ``"0_0"`` means the model said there is no narrative."""
+
+    def __init__(self, answers):
+        self.answers = answers
+
+    def override(self, **_kwargs):
+        from contextlib import nullcontext
+
+        return nullcontext()
+
+    async def run(self, message, model_settings=None):
+        from types import SimpleNamespace
+
+        category = self.answers[message]
+        return SimpleNamespace(output=SimpleNamespace(is_climate_related=category != "0_0", cards_category=category))
+
+
+def _weighted_adapter(answers, weight=0.75, share=0.5):
+    from types import SimpleNamespace
+
+    from climafactskg.classifiers.cards.optimization import CARDSEvalsAdapter
+
+    classifier = SimpleNamespace(
+        _agent=_AnswerAgent(answers),
+        _user_prompt="{text}",
+        _user_prompt_with_context="{text} {context}",
+        _model_settings=None,
+        _default_concurrency=2,
+    )
+    return CARDSEvalsAdapter(classifier, category_weight=weight, narrative_share=share)
+
+
+def _inst(claim, expected):
+    from climafactskg.classifiers.cards.optimization import CARDSDataInst
+
+    return CARDSDataInst(claim=claim, expected=expected)
+
+
+def test_weighted_scores_make_the_batch_mean_follow_the_balanced_objective():
+    # one narrative case in four: weight 0.75 on it, 0.25 shared by the three no-narrative cases
+    batch = [_inst("n", ["1_1"]), _inst("a", ["0_0"]), _inst("b", ["0_0"]), _inst("c", ["0_0"])]
+    adapter = _weighted_adapter({"n": "1_1", "a": "0_0", "b": "0_0", "c": "2_1"}, share=0.25)
+
+    result = adapter.evaluate(batch, {"instructions": "p"})
+
+    # objective: 0.75 * 1.0 (the narrative is right) + 0.25 * (2 / 3) (one false alarm in three) = 0.9167,
+    # and the scores are scaled by the largest weight (0.75 / 0.25 = 3), so mean * 3 equals it
+    assert result.scores[0] == 1.0
+    assert abs(sum(result.scores) / 4 * 3 - (0.75 + 0.25 * 2 / 3)) < 1e-9
+
+
+def test_a_false_alarm_and_a_missed_narrative_both_score_zero():
+    batch = [_inst("alarm", ["0_0"]), _inst("miss", ["1_1"])]
+    adapter = _weighted_adapter({"alarm": "3_1", "miss": "0_0"})
+
+    result = adapter.evaluate(batch, {"instructions": "p"})
+
+    assert result.scores == [0.0, 0.0]
+
+
+def test_a_correct_case_of_the_lighter_class_is_not_reported_as_a_mistake():
+    batch = [_inst("neg", ["0_0"]), _inst("pos", ["2_1"])]
+    adapter = _weighted_adapter({"neg": "0_0", "pos": "1_1"}, share=0.5)  # weight 0.75 on narratives, 0.25 on the rest
+
+    result = adapter.evaluate(batch, {"instructions": "p"}, capture_traces=True)
+    records = adapter.make_reflective_dataset({"instructions": "p"}, result, ["instructions"])["instructions"]
+
+    assert result.scores[0] < 1.0  # the no-narrative case is right but carries the smaller weight
+    assert [r["Inputs"]["claim"] for r in records] == ["pos"]  # only the real mistake is fed back
+
+
+def test_the_feedback_says_which_kind_of_mistake_it_was():
+    batch = [_inst("alarm", ["0_0"]), _inst("miss", ["1_1"]), _inst("wrong", ["1_1"])]
+    adapter = _weighted_adapter({"alarm": "3_1", "miss": "0_0", "wrong": "2_1"})
+
+    result = adapter.evaluate(batch, {"instructions": "p"}, capture_traces=True)
+    feedback = {
+        r["Inputs"]["claim"]: r["Feedback"]
+        for r in adapter.make_reflective_dataset({"instructions": "p"}, result, ["instructions"])["instructions"]
+    }
+
+    assert feedback["alarm"].startswith("False alarm")
+    assert feedback["miss"].startswith("Missed narrative")
+    assert feedback["wrong"].startswith("Wrong category")
+
+
+def test_the_weighting_needs_a_valid_weight_and_a_share():
+    from types import SimpleNamespace
+
+    import pytest
+    from climafactskg.classifiers.cards.optimization import CARDSEvalsAdapter
+
+    classifier = SimpleNamespace(
+        _agent=None, _user_prompt="", _user_prompt_with_context="", _model_settings=None, _default_concurrency=1
+    )
+    for weight, share in ((0.0, 0.5), (1.0, 0.5), (0.75, 0.0), (0.75, 1.0), (0.75, None)):
+        with pytest.raises(ValueError):
+            CARDSEvalsAdapter(classifier, category_weight=weight, narrative_share=share)
+
+
+def test_narrative_share_counts_the_examples_that_are_not_pure_no_narrative():
+    from climafactskg.classifiers.cards.optimization import _narrative_share
+
+    examples = [_inst("a", ["0_0"]), _inst("b", ["0"]), _inst("c", ["1_1"]), _inst("d", ["2_1", "0_0"])]
+
+    assert _narrative_share(examples) == 0.5  # a and b have no narrative; c and the tie with a category do

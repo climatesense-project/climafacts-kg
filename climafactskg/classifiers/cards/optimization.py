@@ -54,6 +54,18 @@ logger = logging.getLogger(__name__)
 
 # Output recorded for a case whose model call raised; scored as wrong and kept out of the reflection feedback.
 _FAILED_CALL = "(call failed)"
+# The codes meaning "no denial narrative": "0" (transformer, matcher) and "0_0" (LLM).
+_NO_NARRATIVE = frozenset({"0", "0_0"})
+
+
+def _is_no_narrative(labels: Sequence[str]) -> bool:
+    """True when every acceptable gold label means no narrative (a tie with a category does not count)."""
+    return all(label in _NO_NARRATIVE for label in labels)
+
+
+def _narrative_share(examples: Sequence["CARDSDataInst"]) -> float:
+    """The share of *examples* that carry a narrative, that is whose gold labels are not all no-narrative."""
+    return sum(not _is_no_narrative(example.expected) for example in examples) / len(examples)
 
 
 @dataclasses.dataclass
@@ -74,6 +86,7 @@ class CARDSTrajectory:
     expected: list[str]
     score: float
     context: str | None = None
+    raw: float | None = None  # the unweighted score; ``None`` means ``score`` is already unweighted
 
 
 class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
@@ -87,9 +100,19 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
     "close enough" candidates (e.g. ones that hedge toward broad parent codes)
     even when they get the precise category wrong, which previously let a
     candidate with degenerate exact-match accuracy still look good to GEPA.
+
+    With ``category_weight`` the score becomes ``category_weight * (0.5 * exact + 0.5 * hierarchical)`` on the cases
+    that carry a narrative plus ``(1 - category_weight) * (1 - false-alarm rate)`` on the cases that do not, so a
+    prompt is rewarded for the balance the evaluation reports, not for how common each kind of case is in the data.
     """
 
-    def __init__(self, classifier: CARDSLLMClassifier, concurrency: int | None = None) -> None:
+    def __init__(
+        self,
+        classifier: CARDSLLMClassifier,
+        concurrency: int | None = None,
+        category_weight: float | None = None,
+        narrative_share: float | None = None,
+    ) -> None:
         """Create a new adapter from a configured classifier.
 
         Args:
@@ -98,7 +121,24 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
                 and model settings are used as-is.
             concurrency: Maximum concurrent ``agent.run()`` calls per batch.
                 Defaults to ``classifier._default_concurrency``.
+            category_weight: ``None`` (default) keeps the plain blend over every case. A number in (0, 1) is the
+                weight of the narrative cases; the no-narrative cases get ``1 - category_weight``.
+            narrative_share: The share of narrative cases in the data (see :func:`_narrative_share`); needed, in
+                (0, 1), whenever ``category_weight`` is set, to turn the weights into per-case scores.
+
+        Raises:
+            ValueError: If ``category_weight`` is set without a valid weight or share.
         """
+        if category_weight is not None and not (
+            0.0 < category_weight < 1.0 and narrative_share is not None and 0.0 < narrative_share < 1.0
+        ):
+            raise ValueError("category_weight and narrative_share must both lie strictly between 0 and 1")
+        self._category_weight = category_weight
+        # Per-case scale of each class, divided by the larger so the best possible score stays 1.0.
+        self._class_scale: tuple[float, float] | None = None
+        if category_weight is not None and narrative_share is not None:
+            w_pos, w_neg = category_weight / narrative_share, (1 - category_weight) / (1 - narrative_share)
+            self._class_scale = (w_pos / max(w_pos, w_neg), w_neg / max(w_pos, w_neg))
         self._agent = classifier._agent
         self._user_prompt = classifier._user_prompt
         self._user_prompt_with_context = classifier._user_prompt_with_context
@@ -144,10 +184,22 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
 
         outputs: list[str] = []
         scores: list[float] = []
-        for i in range(len(batch)):
+        raws: list[float] = []
+        for i, item in enumerate(batch):
             case = done.get(str(i))
-            outputs.append(str(case.output) if case is not None else _FAILED_CALL)
-            scores.append(_blended_score(case) if case is not None else 0.0)
+            output = str(case.output) if case is not None else _FAILED_CALL
+            outputs.append(output)
+            if self._class_scale is None:
+                raw = _blended_score(case) if case is not None else 0.0
+                scores.append(raw)
+            elif _is_no_narrative(item.expected):
+                # a false alarm is any category on a document that has none
+                raw = float(case is not None and output in _NO_NARRATIVE)
+                scores.append(raw * self._class_scale[1])
+            else:
+                raw = _blended_score(case) if case is not None else 0.0
+                scores.append(raw * self._class_scale[0])
+            raws.append(raw)
         if report.failures:
             logger.warning(
                 "%d of %d GEPA evaluation calls failed and were scored as wrong.", len(report.failures), len(batch)
@@ -161,8 +213,9 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
                     expected=item.expected,
                     score=score,
                     context=item.context,
+                    raw=raw,
                 )
-                for item, output, score in zip(batch, outputs, scores, strict=True)
+                for item, output, score, raw in zip(batch, outputs, scores, raws, strict=True)
             ]
         return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
 
@@ -174,15 +227,27 @@ class CARDSEvalsAdapter(GEPAAdapter[CARDSDataInst, CARDSTrajectory, str]):
     ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
         records = []
         for traj in eval_batch.trajectories or []:
-            if traj.score < 1.0 and traj.predicted != _FAILED_CALL:
+            raw = traj.score if traj.raw is None else traj.raw
+            if raw < 1.0 and traj.predicted != _FAILED_CALL:
                 records.append(
                     {
                         "Inputs": {"claim": traj.claim},
                         "Generated Outputs": {"predicted": traj.predicted},
-                        "Feedback": (f"Wrong — predicted '{traj.predicted}' but expected one of {traj.expected}."),
+                        "Feedback": self._feedback(traj),
                     }
                 )
         return {"instructions": records}
+
+    def _feedback(self, traj: CARDSTrajectory) -> str:
+        """Say what went wrong; with the weighting on, also which kind of mistake it was."""
+        plain = f"predicted '{traj.predicted}' but expected one of {traj.expected}."
+        if self._class_scale is None:
+            return f"Wrong — {plain}"
+        if _is_no_narrative(traj.expected):
+            return f"False alarm — the claim has no denial narrative, but it was given '{traj.predicted}'."
+        if traj.predicted in _NO_NARRATIVE:
+            return f"Missed narrative — {plain}"
+        return f"Wrong category — {plain}"
 
 
 def _sliced_cases(
@@ -304,6 +369,7 @@ def optimize_prompt(
     reflection_provider: str = "openrouter",
     reflection_model: str = "openai/gpt-4o-mini",
     save_path: str | None = None,
+    category_weight: float | None = None,
 ) -> str:
     """Optimize the system prompt of a classifier using GEPA.
 
@@ -325,6 +391,8 @@ def optimize_prompt(
         reflection_model: Model for the GEPA reflection LM.
         save_path: Optional file path to write the best prompt to after optimization.
             Useful for persisting results across runs.
+        category_weight: ``None`` (default) scores every case alike. A number in (0, 1) weights the narrative cases
+            by it and the no-narrative cases by ``1 - category_weight`` (see :class:`CARDSEvalsAdapter`).
 
     Returns:
         The best-performing system prompt string found by GEPA.
@@ -343,7 +411,11 @@ def optimize_prompt(
     train_examples = _dataset_to_examples(trainset)
     val_examples = _dataset_to_examples(valset) if valset is not None else train_examples
 
-    adapter = CARDSEvalsAdapter(classifier)
+    adapter = CARDSEvalsAdapter(
+        classifier,
+        category_weight=category_weight,
+        narrative_share=_narrative_share(train_examples) if category_weight is not None else None,
+    )
 
     # Reflection agent — same two-liner pattern as CARDSLLMClassifier.__init__
     r_model = _build_pydantic_ai_model(reflection_provider, reflection_model)
