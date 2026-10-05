@@ -373,7 +373,7 @@ Evaluation benchmarks indicate comparable performance across top-performing mode
 
 | Requirement | Recommended Model | Characteristics |
 | :---------- | :---------------- | :-------------- |
-| Lowest inference cost | `glm-5.3-flash` | Balanced score 0.645, ~\$0.00009 per call. MIT licence, MoE architecture (320B total / 18B active parameters). |
+| Lowest inference cost | `glm-5.3-flash` | Balanced score 0.645, ~\$0.0002 per call (measured on 200 gate-passed graph texts). MIT licence, MoE architecture (320B total / 18B active parameters). |
 | Highest balanced score | `qwen3.8-flash` | Balanced score 0.654, ~\$0.00033 per call. |
 | Highest category accuracy | `deepseek-v4-flash` | 0.604 category accuracy on narrative claims, 19.9% false-alarm rate, ~\$0.0017 per call. |
 | Lowest latency | `gemma-4-31b` or `ministral-14b-2512` | ~5 s per call via hosted providers. |

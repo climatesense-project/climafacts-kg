@@ -17,7 +17,7 @@ This report evaluates 32 classifiers for labelling claims against the CARDS clim
 
 | Requirement | Recommended Model | Characteristics |
 | :---------- | :---------------- | :-------------- |
-| Lowest inference cost | `glm-5.3-flash` | Balanced score 0.645, ~\$0.00009 per call. MIT licence, MoE architecture (320B total / 18B active parameters). |
+| Lowest inference cost | `glm-5.3-flash` | Balanced score 0.645, ~\$0.0002 per call (measured on 200 gate-passed graph texts). MIT licence, MoE architecture (320B total / 18B active parameters). |
 | Highest balanced score | `qwen3.8-flash` | Balanced score 0.654 (tied with `deepseek-v4-flash`), ~\$0.00033 per call. |
 | Highest category accuracy | `deepseek-v4-flash` | 0.604 category accuracy on narrative claims, 19.9% false-alarm rate, ~\$0.0017 per call. |
 | Lowest latency | `gemma-4-31b` or `ministral-14b-2512` | ~5 s latency per call via hosted providers; 17–19% false alarms. |
@@ -86,20 +86,20 @@ Beyond approximately 14B parameters, the performance frontier plateaus. The 1.6T
 
 ### Inference Cost and Latency
 
-Costs represent measured account charges over 24 queries per model:
+Costs are measured account charges. `glm-5.3-flash` was measured on 200 texts from the graph that pass the gate (\$0.00019 per call; the same model measured on 24 benchmark claims gave \$0.00009, so the other figures, which are 24-query samples, may also be understated):
 
 ![Balanced score against measured cost per call](model-selection/cost_vs_score.svg)
 
-| Model | Cost per Call | Median Latency | Entire Graph (Gate Enabled, ~21k calls) | Entire Graph (Gate Disabled, ~263k calls) |
+| Model | Cost per Call | Median Latency | Entire Graph (Gate Enabled, ~25.5k calls) | Entire Graph (Gate Disabled, ~184k calls) |
 | :---- | :------------ | :------------- | :-------------------------------------- | :---------------------------------------- |
-| `glm-5.3-flash` | \$0.00009 | 14 s | ~\$2 | ~\$24 |
-| `ministral-14b-2512` | \$0.00010 | 5 s | ~\$2 | ~\$26 |
-| `glm-4.7-flash` | \$0.00030 | 28 s | ~\$6 | ~\$79 |
-| `qwen3.8-flash` | \$0.00033 | 26 s | ~\$7 | ~\$87 |
-| `gemma-4-31b` | \$0.00039 | 5 s | ~\$8 | ~\$103 |
-| `deepseek-v4-flash` | \$0.00170 | 34 s | ~\$36 | ~\$450 |
+| `glm-5.3-flash` | \$0.00019 | 14 s | ~\$5 | ~\$35 |
+| `ministral-14b-2512` | \$0.00010 | 5 s | ~\$3 | ~\$18 |
+| `glm-4.7-flash` | \$0.00030 | 28 s | ~\$8 | ~\$55 |
+| `qwen3.8-flash` | \$0.00033 | 26 s | ~\$8 | ~\$61 |
+| `gemma-4-31b` | \$0.00039 | 5 s | ~\$10 | ~\$72 |
+| `deepseek-v4-flash` | \$0.00170 | 34 s | ~\$43 | ~\$312 |
 
-Estimated end-to-end processing times for the knowledge graph with the ClimateBERT pre-filter gate enabled (~21,000 calls) range from ~2 hours (`gemma-4-31b` and `ministral-14b-2512` at concurrency 24) to ~18 hours (`deepseek-v4-flash` with extended chain-of-thought generation).
+The call counts are the 183,690 unique English texts in the graph's databases (only English texts are classified); the gate passed 13.9% of 1,500 random English graph texts, so about 25,500 calls with the gate on. Estimated end-to-end times with the gate on range from ~2.5 hours (`gemma-4-31b` and `ministral-14b-2512` at concurrency 24) and ~8 hours for `glm-5.3-flash` (measured 1.1 s per call at concurrency 16, with no failures) to ~21 hours (`deepseek-v4-flash` with extended chain-of-thought generation).
 
 ---
 
