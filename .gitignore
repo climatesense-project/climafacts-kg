@@ -212,3 +212,15 @@ data/eval_runs/
 
 # local agent working files (specs, plans, task ledgers) - not part of the project
 .superpowers/
+docs/model-selection/top5_models_slide.svg
+docs/model-selection/top5_models_slide.png
+docs/model-selection/top5_accuracy_barchart.svg
+docs/model-selection/top5_accuracy_barchart.png
+docs/model-selection/top10_accuracy_barchart.svg
+docs/model-selection/top10_accuracy_barchart.png
+docs/model-selection/size_vs_score_slide.svg
+docs/model-selection/size_vs_score_slide.png
+docs/model-selection/methodology_slide.svg
+docs/model-selection/methodology_slide.png
+docs/model-selection/dataset_comparison_slide.svg
+docs/model-selection/dataset_comparison_slide.png
