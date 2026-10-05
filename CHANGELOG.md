@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v2.5.0 (2026-10-05)
+
+### Bug Fixes
+
+- **builders**: Sanitize control characters in literals and validate RDF/XML output
+  ([`205eadb`](https://github.com/climatesense-project/climafacts-kg/commit/205eadb90128cba81c587fd94585fd779f6a2b24))
+
+### Continuous Integration
+
+- **release**: Separate software and data release workflows
+  ([`6d79379`](https://github.com/climatesense-project/climafacts-kg/commit/6d793792b39494253d3f334d4f12a85e6ca7fbc5))
+
+### Documentation
+
+- Correct the graph cost estimates with a measured gate share and glm cost
+  ([`3aa67d1`](https://github.com/climatesense-project/climafacts-kg/commit/3aa67d1272582b3d35797cb7812822c06da743cd))
+
+- Streamline documentation, add CARDS taxonomy and SPARQL guides
+  ([`5ecbdd9`](https://github.com/climatesense-project/climafacts-kg/commit/5ecbdd9343eb9ec17c2b9f5c592e8f4691fae062))
+
+### Features
+
+- **classifiers**: Add the gemma-tuned preset
+  ([`a0975a9`](https://github.com/climatesense-project/climafacts-kg/commit/a0975a959dca6648f6e6f0cc9993929d667d6562))
+
+- **eval**: Let the prompt optimizer target the balanced score
+  ([`c66f794`](https://github.com/climatesense-project/climafacts-kg/commit/c66f794babf031fc34ecf3faa8d67dd9e294b519))
+
+
 ## v2.4.1 (2026-10-04)
 
 ### Bug Fixes
