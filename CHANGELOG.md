@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.6.0 (2026-10-06)
+
+### Features
+
+- **cli**: Serve a CARDS classifier over HTTP with optional bearer-token auth
+  ([`82bb34e`](https://github.com/climatesense-project/climafacts-kg/commit/82bb34e16a706c65a76a3abbe424725c41798cfa))
+
+
 ## v2.5.0 (2026-10-05)
 
 ### Bug Fixes
