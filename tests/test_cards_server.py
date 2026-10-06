@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from climafactskg.classifiers.cards.server import build_classifier, create_classifier_app
 from fastapi.testclient import TestClient
@@ -57,7 +59,8 @@ def test_serve_commands(monkeypatch):
     assert [c[0] for c in calls] == ["a.ttl", "b.ttl"]
     assert calls[0][3] == 9
     out = runner.invoke(cli.app, ["serve", "classifier", "--help"])
-    assert out.exit_code == 0 and "--classifier" in out.output
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", out.output)  # CI forces colour, which splits the flag
+    assert out.exit_code == 0 and "--classifier" in plain
 
 
 class TestApiKey:
