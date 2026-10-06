@@ -144,7 +144,8 @@ def _build_pydantic_ai_model(provider: str, model: str):
     Supported provider strings
     --------------------------
     ``"openai"``, ``"anthropic"``, ``"groq"``, and other natively-supported
-    pydantic-ai providers are passed through as ``"{provider}:{model}"``.
+    pydantic-ai providers are passed through as ``"{provider}:{model}"``. ``"openai"`` honours the standard
+    ``OPENAI_API_KEY`` and ``OPENAI_BASE_URL`` variables, so any OpenAI-compatible endpoint works by setting them.
 
     ``"ollama"``
         Uses :class:`~pydantic_ai.providers.ollama.OllamaProvider`.

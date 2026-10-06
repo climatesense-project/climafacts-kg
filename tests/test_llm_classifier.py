@@ -388,3 +388,15 @@ class TestClimateBertGate:
 
         assert clf.classify_batch(["cat video", "ice is melting"]) == ["0", "1_1"]
         assert clf.llm_calls == ["ice is melting"]
+
+
+class TestOpenAIBaseUrl:
+    def test_openai_honours_standard_env_vars(self, monkeypatch):
+        from climafactskg.classifiers.cards.llm.classifier import _build_pydantic_ai_model
+        from pydantic_ai.models import infer_model
+
+        monkeypatch.setenv("OPENAI_BASE_URL", "http://example.test/v1")
+        monkeypatch.setenv("OPENAI_API_KEY", "secret")
+        model = infer_model(_build_pydantic_ai_model("openai", "m"))
+        assert str(model.client.base_url).startswith("http://example.test/v1")
+        assert model.client.api_key == "secret"

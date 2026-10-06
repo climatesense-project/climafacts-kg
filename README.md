@@ -305,6 +305,16 @@ clf = CARDSMatcher()
 clf.classify("CO2 is not the main driver of warming")  # → e.g. "2_1"
 ```
 
+#### Serving a classifier
+
+```bash
+climafactskg serve classifier --classifier llm --preset xplainnlp-nslp --port 8001
+curl -s localhost:8001/classify -H 'content-type: application/json' -d '{"text": "CO2 is plant food"}'
+curl -s localhost:8001/classify/batch -H 'content-type: application/json' -d '{"texts": ["a", "b"]}'
+```
+
+`POST /classify` takes `text` and optional `context`; `POST /classify/batch` takes `texts` (max 256) and optional `contexts`, and returns `null` for items that failed. `GET /healthz` reports status and OpenAPI docs live at `/docs`. It binds to `127.0.0.1`. Set `CLIMAFACTSKG_API_KEY` (comma-separated for several keys, so you can rotate without downtime) to require `Authorization: Bearer <key>` on the two classify routes; `/healthz` and `/docs` stay open. Unset means no authentication, and binding to a non-local host that way logs a warning. The key travels in clear over plain HTTP, so terminate TLS in a proxy before exposing the server.
+
 #### LLM classifier
 
 Structured-output LLM classifier built on [pydantic-ai](https://github.com/pydantic/pydantic-ai). Supports any OpenAI-compatible provider and includes an optional ClimateBERT pre-filter and [Preserve](https://github.com/kylepollina/preserve) SQLite result cache.
@@ -313,7 +323,7 @@ Supported providers:
 
 | Provider string | Backend | Credentials |
 | :-------------- | :------ | :---------- |
-| `"openai"` | OpenAI API | `OPENAI_API_KEY` env var |
+| `"openai"` | OpenAI API, or any OpenAI-compatible endpoint | `OPENAI_API_KEY` env var; set `OPENAI_BASE_URL` to use another endpoint |
 | `"anthropic"` | Anthropic API | `ANTHROPIC_API_KEY` env var |
 | `"groq"` | Groq API | `GROQ_API_KEY` env var |
 | `"openrouter"` | OpenRouter API | `OPENROUTER_API_KEY` env var |
