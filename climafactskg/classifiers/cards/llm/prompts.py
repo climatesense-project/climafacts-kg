@@ -364,12 +364,14 @@ _XPLAINNLP_NSLP_TAXONOMY = {
 
 XPLAINNLP_NSLP_PROVIDER = "lmstudio"
 XPLAINNLP_NSLP_MODEL = "qwen/qwen3-8b-mlx"
+_XPLAINNLP_NSLP_TAXONOMY_TEXT = "\n".join(f"{k}: {v}" for k, v in _XPLAINNLP_NSLP_TAXONOMY.items())
+
 XPLAINNLP_NSLP_SYSTEM_PROMPT = f"""You are an expert in detecting climate change related disinformation.
 
 Your task is to classify the claim using the provided taxonomy.
 
 Taxonomy:
-{"\n".join([f"{k}: {v}" for k, v in _XPLAINNLP_NSLP_TAXONOMY.items()])}
+{_XPLAINNLP_NSLP_TAXONOMY_TEXT}
 
 Follow this 3-step reasoning process and record it in the reasoning field:
 
