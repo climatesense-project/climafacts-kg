@@ -28,6 +28,8 @@ eval_app = typer.Typer(
     help="Benchmark and report on the CARDS classifiers (needs the `eval` extra).", no_args_is_help=True
 )
 app.add_typer(eval_app, name="eval")
+serve_app = typer.Typer(help="Serve the knowledge graph or a CARDS classifier over HTTP.")
+app.add_typer(serve_app, name="serve")
 
 # Top-level modules the optional `eval` extra provides; importing one without it means the extra is missing.
 _EVAL_EXTRA_MODULES = ("pydantic_evals", "gepa", "gspread", "google")
@@ -575,53 +577,81 @@ def classify(
             print(name)
         raise typer.Exit()
 
-    if classifier == "matcher":
-        from climafactskg.classifiers.cards import CARDSMatcher
+    from climafactskg.classifiers.cards.server import build_classifier
 
-        clf = CARDSMatcher()
-        print(clf.classify(text, context=context))
-        return
-
-    if classifier == "llm":
-        from climafactskg.classifiers.cards import CARDSLLMClassifier
-
-        overrides = {}
-        if provider is not None:
-            overrides["provider"] = provider
-        if model is not None:
-            overrides["model"] = model
-        if cache_path is not None:
-            overrides["cache_path"] = cache_path
-
-        if preset is not None:
-            clf = CARDSLLMClassifier.from_preset(preset, use_preclassifier=not no_preclassifier, **overrides)
-        else:
-            clf = CARDSLLMClassifier(use_preclassifier=not no_preclassifier, **overrides)
-
-        print(clf.classify(text, context=context))
-        return
-
-    from climafactskg.classifiers.cards import CARDSClassifier
-
-    clf = CARDSClassifier(cache_path=cache_path)
+    try:
+        clf = build_classifier(classifier, preset, provider, model, cache_path, no_preclassifier)
+    except ValueError as e:
+        raise typer.BadParameter(str(e)) from e
     print(clf.classify(text, context=context))
 
 
-@app.command()
+def _serve_sparql(rdf: str, rdf_format: str, host: str, port: int) -> None:
+    from climafactskg.endpoints import climafactskg_to_sparql_endpoint, serve_endpoint
+
+    serve_endpoint(climafactskg_to_sparql_endpoint(rdf, format=rdf_format), host=host, port=port)
+
+
+_RDF_HELP = "Path to the RDF file containing the knowledge graph."
+
+
+@serve_app.callback(invoke_without_command=True)
 def serve(
-    rdf: str = typer.Option(
-        "climafacts-kg/data/climafacts_kg.ttl",
-        help="Path to the RDF file containing the knowledge graph.",
-    ),
+    ctx: typer.Context,
+    # Bare `climafactskg serve [--rdf ...]` serves SPARQL, as it did before `serve` became a group.
+    rdf: str = typer.Option("climafacts-kg/data/climafacts_kg.ttl", help=_RDF_HELP, hidden=True),
+    rdf_format: str = typer.Option("ttl", help="Format of the RDF file.", hidden=True),
+    host: str = typer.Option("127.0.0.1", help="Host to bind the SPARQL endpoint.", hidden=True),
+    port: int = typer.Option(8000, help="Port to serve the SPARQL endpoint.", hidden=True),
+):
+    """Serve the knowledge graph (`sparql`) or a CARDS classifier (`classifier`) over HTTP."""
+    if ctx.invoked_subcommand is None:
+        _serve_sparql(rdf, rdf_format, host, port)
+
+
+@serve_app.command(name="sparql")
+def serve_sparql(
+    rdf: str = typer.Option("climafacts-kg/data/climafacts_kg.ttl", help=_RDF_HELP),
     rdf_format: str = typer.Option("ttl", help="Format of the RDF file."),
     host: str = typer.Option("127.0.0.1", help="Host to bind the SPARQL endpoint."),
     port: int = typer.Option(8000, help="Port to serve the SPARQL endpoint."),
 ):
     """Create a SPARQL endpoint for serving a knowledge graph."""
-    from climafactskg.endpoints import climafactskg_to_sparql_endpoint, serve_endpoint
+    _serve_sparql(rdf, rdf_format, host, port)
 
-    app = climafactskg_to_sparql_endpoint(rdf, format=rdf_format)
-    serve_endpoint(app, host=host, port=port)
+
+@serve_app.command(name="classifier")
+def serve_classifier_cmd(
+    classifier: str = typer.Option("transformer", "--classifier", "-c", help="'transformer', 'matcher' or 'llm'."),
+    preset: Optional[str] = typer.Option(None, "--preset", "-p", help="Named LLM preset. LLM only."),
+    provider: Optional[str] = typer.Option(None, "--provider", help="LLM provider override. LLM only."),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="LLM model override. LLM only."),
+    cache_path: Optional[str] = typer.Option(None, "--cache-path", help="Preserve SQLite cache. LLM/transformer only."),
+    no_preclassifier: bool = typer.Option(False, "--no-preclassifier", help="Disable the ClimateBERT gate. LLM only."),
+    host: str = typer.Option("127.0.0.1", help="Host to bind. Use 0.0.0.0 to expose on the network."),
+    port: int = typer.Option(8001, help="Port to serve the classifier on."),
+):
+    """Serve a CARDS classifier over HTTP (POST /classify, POST /classify/batch).
+
+    Set CLIMAFACTSKG_API_KEY (comma-separated for several keys) to require `Authorization: Bearer <key>`.
+    """
+    import os
+
+    from climafactskg.classifiers.cards.server import (
+        API_KEY_ENV,
+        build_classifier,
+        create_classifier_app,
+        parse_api_keys,
+        serve_classifier,
+    )
+
+    try:
+        clf = build_classifier(classifier, preset, provider, model, cache_path, no_preclassifier)
+    except ValueError as e:
+        raise typer.BadParameter(str(e)) from e
+    keys = parse_api_keys(os.getenv(API_KEY_ENV))
+    app = create_classifier_app(clf, name=f"CARDS classifier ({classifier})", api_keys=keys)
+    serve_classifier(app, host=host, port=port, authenticated=bool(keys))
 
 
 # create a command that export the db file to json

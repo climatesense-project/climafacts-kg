@@ -33,7 +33,8 @@ climafactskg process --classifier llm --concurrency 4   # same, via the LLM engi
 climafactskg build                                      # assemble data/climafacts_kg.ttl from the DBs, auto-validates the output
 climafactskg validate                                   # re-check an existing data/climafacts_kg.ttl parses and meets sanity thresholds
 climafactskg classify "some claim text" --classifier matcher
-climafactskg serve                                      # SPARQL endpoint over the built graph
+climafactskg serve sparql                               # SPARQL endpoint over the built graph (bare `serve` still works)
+climafactskg serve classifier -c llm --preset <name>    # HTTP API for a CARDS classifier (classifiers/cards/server.py: /classify, /classify/batch, /healthz)
 climafactskg export
 climafactskg eval context v2                             # build the review-context sidecar for an eval dataset (v1|v2; --force rebuilds)
 climafactskg eval run eval.toml [--dry-run] [--yes] [--report]   # benchmark what a config file names (see eval.example.toml)
